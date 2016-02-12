@@ -33,18 +33,18 @@ class Permutation(object):
           return typemap
         self.universe = universe_slicer
         super(_Permutation, self).__init__(*args, **kwargs)
-        try:
-          if len(kwargs) > 0:
-            trial_param = {}
-            for k in kwargs:
-              trial_param.setdefault(kwargs[k].__class__, set()).add(kwargs[k])
-            items = self.Query(lambda : trial_param)
-            print items
-            if self not in set(items):
-              raise AttributeError(str.format("Object {0} does not fit the membership condition for {1}", obj, obj.__class__))
-        except RuntimeError:
+#        try:
+#          if len(kwargs) > 0:
+#            trial_param = {}
+#            for k in kwargs:
+#              trial_param.setdefault(kwargs[k].__class__, set()).add(kwargs[k])
+#            items = self.Query(lambda : trial_param)
+#            print items
+#            if self not in set(items):
+#              raise AttributeError(str.format("Object {0} does not fit the membership condition for {1}", obj, obj.__class__))
+#        except RuntimeError:
           # all good. should go recursively
-          return 
+#          return 
 
       def __call__(self, from_gc = True):
         return self.Query(self.universe)
