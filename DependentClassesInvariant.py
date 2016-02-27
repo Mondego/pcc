@@ -21,10 +21,18 @@ class Join(object):
       def __init__(s, universe = None):
         if not universe:
           universe = s.__getfromgc__(types)
+        s._original = universe
         s.cl = cl
         self.cl = cl
-        s.universe = [copy.deepcopy(item) for item in universe]
-        #Todo(rohan) Need to associate copied items with originals
+        s.copyrelation = {}
+        s.universe = []
+        for collection in universe:
+          new_collect = []
+          for item in collection:
+            new_item = copy.deepcopy(item)
+            s.copyrelation[item] = new_item
+            new_collect.append(new_item)
+          s.universe.append(new_collect)
         s.items = s.cl.__query__(*s.universe)
 
       def All(s):
@@ -32,25 +40,35 @@ class Join(object):
 
       @Static
       def Create(*args, **kwargs):
+        # Tricky line. Self is top level class. Not _Permutation!
         return self.cl(*args, **kwargs) if self.cl.__invariant__(*args, **kwargs) else None
 
       @Static
       def __invariant__(*args, **kwargs):
+        # Tricky line. Self is top level class. Not _Permutation!
         return self.cl.__invariant__(*args, **kwargs)
         
-      def __getfromgc__(self, types):
+      def __getfromgc__(s, types):
         typemap = {}
         for item in gc.get_objects():
           if type(item) in types:
             typemap.setdefault(item.__class__, set()).add(item)
         return [list(typemap[t]) for t in types]
 
-      def __enter__(self, *args):
-        return self
+      def __enter__(s, *args):
+        return s
 
-      def __exit__(self, *args):
-        #todo(rohan) here is where I should copy back
-        pass
+      def __exit__(s, *args):
+        return s.Merge()
+
+      def Merge(s):
+        try:
+          for item in s.copyrelation:
+            item.__dict__ = s.copyrelation[item].__dict__
+        except TypeError as e:
+          raise TypeError("Immutable collections cannot be merged")
+
+
     return _Join
 
 # This part down is the application
@@ -121,7 +139,7 @@ with RedAlert(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3])) as ras:
 
 for c in [c1p1, c2p1, c1p2]:
   if c.holdstate:
-    print "Card " + c.id + " is under hold"
+    print "Card " + str(c.id) + " is under hold"
 
 
 if not RedAlert.Create(p1, c1p1, t1):
