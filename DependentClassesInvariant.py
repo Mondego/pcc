@@ -1,4 +1,4 @@
-# The preparation for Permutations
+# The preparation for Joins
 import copy, gc
 
 def Static(func):
@@ -11,15 +11,14 @@ def Static(func):
 
   return Func()
 
-class Permutation(object):
+class Join(object):
   def __init__(self, *args):
     self.types = args
 
   def __call__(self, cl):
     types = self.types
-    class _Permutation(object):
+    class _Join(object):
       def __init__(s, universe = None):
-        print "Initialized"
         if not universe:
           universe = s.__getfromgc__(types)
         s.cl = cl
@@ -52,7 +51,7 @@ class Permutation(object):
       def __exit__(self, *args):
         #todo(rohan) here is where I should copy back
         pass
-    return _Permutation
+    return _Join
 
 # This part down is the application
 
@@ -82,7 +81,7 @@ class Person(object):
   def notify(self):
     print "Hey " + str(self.name) + "! Your card is shadyyy!" 
 
-@Permutation(Person, Card, Transaction)
+@Join(Person, Card, Transaction)
 class RedAlert(object):
   def __init__(self, p, c, t):
     self.p = p
@@ -117,7 +116,6 @@ t2 = Transaction(2, 1000)
 t3 = Transaction(0, 10000)
 
 with RedAlert(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3])) as ras:
-  print ras
   for ra in ras.All():
     ra.Protect()
 
@@ -131,4 +129,4 @@ if not RedAlert.Create(p1, c1p1, t1):
 
 
 # Requirements: Constructor and __invariant__ functions
-# of Permutation class (RedAlert) must have same arguments
+# of Join class (RedAlert) must have same arguments

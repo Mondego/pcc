@@ -4,9 +4,9 @@
 import gc, inspect
 
 def Subset(arg):
-  return Permutation(arg)
+  return Join(arg)
 
-class Permutation(object):
+class Join(object):
   def __init__(self, *args):
     self.args = args
 
@@ -15,7 +15,7 @@ class Permutation(object):
       self.cl = args[0]
     
     the_args = self.args
-    class _Permutation(self.cl):
+    class _Join(self.cl):
       def __init__(self, *args, **kwargs):
         def universe_slicer(obj_list = None):
           if obj_list == None:
@@ -32,7 +32,7 @@ class Permutation(object):
 
           return typemap
         self.universe = universe_slicer
-        super(_Permutation, self).__init__(*args, **kwargs)
+        super(_Join, self).__init__(*args, **kwargs)
 #        try:
 #          if len(kwargs) > 0:
 #            trial_param = {}
@@ -48,7 +48,7 @@ class Permutation(object):
 
       def __call__(self, from_gc = True):
         return self.Query(self.universe)
-    return _Permutation
+    return _Join
 
 
 
@@ -90,7 +90,7 @@ class Person(object):
     self.position = (self.position[0], self.position[1] - 1)
 
 
-@Permutation(Car, Person)
+@Join(Car, Person)
 class CarAndPersonNextToEachOther(object):
   def __init__(self, *args, **kwargs):
     if "Car" in kwargs:
@@ -151,7 +151,7 @@ while car1.position[0] != 10 and person1.position[0] != 0:
   print car1.position, person1.position
 
 
-# Trying to create a new object of Permutation type that does not meet condition.
+# Trying to create a new object of Join type that does not meet condition.
 try:
   cp = CarAtPos3(Car = Car(0, (3,0)))
   print cp
