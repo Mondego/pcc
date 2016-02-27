@@ -19,14 +19,17 @@ class Permutation(object):
     types = self.types
     class _Permutation(object):
       def __init__(s, universe = None):
+        print "Initialized"
         if not universe:
           universe = s.__getfromgc__(types)
         s.cl = cl
         self.cl = cl
         s.universe = [copy.deepcopy(item) for item in universe]
+        #Todo(rohan) Need to associate copied items with originals
+        s.items = s.cl.__query__(*s.universe)
 
       def All(s):
-        return s.cl.__query__(*s.universe)
+        return s.items
 
       @Static
       def Create(*args, **kwargs):
@@ -43,6 +46,12 @@ class Permutation(object):
             typemap.setdefault(item.__class__, set()).add(item)
         return [list(typemap[t]) for t in types]
 
+      def __enter__(self, *args):
+        return self
+
+      def __exit__(self, *args):
+        #todo(rohan) here is where I should copy back
+        pass
     return _Permutation
 
 # This part down is the application
@@ -59,8 +68,10 @@ class Card(object):
   def __init__(self, id, owner):
     self.id = id
     self.owner = owner
+    self.holdstate = False
 
   def hold(self):
+    self.holdstate = True
     print "Hold it card " + str(self.id) + "!"
 
 class Person(object):
@@ -105,12 +116,15 @@ t1 = Transaction(1, 100)
 t2 = Transaction(2, 1000)
 t3 = Transaction(0, 10000)
 
-for ra in RedAlert(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3])).All():
-  ra.Protect()
+with RedAlert(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3])) as ras:
+  print ras
+  for ra in ras.All():
+    ra.Protect()
 
-#for ra in RedAlert().All():
-#  ra.Protect()
-# This goes on many times because of deepcopy.
+for c in [c1p1, c2p1, c1p2]:
+  if c.holdstate:
+    print "Card " + c.id + " is under hold"
+
 
 if not RedAlert.Create(p1, c1p1, t1):
   print "Creating a incorrect RedAlert did not work"
