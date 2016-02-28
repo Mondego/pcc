@@ -1,1 +1,1 @@
-# dependent-classes
+# Predicative Collection Classes (PCC)
