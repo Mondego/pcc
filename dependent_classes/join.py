@@ -8,25 +8,19 @@ class Join(object):
   def __call__(self, cl):
     self.cl = cl
     class _Join(self.cl):
+      __dependent_type__ = True
       def __init__(s, *args, **kwargs):
         universe = kwargs["universe"] if "universe" in kwargs else None
         if not universe:
           universe = s.__getfromgc__()
         s._original = universe
-        s.cl = cl
-        s.copyrelation = {}
-        s.universe = []
-        for collection in universe:
-          new_collect = []
-          for item in collection:
-            new_item = copy.deepcopy(item)
-            s.copyrelation[item] = new_item
-            new_collect.append(new_item)
-          s.universe.append(new_collect)
-        s.items = s.cl.__query__(*s.universe)
+        s._cl = cl
+        s._copyrelation = {}
+        s._universe = []
+        s._items = []
 
       def All(s):
-        return s.items
+        return s._items
 
       @staticmethod
       def Create(*args, **kwargs):
@@ -46,6 +40,7 @@ class Join(object):
         return [list(typemap[t]) for t in self.types]
 
       def __enter__(s, *args):
+        s.CreateSnapShot()
         return s
 
       def __exit__(s, *args):
@@ -53,10 +48,22 @@ class Join(object):
 
       def Merge(s):
         try:
-          for item in s.copyrelation:
-            item.__dict__ = s.copyrelation[item].__dict__
+          for item in s._copyrelation:
+            item.__dict__ = s._copyrelation[item].__dict__
         except TypeError as e:
           raise TypeError("Immutable collections cannot be merged")
 
+      def _queryparams(s):
+        return s._universe
+
+      def CreateSnapShot(s):
+        for collection in s._original:
+          new_collect = []
+          for item in collection:
+            new_item = copy.deepcopy(item)
+            s._copyrelation[item] = new_item
+            new_collect.append(new_item)
+          s._universe.append(new_collect)
+        s._items = s._cl.__query__(*s._queryparams())
 
     return _Join
