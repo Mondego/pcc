@@ -1,4 +1,4 @@
-from dependent_classes.join import Join
+﻿from dependent_classes.join import Join
 from dependent_classes.subset import Subset
 
 class Transaction(object):
@@ -47,9 +47,10 @@ class RedAlert(object):
     return c.owner == p.id and t.card == c.id and t.amount > 2000
 
   def Protect(self):
-    self.t.flag()
-    self.c.hold()
-    self.p.notify()
+    #self.t.flag()
+    #self.c.hold()
+    #self.p.notify()
+    self.c.holdstate = True
 
 @Subset(RedAlert)
 class RedAlertWithPersonVishnu(RedAlert):
@@ -84,3 +85,7 @@ with RedAlert(universe = ([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3])) as ras:
 for c in [c1p1, c2p1, c1p2]:
   if c.holdstate:
     print "Card " + str(c.id) + " is under hold"
+
+
+
+

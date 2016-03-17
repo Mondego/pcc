@@ -1,4 +1,4 @@
-import copy, gc
+﻿import copy, gc
 
 class Subset(object):
   def __init__(self, arg):
@@ -8,6 +8,7 @@ class Subset(object):
     self.cl = cl
     if len(cl.mro()) < 1 and type not in set(cl.mro()[1:]):
       raise TypeError("Subset type must derive from type" + str(self.type))
+
     class _Subset(self.cl):
       __dependent_type__ = True
       def __init__(s, *args, **kwargs):
@@ -48,6 +49,7 @@ class Subset(object):
 
       def Merge(s):
         try:
+
           for item in s._copyrelation:
             item.__dict__ = s._copyrelation[item].__dict__
         except TypeError as e:

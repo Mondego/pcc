@@ -1,4 +1,4 @@
-from dependent_classes.join import Join
+﻿from dependent_classes.join import Join
 
 class Transaction(object):
   def __init__(self, card, amount):
@@ -46,9 +46,11 @@ class RedAlert(object):
     return c.owner == p.id and t.card == c.id and t.amount > 2000
 
   def Protect(self):
-    self.t.flag()
-    self.c.hold()
-    self.p.notify()
+    #Functions Dont work!! Have to manipulate variables directly.
+    #self.t.flag()
+    #self.c.hold()
+    #self.p.notify()
+    self.c.holdstate = True
 
 
 p1 = Person(0, "Vishnu")

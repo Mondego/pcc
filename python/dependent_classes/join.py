@@ -1,4 +1,4 @@
-import copy
+﻿import copy
 import gc
 
 class Join(object):
@@ -7,6 +7,17 @@ class Join(object):
 
   def __call__(self, cl):
     self.cl = cl
+    
+    class _Container(object):
+      def __init__(s):
+        s.__pcc_touched = set()
+
+      def __setattr__(s, arg, value):
+        if arg != "_Container__pcc_touched":
+          s.__pcc_touched.add(arg)
+        return super(_Container, s).__setattr__(arg, value)
+      pass
+
     class _Join(self.cl):
       __dependent_type__ = True
       def __init__(s, *args, **kwargs):
@@ -60,7 +71,8 @@ class Join(object):
         for collection in s._original:
           new_collect = []
           for item in collection:
-            new_item = copy.deepcopy(item)
+            new_item = _Container()
+            new_item.__dict__.update(copy.deepcopy(item.__dict__))
             s._copyrelation[item] = new_item
             new_collect.append(new_item)
           s._universe.append(new_collect)
