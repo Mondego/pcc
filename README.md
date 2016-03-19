@@ -1,1 +1,1 @@
-# Predicative Collection Classes (PCC)
+# Predicate Collection Classes (PCC)
