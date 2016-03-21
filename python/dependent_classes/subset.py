@@ -51,7 +51,7 @@ class Subset(object):
         try:
 
           for item in s._copyrelation:
-            item.__dict__ = s._copyrelation[item].__dict__
+            item.__dict__.update(s._copyrelation[item].__dict__)
         except TypeError as e:
           raise TypeError("Immutable collections cannot be merged")
 
