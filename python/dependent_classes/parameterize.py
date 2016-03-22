@@ -1,4 +1,4 @@
-import copy, gc
+﻿import copy, gc
 
 def Parameterize(cl):
   if len(cl.mro()) < 2:
@@ -6,6 +6,7 @@ def Parameterize(cl):
   class _Parameterize(cl):
     __dependent_type__ = True
     def __init__(s, *args, **kwargs):
+      super(_Parameterize, s).__init__(*args, **kwargs)
       if "params" not in kwargs:
         raise TypeError("Parameter needed to initialize Parameterized type")
       try:
@@ -14,7 +15,7 @@ def Parameterize(cl):
       except AttributeError as e:
         raise TypeError("Can only parameterize other dependent types")
       s.params = kwargs["params"]
-      super(_Parameterize, s).__init__(*args, **kwargs)
+      
       
     def _queryparams(s):
       return tuple(list(super(_Parameterize, s)._queryparams()) + list(s.params))

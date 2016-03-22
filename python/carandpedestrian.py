@@ -28,9 +28,7 @@ class CarSprite(pygame.sprite.Sprite):
     oldx, oldy, oldz = self.car.old_position
     x, y, z = self.car.position
     if x != oldx or y != oldy:
-      print "Changing position", (x - oldx, y - oldy)
       self.rect.move_ip((x - oldx, y - oldy))
-      print "Changed position" 
       self.car.old_position = self.car.position
   
 
@@ -84,28 +82,29 @@ class PedestrianSprites(pygame.sprite.Sprite):
     self.ped = ped
     pygame.sprite.Sprite.__init__(self) 
     self.image, self.rect = load_image('images/man-walking-small.gif',-1)
+    self.rect.move_ip((self.ped.X, self.ped.Y))
 
   def update(self):
-    if self.ped.X != self.ped.oldX and self.ped.Y != self.ped.oldY:
+    if self.ped.X != self.ped.oldX or self.ped.Y != self.ped.oldY:
+      print "Starting to change position"
       self.rect.move_ip((self.ped.X - self.ped.oldX, self.ped.Y - self.ped.oldY)) 
       self.ped.oldX, self.ped.oldY = self.ped.X, self.ped.Y
           
 class Pedestrian(object):
-  INITIAL_POSITION = (650, 0)
+  INITIAL_POSITION = (400, 0)
   SPEED = 10
   def __init__(self):
     self.ID = hash(self)
-    self.X, self.Y = INITIAL_POSITION
-    self.oldX, self.oldY = INITIAL_POSITION
-    return super(Pedestrian, self).__init__(*groups)
+    self.X, self.Y = Pedestrian.INITIAL_POSITION
+    self.oldX, self.oldY = Pedestrian.INITIAL_POSITION
 
   def Move(self):
-    self.X -= SPEED
+    self.X -= Pedestrian.SPEED
     if self.X <= 0:
       self.Stop()
 
   def Stop(self):
-    self.X, self.Y = INITIAL_POSITION
+    self.X, self.Y = Pedestrian.INITIAL_POSITION
 
   def SetPosition(self, x):
     self.X = x
@@ -141,17 +140,17 @@ class PedestrianInDanger(Pedestrian):
   def __query__(pedestrians, cars):
     return [p 
      for p in pedestrians
-     if Walker.__invariant__(p, cars)]
+     if PedestrianInDanger.__invariant__(p, cars)]
 
   @staticmethod
   def __invariant__(p, cars):
     for c in cars:
       cx, cy, cz = c.position
-      if cy == p.Y and  abs(cx - p.X) < 130:
+      if cy == p.Y and  abs(cx - p.X) < 30:
         return True
     return False
 
-  def Move(self):
+  def Avoid(self):
     self.Y += 50
 
 class PyManMain(object):
@@ -227,6 +226,36 @@ def CruiseControl(cars, MainWindow):
   engines.join()
   drivetrain.join()
 
+def startWalking(peds, MainWindow, pedsprites):
+  while True:
+    with StoppedPedestrian(universe = peds) as sps:
+      for ped in sps.All():
+        MainWindow.RegisterSpriteForRender(pedsprites[ped.ID])
+        ped.Move()
+        break
+    _sleep(5)
+
+def movepeds(peds, cars, MainWindow):
+  while True:
+    with PedestrianInDanger(universe = peds, params = (cars,)) as pids, Walker(universe = peds) as wks:
+      for pid in pids.All():
+        pid.Avoid()
+      for wk in wks.All():
+        wk.Move()
+
+def WalkingControl(peds, cars, MainWindow):
+  pedsprites = dict([(ped.ID, PedestrianSprites(ped)) for ped in peds]) 
+  walkers = Thread(target = startWalking, args = (peds, MainWindow, pedsprites))
+  walkers.daemon = True
+  walkers.start()
+
+  pedmovers = Thread(target = movepeds, args = (peds, cars, MainWindow))
+  pedmovers.daemon = True
+  pedmovers.start()
+
+  walkers.join()
+  pedmovers.join()
+
 
 
 if __name__ == "__main__":
@@ -235,15 +264,15 @@ if __name__ == "__main__":
   carController = Thread(target = CruiseControl, args = (cars, MainWindow))
   carController.daemon = True
   
-  #pedestrians = [Pedestrian()] * 4
-  #pedController = Thread(target = WalkingControl, args = (pedestrians, MainWindow))
-  #pedController.daemon = True
+  pedestrians = [Pedestrian()]
+  pedController = Thread(target = WalkingControl, args = (pedestrians, cars, MainWindow))
+  pedController.daemon = True
   
   gfx = Thread(target = MainWindow.MainLoop)
   gfx.daemon = True
 
   gfx.start()
   carController.start()
-  #pedController.start()
+  pedController.start()
   
   gfx.join()
