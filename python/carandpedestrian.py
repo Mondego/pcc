@@ -86,7 +86,6 @@ class PedestrianSprites(pygame.sprite.Sprite):
 
   def update(self):
     if self.ped.X != self.ped.oldX or self.ped.Y != self.ped.oldY:
-      print "Starting to change position"
       self.rect.move_ip((self.ped.X - self.ped.oldX, self.ped.Y - self.ped.oldY)) 
       self.ped.oldX, self.ped.oldY = self.ped.X, self.ped.Y
           
@@ -146,7 +145,7 @@ class PedestrianInDanger(Pedestrian):
   def __invariant__(p, cars):
     for c in cars:
       cx, cy, cz = c.position
-      if cy == p.Y and  abs(cx - p.X) < 30:
+      if cy == p.Y and  abs(cx - p.X) < 70:
         return True
     return False
 
@@ -233,7 +232,7 @@ def startWalking(peds, MainWindow, pedsprites):
         MainWindow.RegisterSpriteForRender(pedsprites[ped.ID])
         ped.Move()
         break
-    _sleep(5)
+    _sleep(3)
 
 def movepeds(peds, cars, MainWindow):
   while True:
@@ -242,6 +241,7 @@ def movepeds(peds, cars, MainWindow):
         pid.Avoid()
       for wk in wks.All():
         wk.Move()
+    _sleep(0.5)
 
 def WalkingControl(peds, cars, MainWindow):
   pedsprites = dict([(ped.ID, PedestrianSprites(ped)) for ped in peds]) 
