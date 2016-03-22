@@ -1,4 +1,7 @@
-﻿import copy, gc
+﻿import copy, gc, types
+
+
+      
 
 class Subset(object):
   def __init__(self, arg):
@@ -12,6 +15,7 @@ class Subset(object):
     class _Subset(self.cl):
       __dependent_type__ = True
       def __init__(s, *args, **kwargs):
+        s._startTrack = False
         universe = kwargs["universe"] if "universe" in kwargs else None
         if not universe:
           universe = s.__getfromgc__()
@@ -20,8 +24,13 @@ class Subset(object):
         s._copyrelation = {}
         s._universe = []
         s._items = []
+        s._objectchanges = []
         
-
+      def __setattr__(s, arg, value):
+        if "_startTrack" not in arg and s._startTrack and "_objectchanges" not in arg:
+          s._objectchanges.append(arg)
+        return super(_Subset, s).__setattr__(arg, value)
+        
       def All(s):
         return s._items
 
@@ -51,18 +60,22 @@ class Subset(object):
         try:
 
           for item in s._copyrelation:
-            item.__dict__.update(s._copyrelation[item].__dict__)
+            for arg in s._copyrelation[item]._objectchanges:
+              item.__dict__[arg] = s._copyrelation[item].__dict__[arg]
         except TypeError as e:
-          raise TypeError("Immutable collections cannot be merged")
+          raise TypeError("Immutable collections cannot be merged" + e.message)
 
       def CreateSnapShot(s):
         for item in s._original:
           new_item = copy.deepcopy(item)
+          new_item.__class__ = s.__class__
+          new_item._startTrack = True
+          new_item._objectchanges = []
+          #new_item.__setattr__ = types.MethodType(__setattr__, new_item, self.cl)
           s._copyrelation[item] = new_item
           s._universe.append(new_item)
         s._items = s._cl.__query__(*s._queryparams())
-        for item in s._items:
-          item.__class__ = self.cl
+          
 
 
     return _Subset

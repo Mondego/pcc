@@ -3,7 +3,7 @@ from dependent_classes.parameterize import Parameterize
 from pygame.locals import *
 import pygame, sys, os
 from time import sleep
-from threading import Thread
+from threading import Thread, _sleep
 
 def load_image(fullname, colorkey=None):
   try:
@@ -23,22 +23,25 @@ class CarSprite(pygame.sprite.Sprite):
     self.car = car
     pygame.sprite.Sprite.__init__(self) 
     self.image, self.rect = load_image('images/car-small.gif',-1)
-    
+   
   def update(self):
     oldx, oldy, oldz = self.car.old_position
     x, y, z = self.car.position
-    if x != oldx and y != oldy:
-      self.rect.move_ip((x - old_x, y - old_y)) 
+    if x != oldx or y != oldy:
+      print "Changing position", (x - oldx, y - oldy)
+      self.rect.move_ip((x - oldx, y - oldy))
+      print "Changed position" 
       self.car.old_position = self.car.position
+  
 
 class Car(object):
   FINAL_POSITION = 500
-  SPEED = 40
+  SPEED = 10
   def __init__(self, position):
     self.old_position = position
     self.position = position
     self.velocity = None
-    self.id = hash(self)
+    self.ID = hash(self)
   
     
 @Subset(Car)
@@ -72,7 +75,7 @@ class ActiveCar(Car):
     x,y,z = self.position
     xvel, yvel, zvel = self.velocity
     self.position = (x + xvel, y + yvel, z + zvel)
-
+    
   def Stop(self):
     self.position, self.velocity = (0,0,0), (0,0,0)
 
@@ -174,19 +177,20 @@ class PyManMain(object):
     self.background = self.background.convert()
     self.background.fill((255,255,255))
     while True:
+      self.screen.blit(self.background, (0, 0))
       self.LoadNewSprites()
       for sp in self.PresentSprites:
         sp.update()
+      groups = pygame.sprite.RenderPlain(tuple(self.PresentSprites))
+      groups.draw(self.screen)
       pygame.display.flip()
       events = pygame.event.get(pygame.QUIT)
       if events:
         sys.exit(0)
-      sleep(0.2)
+      _sleep(0.5)
 
   def LoadNewSprites(self):
     if self.NewSprites:
-      groups = pygame.sprite.RenderPlain(tuple(self.NewSprites))
-      groups.draw(self.screen)
       self.PresentSprites += self.NewSprites
       self.NewSprites = []
 
@@ -194,22 +198,25 @@ class PyManMain(object):
     self.NewSprites.append(sp)
 
 
-def startEngines(cars, MainWindow):
-  with InactiveCar(universe = cars) as iacs:
-    for car in iacs.All():
-      car.Start()
-      MainWindow.RegisterSpriteForRender(CarSprite(car))
-      sleep(3)
+def startEngines(cars, MainWindow, carsprites):
+  while True:
+    with InactiveCar(universe = cars) as iacs:
+      for car in iacs.All():
+        car.Start()
+        MainWindow.RegisterSpriteForRender(carsprites[car.ID])
+        break
+    _sleep(5)
 
 def movecars(cars, MainWindow):
   while True:
     with ActiveCar(universe = cars) as acs:
       for car in acs.All():
         car.Move()
-        sleep(0.2)
+        _sleep(0.3)
 
 def CruiseControl(cars, MainWindow):
-  engines = Thread(target = startEngines, args = (cars, MainWindow))
+  carsprites = dict([(car.ID, CarSprite(car)) for car in cars]) 
+  engines = Thread(target = startEngines, args = (cars, MainWindow, carsprites))
   engines.daemon = True
   engines.start()
 
@@ -224,7 +231,7 @@ def CruiseControl(cars, MainWindow):
 
 if __name__ == "__main__":
   MainWindow = PyManMain()
-  cars = [Car((0,0,0))] * 1
+  cars = [Car((0,0,0)), Car((0,0,0)), Car((0,0,0)), Car((0,0,0))]
   carController = Thread(target = CruiseControl, args = (cars, MainWindow))
   carController.daemon = True
   
