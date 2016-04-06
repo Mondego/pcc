@@ -1,4 +1,5 @@
-﻿from dependent_classes.join import Join
+﻿from pcc.join import join
+from pcc.dataframe import dataframe
 
 class Transaction(object):
   def __init__(self, card, amount):
@@ -26,7 +27,7 @@ class Person(object):
   def notify(self):
     print "Hey " + str(self.name) + "! Your card is shadyyy!" 
 
-@Join(Person, Card, Transaction)
+@join(Person, Card, Transaction)
 class RedAlert(object):
   def __init__(self, p, c, t):
     self.p = p
@@ -62,7 +63,7 @@ t1 = Transaction(1, 100)
 t2 = Transaction(2, 1000)
 t3 = Transaction(0, 10000)
 
-with RedAlert(universe = ([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3])) as ras:
+with RedAlert(universe = dataframe(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]))) as ras:
   for ra in ras.All():
     ra.Protect()
 
@@ -70,8 +71,9 @@ for c in [c1p1, c2p1, c1p2]:
   if c.holdstate:
     print "Card " + str(c.id) + " is under hold"
 
-
-if not RedAlert.Create(p1, c1p1, t1):
+try:
+  RedAlert.Create(p1, c1p1, t1)
+except TypeError:
   print "Creating a incorrect RedAlert did not work"
 
 

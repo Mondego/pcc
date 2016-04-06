@@ -1,4 +1,5 @@
-from dependent_classes.subset import Subset
+from pcc.subset import subset
+from pcc.dataframe import dataframe
 
 class Transaction(object):
   def __init__(self, card, amount):
@@ -10,7 +11,7 @@ class Transaction(object):
     print str(self.card) + "/" + str(self.amount) + ": This transaction is " + ("suspicious" if self.suspicious else " not suspicious")
 
 
-@Subset(Transaction)
+@subset(Transaction)
 class HighValueTransaction(Transaction):
   @staticmethod
   def __query__(transactions):
@@ -30,7 +31,7 @@ t1 = Transaction(1, 100)
 t2 = Transaction(2, 1000)
 t3 = Transaction(0, 10000)
 
-with HighValueTransaction(universe = [t1, t2, t3]) as hvts:
+with HighValueTransaction(universe = dataframe([t1, t2, t3])) as hvts:
   for hvt in hvts.All():
     hvt.flag()
 

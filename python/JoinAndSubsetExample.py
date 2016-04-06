@@ -1,5 +1,6 @@
-﻿from dependent_classes.join import Join
-from dependent_classes.subset import Subset
+﻿from pcc.join import join
+from pcc.subset import subset
+from pcc.dataframe import dataframe
 
 class Transaction(object):
   def __init__(self, card, amount):
@@ -27,7 +28,7 @@ class Person(object):
   def notify(self):
     print "Hey " + str(self.name) + "! Your card is shadyyy!" 
 
-@Join(Person, Card, Transaction)
+@join(Person, Card, Transaction)
 class RedAlert(object):
   def __init__(self, p, c, t):
     self.p = p
@@ -47,13 +48,12 @@ class RedAlert(object):
     return c.owner == p.id and t.card == c.id and t.amount > 2000
 
   def Protect(self):
-    #self.t.flag()
-    #self.c.hold()
-    #self.p.notify()
-    self.c.holdstate = True
+    self.t.flag()
+    self.c.hold()
+    self.p.notify()
 
-@Subset(RedAlert)
-class RedAlertWithPersonVishnu(RedAlert):
+@subset(RedAlert)
+class RedAlertWithPersonVishnu(RedAlert.Class()):
   @staticmethod
   def __query__(redalerts):
     return [ra 
@@ -77,8 +77,8 @@ t3 = Transaction(0, 10000)
 #Also RedAlert Card but not Vishnu's
 t4 = Transaction(3, 10000)
 
-with RedAlert(universe = ([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3])) as ras:
-  with RedAlertWithPersonVishnu(universe = ras.All()) as rawpvs:
+with RedAlert(universe = dataframe(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]), retain_types = True)) as ras:
+  with RedAlertWithPersonVishnu(universe = dataframe(ras.All(), retain_types = True)) as rawpvs:
     for ra in rawpvs.All():
       ra.Protect()
 

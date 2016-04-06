@@ -1,16 +1,16 @@
-﻿import copy, gc
 
-def Parameterize(cl):
-  if len(cl.mro()) < 2:
+def parameterize(pcc_class):
+  # parameterize should be on pcc classes only
+  if len(pcc_class.mro()) < 2:
     raise TypeError("Parameter type must derive from some type")
-  class _Parameterize(cl):
+  class _Parameterize(pcc_class):
     __dependent_type__ = True
     def __init__(s, *args, **kwargs):
       super(_Parameterize, s).__init__(*args, **kwargs)
       if "params" not in kwargs:
         raise TypeError("Parameter needed to initialize Parameterized type")
       try:
-        if not cl.__dependent_type__:
+        if not pcc_class.__dependent_type__:
           raise TypeError("Can only parameterize other dependent types")
       except AttributeError as e:
         raise TypeError("Can only parameterize other dependent types")

@@ -1,5 +1,6 @@
-﻿from dependent_classes.subset import Subset
-from dependent_classes.parameterize import Parameterize
+﻿from pcc.subset import subset
+from pcc.parameterize import parameterize
+from pcc.dataframe import dataframe
 from pygame.locals import *
 import pygame, sys, os
 from time import sleep
@@ -42,7 +43,7 @@ class Car(object):
     self.ID = hash(self)
   
     
-@Subset(Car)
+@subset(Car)
 class InactiveCar(Car):
   @staticmethod
   def __query__(cars):
@@ -57,7 +58,7 @@ class InactiveCar(Car):
   def Start(self):
     self.velocity = (Car.SPEED, 0, 0)
 
-@Subset(Car)
+@subset(Car)
 class ActiveCar(Car):
   @staticmethod
   def __query__(cars):
@@ -108,7 +109,7 @@ class Pedestrian(object):
   def SetPosition(self, x):
     self.X = x
 
-@Subset(Pedestrian)
+@subset(Pedestrian)
 class StoppedPedestrian(Pedestrian):
   @staticmethod
   def __query__(pedestrians):
@@ -120,7 +121,7 @@ class StoppedPedestrian(Pedestrian):
   def __invariant__(p):
     return p.X, p.Y == Pedestrian.INITIAL_POSITION
 
-@Subset(Pedestrian)
+@subset(Pedestrian)
 class Walker(Pedestrian):
   @staticmethod
   def __query__(pedestrians):
@@ -132,8 +133,8 @@ class Walker(Pedestrian):
   def __invariant__(p):
     return p.X, p.Y != Pedestrian.INITIAL_POSITION
 
-@Parameterize
-@Subset(Pedestrian)
+@parameterize
+@subset(Pedestrian)
 class PedestrianInDanger(Pedestrian):
   @staticmethod
   def __query__(pedestrians, cars):
@@ -198,7 +199,7 @@ class PyManMain(object):
 
 def startEngines(cars, MainWindow, carsprites):
   while True:
-    with InactiveCar(universe = cars) as iacs:
+    with InactiveCar(universe = dataframe(cars)) as iacs:
       for car in iacs.All():
         car.Start()
         MainWindow.RegisterSpriteForRender(carsprites[car.ID])
@@ -207,7 +208,7 @@ def startEngines(cars, MainWindow, carsprites):
 
 def movecars(cars, MainWindow):
   while True:
-    with ActiveCar(universe = cars) as acs:
+    with ActiveCar(universe = dataframe(cars)) as acs:
       for car in acs.All():
         car.Move()
         _sleep(0.3)
@@ -227,7 +228,7 @@ def CruiseControl(cars, MainWindow):
 
 def startWalking(peds, MainWindow, pedsprites):
   while True:
-    with StoppedPedestrian(universe = peds) as sps:
+    with StoppedPedestrian(universe = dataframe(peds)) as sps:
       for ped in sps.All():
         MainWindow.RegisterSpriteForRender(pedsprites[ped.ID])
         ped.Move()
@@ -236,7 +237,7 @@ def startWalking(peds, MainWindow, pedsprites):
 
 def movepeds(peds, cars, MainWindow):
   while True:
-    with PedestrianInDanger(universe = peds, params = (cars,)) as pids, Walker(universe = peds) as wks:
+    with PedestrianInDanger(universe = dataframe(peds), params = (cars,)) as pids, Walker(universe = dataframe(peds)) as wks:
       for pid in pids.All():
         pid.Avoid()
       for wk in wks.All():

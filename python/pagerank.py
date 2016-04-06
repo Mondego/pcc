@@ -1,5 +1,6 @@
-from dependent_classes.subset import Subset
-from dependent_classes.parameterize import Parameterize
+from pcc.subset import subset
+from pcc.parameterize import parameterize
+from pcc.dataframe import dataframe
 
 class Node(object):
   def __init__(self, id, pagerank):
@@ -9,27 +10,27 @@ class Edge(object):
   def __init__(self, n1, n2):
     self.n1, self.n2 = (n1, n2)
 
-@Parameterize
-@Subset(Edge)
+@parameterize
+@subset(Edge)
 class InEdge(Edge):
   @staticmethod
   def __query__(edges, n):
     return [e
       for e in edges
-      if InEdge.__invariant__(e) and e.n2 == n.id]
+      if InEdge.__invariant__(e) and e.n2.id == n.id]
 
   @staticmethod
   def __invariant__(e):
     return True
 
-@Parameterize
-@Subset(Edge)
+@parameterize
+@subset(Edge)
 class OutEdge(Edge):
   @staticmethod
   def __query__(edges, n):
     return [e
       for e in edges
-      if OutEdge.__invariant__(e) and e.n1 == n.id]
+      if OutEdge.__invariant__(e) and e.n1.id == n.id]
 
   @staticmethod
   def __invariant__(e):
@@ -41,24 +42,12 @@ def CreateNodesAndEdges():
   for i in range(4):
     nodes.append(Node(i, 0.25))
 
-  # Very problematic because of copy semantics.
-  #edges.append(Edge(nodes[0],nodes[1]))
-  #edges.append(Edge(nodes[0],nodes[2]))
-  #edges.append(Edge(nodes[0],nodes[3]))
-  #edges.append(Edge(nodes[1],nodes[2]))
-  #edges.append(Edge(nodes[3],nodes[2]))
-  edges.append(Edge(0,1))
-  edges.append(Edge(0,2))
-  edges.append(Edge(0,3))
-  edges.append(Edge(1,2))
-  edges.append(Edge(3,2))
-
+  edges.append(Edge(nodes[0],nodes[1]))
+  edges.append(Edge(nodes[0],nodes[2]))
+  edges.append(Edge(nodes[0],nodes[3]))
+  edges.append(Edge(nodes[1],nodes[2]))
+  edges.append(Edge(nodes[3],nodes[2]))
   return nodes, edges
-
-def GetNodeFromId(nodes, id):
-  for n in nodes:
-    if n.id == id:
-      return n
 
 nodes, edges = CreateNodesAndEdges()
 largest_change = 100
@@ -70,10 +59,11 @@ while largest_change > allowed_delta:
   for n in nodes:
     old = n.pagerank
     sum = 0.0
-    with InEdge(universe = edges, params = (n,)) as ies:
+    df = dataframe(edges)
+    with InEdge(universe = df, params = (n,)) as ies:
       for ie in ies.All():
-        contributor = GetNodeFromId(nodes, ie.n1)
-        with OutEdge(universe = edges, params = (contributor,)) as oes:
+        contributor = ie.n1
+        with OutEdge(universe = df, params = (contributor,), nomerge = True) as oes:
           sum += contributor.pagerank / len(oes.All())
     n.pagerank = ((1.0 - damp) / len(nodes)) + (damp * sum)
     diff = n.pagerank - old

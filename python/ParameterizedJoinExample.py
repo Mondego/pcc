@@ -1,5 +1,6 @@
-from dependent_classes.join import Join
-from dependent_classes.parameterize import Parameterize
+from pcc.join import join
+from pcc.parameterize import parameterize
+from pcc.dataframe import dataframe
 
 class Transaction(object):
   def __init__(self, card, amount):
@@ -27,8 +28,8 @@ class Person(object):
   def notify(self):
     print "Hey " + str(self.name) + "! Your card is shadyyy!" 
 
-@Parameterize
-@Join(Person, Card, Transaction)
+@parameterize
+@join(Person, Card, Transaction)
 class RedAlertOnPerson(object):
   def __init__(self, p, c, t):
     self.p = p
@@ -65,7 +66,7 @@ t3 = Transaction(0, 10000)
 #Also RedAlert Card but not Vishnu's
 t4 = Transaction(3, 10000)
 
-with RedAlertOnPerson(universe = ([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]), params = (p1,)) as ras:
+with RedAlertOnPerson(universe = dataframe(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]), retain_types = True), params = (p1,)) as ras:
   for ra in ras.All():
     ra.Protect()
 
