@@ -1,4 +1,4 @@
-
+﻿
 class projection(object):
   def __init__(self, of_class):
     # Class that it is going to be a projection of.
@@ -12,6 +12,16 @@ class projection(object):
     # The pcc projection class being cooked right here. 
     class _Projection(object):
       __dependent_type__ = True
+      __ENTANGLED_TYPES__ = [self.type]
+      __PCC_BASE_TYPE__ = False
+      __pcc_bases__ = set([self.type]).union(
+          actual_class.__pcc_bases__ 
+          if hasattr(actual_class, "__pcc_bases__") else 
+          set())
+      __start_tracking__ = False
+      
+      #__dimensions__ = actual_class.__dimensions__ if hasattr(actual_class, "__dimensions__") else set()
+
       
       def __init__(s, *args, **kwargs):
         s._dataframe_universe = kwargs["universe"] if "universe" in kwargs else None

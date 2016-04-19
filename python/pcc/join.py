@@ -1,4 +1,4 @@
-class join(object):
+﻿class join(object):
   def __init__(self, *classes):
     # List of classes that are part of join
     # should create a class when it gets called
@@ -8,7 +8,12 @@ class join(object):
     # actual_class the class that is being passed from application.
     class _Join(object):
       __dependent_type__ = True
-
+      __ENTANGLED_TYPES__ = self.types
+      __PCC_BASE_TYPE__ = False
+      __pcc_bases__ = set([self.type]).union(set([tp.__pcc_bases__ for tp in self.types if hasattr(tp, "__pcc_bases__")]))
+      __start_tracking__ = False
+      
+      
       def __init__(s, **kwargs):
         # kwargs just needs to have universe
         # unless it is parameterized, in which case it can have params also
