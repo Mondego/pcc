@@ -10,7 +10,7 @@ class Edge(object):
   def __init__(self, n1, n2):
     self.n1, self.n2 = (n1, n2)
 
-@parameterize
+@parameterize(Node)
 @subset(Edge)
 class InEdge(Edge):
   @staticmethod
@@ -23,7 +23,7 @@ class InEdge(Edge):
   def __invariant__(e):
     return True
 
-@parameterize
+@parameterize(Node)
 @subset(Edge)
 class OutEdge(Edge):
   @staticmethod

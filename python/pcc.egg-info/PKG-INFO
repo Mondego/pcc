@@ -1,0 +1,18 @@
+Metadata-Version: 1.1
+Name: pcc
+Version: 0.0.1
+Summary: Predicate collection classes
+Home-page: https://github.com/Mondego/pcc
+Author: Rohan Achar
+Author-email: ra.rohan@gmail.com
+License: MIT
+Description: Needs to be one level up.
+Keywords: predicate collection classes,design patterns
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Design Patterns
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
