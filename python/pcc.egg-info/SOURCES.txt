@@ -1,9 +1,12 @@
 setup.py
 pcc/__init__.py
+pcc/attributes.py
 pcc/dataframe.py
 pcc/join.py
 pcc/parameterize.py
 pcc/projection.py
+pcc/recursive_dictionary.py
+pcc/set.py
 pcc/subset.py
 pcc.egg-info/PKG-INFO
 pcc.egg-info/SOURCES.txt

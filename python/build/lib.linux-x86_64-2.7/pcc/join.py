@@ -1,4 +1,6 @@
-﻿class join(object):
+﻿from set import PCCMeta
+
+class join(object):
   def __init__(self, *classes):
     # List of classes that are part of join
     # should create a class when it gets called
@@ -7,7 +9,7 @@
   def __call__(self, actual_class):
     # actual_class the class that is being passed from application.
     class _Join(object):
-      #__metaclass__ = PCCMeta(actual_class)
+      __metaclass__ = PCCMeta(actual_class)
       __dependent_type__ = True
       __ENTANGLED_TYPES__ = self.types
       __PCC_BASE_TYPE__ = False
