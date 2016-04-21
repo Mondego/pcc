@@ -3,7 +3,6 @@ from threading import currentThread
 from recursive_dictionary import RecursiveDictionary
 
 def get_type(obj):
-  def get_type(obj):
   # both iteratable/dictionary + object type is messed up. Won't work.
   try:
     if hasattr(obj, "__dependent_type__"):
