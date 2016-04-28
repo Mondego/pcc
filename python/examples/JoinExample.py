@@ -40,10 +40,10 @@ class RedAlert(object):
      for p in persons 
      for c in cards 
      for t in transactions
-     if RedAlert.__invariant__(p, c, t)]
+     if RedAlert.__predicate__(p, c, t)]
 
   @staticmethod
-  def __invariant__(p, c, t):
+  def __predicate__(p, c, t):
     return c.owner == p.id and t.card == c.id and t.amount > 2000
 
   def Protect(self):
@@ -77,5 +77,5 @@ except TypeError:
   print "Creating a incorrect RedAlert did not work"
 
 
-# Requirements: Constructor and __invariant__ functions
+# Requirements: Constructor and __predicate__ functions
 # of Join class (RedAlert) must have same arguments

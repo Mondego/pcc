@@ -49,10 +49,10 @@ class InactiveCar(Car):
   def __query__(cars):
     return [c 
      for c in cars
-     if InactiveCar.__invariant__(c)]
+     if InactiveCar.__predicate__(c)]
 
   @staticmethod
-  def __invariant__(c):
+  def __predicate__(c):
     return c.velocity == (0, 0, 0) or c.velocity == None
 
   def Start(self):
@@ -64,10 +64,10 @@ class ActiveCar(Car):
   def __query__(cars):
     return [c 
      for c in cars
-     if ActiveCar.__invariant__(c)]
+     if ActiveCar.__predicate__(c)]
 
   @staticmethod
-  def __invariant__(c):
+  def __predicate__(c):
     return not (c.velocity == (0, 0, 0) or c.velocity == None)
 
   def Move(self):
@@ -115,10 +115,10 @@ class StoppedPedestrian(Pedestrian):
   def __query__(pedestrians):
     return [p 
      for p in pedestrians
-     if StoppedPedestrian.__invariant__(p)]
+     if StoppedPedestrian.__predicate__(p)]
 
   @staticmethod
-  def __invariant__(p):
+  def __predicate__(p):
     return p.X, p.Y == Pedestrian.INITIAL_POSITION
 
 @subset(Pedestrian)
@@ -127,10 +127,10 @@ class Walker(Pedestrian):
   def __query__(pedestrians):
     return [p 
      for p in pedestrians
-     if Walker.__invariant__(p)]
+     if Walker.__predicate__(p)]
 
   @staticmethod
-  def __invariant__(p):
+  def __predicate__(p):
     return p.X, p.Y != Pedestrian.INITIAL_POSITION
 
 @parameterize
@@ -140,10 +140,10 @@ class PedestrianInDanger(Pedestrian):
   def __query__(pedestrians, cars):
     return [p 
      for p in pedestrians
-     if PedestrianInDanger.__invariant__(p, cars)]
+     if PedestrianInDanger.__predicate__(p, cars)]
 
   @staticmethod
-  def __invariant__(p, cars):
+  def __predicate__(p, cars):
     for c in cars:
       cx, cy, cz = c.position
       if cy == p.Y and  abs(cx - p.X) < 70:

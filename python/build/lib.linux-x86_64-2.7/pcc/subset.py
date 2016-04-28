@@ -38,8 +38,8 @@ class subset(object):
         return actual_class
 
       @staticmethod
-      def __invariant__(*args, **kwargs):
-        return actual_class.__invariant__(*args, **kwargs)
+      def __predicate__(*args, **kwargs):
+        return actual_class.__predicate__(*args, **kwargs)
 
       def __create__(s, base_set_obj):
         return s._dataframe_universe._change_type(base_set_obj, actual_class)

@@ -43,7 +43,7 @@ class join(object):
       def Create(*args, **kwargs):
         # The function that allows creation of the object.
         # If invariant is satisfied.
-        if actual_class.__invariant__(*args, **kwargs):
+        if actual_class.__predicate__(*args, **kwargs):
           return actual_class(*args, **kwargs)
         else:
           raise TypeError("Invariant for " 
@@ -54,8 +54,8 @@ class join(object):
               + str(kwargs))
 
       @staticmethod
-      def __invariant__(*args, **kwargs):
-        return actual_class.__invariant__(*args, **kwargs)
+      def __predicate__(*args, **kwargs):
+        return actual_class.__predicate__(*args, **kwargs)
 
       def All(s):
         return s._items

@@ -17,10 +17,10 @@ class HighValueTransaction(Transaction):
   def __query__(transactions):
     return [t 
      for t in transactions
-     if HighValueTransaction.__invariant__(t)]
+     if HighValueTransaction.__predicate__(t)]
 
   @staticmethod
-  def __invariant__(t):
+  def __predicate__(t):
     return t.amount > 2000
 
   def flag(self):

@@ -28,7 +28,7 @@ class Person(object):
   def notify(self):
     print "Hey " + str(self.name) + "! Your card is shadyyy!" 
 
-@parameterize
+@parameterize(Person)
 @join(Person, Card, Transaction)
 class RedAlertOnPerson(object):
   def __init__(self, p, c, t):
@@ -42,10 +42,10 @@ class RedAlertOnPerson(object):
      for p in persons 
      for c in cards 
      for t in transactions
-     if RedAlertOnPerson.__invariant__(p, c, t) and p.id == person.id]
+     if RedAlertOnPerson.__predicate__(p, c, t) and p.id == person.id]
 
   @staticmethod
-  def __invariant__(p, c, t):
+  def __predicate__(p, c, t):
     return c.owner == p.id and t.card == c.id and t.amount > 2000
 
   def Protect(self):

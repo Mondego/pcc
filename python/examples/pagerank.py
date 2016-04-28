@@ -17,10 +17,10 @@ class InEdge(Edge):
   def __query__(edges, n):
     return [e
       for e in edges
-      if InEdge.__invariant__(e) and e.n2.id == n.id]
+      if InEdge.__predicate__(e) and e.n2.id == n.id]
 
   @staticmethod
-  def __invariant__(e):
+  def __predicate__(e):
     return True
 
 @parameterize(Node)
@@ -30,10 +30,10 @@ class OutEdge(Edge):
   def __query__(edges, n):
     return [e
       for e in edges
-      if OutEdge.__invariant__(e) and e.n1.id == n.id]
+      if OutEdge.__predicate__(e) and e.n1.id == n.id]
 
   @staticmethod
-  def __invariant__(e):
+  def __predicate__(e):
     return True
 
 def CreateNodesAndEdges():

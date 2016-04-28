@@ -41,10 +41,10 @@ class RedAlert(object):
      for p in persons 
      for c in cards 
      for t in transactions
-     if RedAlert.__invariant__(p, c, t)]
+     if RedAlert.__predicate__(p, c, t)]
 
   @staticmethod
-  def __invariant__(p, c, t):
+  def __predicate__(p, c, t):
     return c.owner == p.id and t.card == c.id and t.amount > 2000
 
   def Protect(self):
@@ -58,10 +58,10 @@ class RedAlertWithPersonVishnu(RedAlert.Class()):
   def __query__(redalerts):
     return [ra 
      for ra in redalerts
-     if RedAlertWithPersonVishnu.__invariant__(ra)]
+     if RedAlertWithPersonVishnu.__predicate__(ra)]
 
   @staticmethod
-  def __invariant__(ra):
+  def __predicate__(ra):
     return ra.p.name == "Vishnu"
 
 p1 = Person(0, "Vishnu")
