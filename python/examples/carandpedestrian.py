@@ -1,11 +1,15 @@
 ﻿from pcc.subset import subset
 from pcc.parameterize import parameterize
 from pcc.dataframe import dataframe
+from pcc.attributes import dimension
+
 from pygame.locals import *
 import pygame, sys, os
 from time import sleep
-from threading import Thread, _sleep
+from threading import Thread, _sleep, Lock
 
+carlock = Lock()
+pedlock = Lock()
 def load_image(fullname, colorkey=None):
   try:
     image = pygame.image.load(fullname)
@@ -36,6 +40,30 @@ class CarSprite(pygame.sprite.Sprite):
 class Car(object):
   FINAL_POSITION = 500
   SPEED = 10
+  @dimension(str)
+  def ID(self):
+    return self._ID
+
+  @ID.setter
+  def ID(self, value):
+    self._ID = value
+
+  @dimension(tuple)
+  def position(self):
+    return self._position
+
+  @position.setter
+  def position(self, value):
+    self._position = value
+
+  @dimension(tuple)
+  def velocity(self):
+    return self._velocity
+
+  @velocity.setter
+  def velocity(self, value):
+    self._velocity = value
+
   def __init__(self, position):
     self.old_position = position
     self.position = position
@@ -46,12 +74,6 @@ class Car(object):
 @subset(Car)
 class InactiveCar(Car):
   @staticmethod
-  def __query__(cars):
-    return [c 
-     for c in cars
-     if InactiveCar.__predicate__(c)]
-
-  @staticmethod
   def __predicate__(c):
     return c.velocity == (0, 0, 0) or c.velocity == None
 
@@ -60,12 +82,6 @@ class InactiveCar(Car):
 
 @subset(Car)
 class ActiveCar(Car):
-  @staticmethod
-  def __query__(cars):
-    return [c 
-     for c in cars
-     if ActiveCar.__predicate__(c)]
-
   @staticmethod
   def __predicate__(c):
     return not (c.velocity == (0, 0, 0) or c.velocity == None)
@@ -93,6 +109,31 @@ class PedestrianSprites(pygame.sprite.Sprite):
 class Pedestrian(object):
   INITIAL_POSITION = (400, 0)
   SPEED = 10
+  
+  @dimension(str)
+  def ID(self):
+    return self._ID
+
+  @ID.setter
+  def ID(self, value):
+    self._ID = value
+
+  @dimension(int)
+  def X(self):
+    return self._X
+
+  @X.setter
+  def X(self, value):
+    self._X = value
+
+  @dimension(int)
+  def Y(self):
+    return self._Y
+
+  @Y.setter
+  def Y(self, value):
+    self._Y = value
+
   def __init__(self):
     self.ID = hash(self)
     self.X, self.Y = Pedestrian.INITIAL_POSITION
@@ -112,36 +153,18 @@ class Pedestrian(object):
 @subset(Pedestrian)
 class StoppedPedestrian(Pedestrian):
   @staticmethod
-  def __query__(pedestrians):
-    return [p 
-     for p in pedestrians
-     if StoppedPedestrian.__predicate__(p)]
-
-  @staticmethod
   def __predicate__(p):
     return p.X, p.Y == Pedestrian.INITIAL_POSITION
 
 @subset(Pedestrian)
 class Walker(Pedestrian):
   @staticmethod
-  def __query__(pedestrians):
-    return [p 
-     for p in pedestrians
-     if Walker.__predicate__(p)]
-
-  @staticmethod
   def __predicate__(p):
     return p.X, p.Y != Pedestrian.INITIAL_POSITION
 
-@parameterize
+@parameterize(list)
 @subset(Pedestrian)
 class PedestrianInDanger(Pedestrian):
-  @staticmethod
-  def __query__(pedestrians, cars):
-    return [p 
-     for p in pedestrians
-     if PedestrianInDanger.__predicate__(p, cars)]
-
   @staticmethod
   def __predicate__(p, cars):
     for c in cars:
@@ -199,8 +222,9 @@ class PyManMain(object):
 
 def startEngines(cars, MainWindow, carsprites):
   while True:
-    with InactiveCar(universe = dataframe(cars)) as iacs:
-      for car in iacs.All():
+    with dataframe(carlock) as df:
+      iacs = df.add(InactiveCar, cars)
+      for car in iacs:
         car.Start()
         MainWindow.RegisterSpriteForRender(carsprites[car.ID])
         break
@@ -208,8 +232,9 @@ def startEngines(cars, MainWindow, carsprites):
 
 def movecars(cars, MainWindow):
   while True:
-    with ActiveCar(universe = dataframe(cars)) as acs:
-      for car in acs.All():
+    with dataframe(carlock) as df:
+      acs = df.add(ActiveCar, cars)
+      for car in acs:
         car.Move()
         _sleep(0.3)
 
@@ -228,8 +253,9 @@ def CruiseControl(cars, MainWindow):
 
 def startWalking(peds, MainWindow, pedsprites):
   while True:
-    with StoppedPedestrian(universe = dataframe(peds)) as sps:
-      for ped in sps.All():
+    with dataframe(pedlock) as df:
+      sps = df.add(StoppedPedestrian, peds)
+      for ped in sps:
         MainWindow.RegisterSpriteForRender(pedsprites[ped.ID])
         ped.Move()
         break
@@ -237,10 +263,12 @@ def startWalking(peds, MainWindow, pedsprites):
 
 def movepeds(peds, cars, MainWindow):
   while True:
-    with PedestrianInDanger(universe = dataframe(peds), params = (cars,)) as pids, Walker(universe = dataframe(peds)) as wks:
-      for pid in pids.All():
+    with dataframe(pedlock) as df:
+      pids = df.add(PedestrianInDanger, peds, params = (cars,))
+      wks = df.add(Walker, peds)
+      for pid in pids:
         pid.Avoid()
-      for wk in wks.All():
+      for wk in wks:
         wk.Move()
     _sleep(0.5)
 

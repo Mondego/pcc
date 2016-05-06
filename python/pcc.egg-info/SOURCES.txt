@@ -8,6 +8,7 @@ pcc/projection.py
 pcc/recursive_dictionary.py
 pcc/set.py
 pcc/subset.py
+pcc/union.py
 pcc.egg-info/PKG-INFO
 pcc.egg-info/SOURCES.txt
 pcc.egg-info/dependency_links.txt

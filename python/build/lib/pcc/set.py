@@ -6,8 +6,10 @@ def PCCMeta(cooked_cls):
       result = super(_PCCMeta, cls).__new__(cls, name, bases, dict)
       result.__dimensions__ = set()
       result.__dimensionmap__ = {}
+      result.__dimensions_name__ = set()
       result.__primarykey__ = None
       cooked_cls.__dimensions__ = set()
+      cooked_cls.__dimensions_name__ = set()
       cooked_cls.__dimensionmap__ = {}
       cooked_cls.__primarykey__ = None
       values = set()
@@ -26,8 +28,10 @@ def PCCMeta(cooked_cls):
         if hasattr(value, "_dimension"):
           result.__dimensions__.add(value)
           result.__dimensionmap__[value._name] = value
+          result.__dimensions_name__.add(value._name)
           cooked_cls.__dimensions__.add(value)
           cooked_cls.__dimensionmap__[value._name] = value
+          cooked_cls.__dimensions_name__.add(value._name)
         if hasattr(value, "_primarykey") and getattr(value, "_primarykey") != None:
           result.__primarykey__ = value
           cooked_cls.__primarykey__ = value
@@ -36,6 +40,7 @@ def PCCMeta(cooked_cls):
 
 def pcc_set(actual_class):
   class _set(actual_class):
+    __realname__ = actual_class.__name__
     __metaclass__ = PCCMeta(actual_class)
     __PCC_BASE_TYPE__ = True
     __dependent_type__ = True

@@ -22,6 +22,7 @@ def get_type(obj):
 
 class spacetime_property(property):
   change_tracker = RecursiveDictionary()
+  GLOBAL_TRACKER = False
   def __init__(self, tp, fget, fset = None, fdel = None, doc = None):
     setattr(self, "_type", tp)
     setattr(self, "_dimension", True)
@@ -44,7 +45,7 @@ class spacetime_property(property):
 
   def __set__(self, obj, value, bypass = False):
     property.__set__(self, obj, value)
-    if not hasattr(obj, "__start_tracking__"):
+    if not hasattr(obj, "__start_tracking__") or not spacetime_property.GLOBAL_TRACKER:
       return
     if not obj.__start_tracking__ or bypass:
       if self._primarykey and value == None:

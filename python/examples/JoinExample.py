@@ -1,7 +1,24 @@
 ﻿from pcc.join import join
 from pcc.dataframe import dataframe
+from pcc.attributes import dimension
 
 class Transaction(object):
+  @dimension(int)
+  def card(self):
+    return self._card
+
+  @card.setter
+  def card(self, value):
+    self._card = value
+
+  @dimension(int)
+  def amount(self):
+    return self._amount
+
+  @amount.setter
+  def amount(self, value):
+    self._amount = value
+
   def __init__(self, card, amount):
     self.card = card
     self.amount = amount
@@ -10,6 +27,30 @@ class Transaction(object):
     print "Whoa " + str(self.card) + "! You can't spend that much!"
 
 class Card(object):
+  @dimension(int)
+  def id(self):
+    return self._id
+
+  @id.setter
+  def id(self, value):
+    self._id = value
+    
+  @dimension(bool)
+  def holdstate(self):
+    return self._holdstate
+
+  @holdstate.setter
+  def holdstate(self, value):
+    self._holdstate = value
+
+  @dimension(str)
+  def owner(self):
+    return self._owner
+
+  @owner.setter
+  def owner(self, value):
+    self._owner = value
+    
   def __init__(self, id, owner):
     self.id = id
     self.owner = owner
@@ -20,6 +61,22 @@ class Card(object):
     print "Hold it card " + str(self.id) + "!"
 
 class Person(object):
+  @dimension(int)
+  def id(self):
+    return self._id
+
+  @id.setter
+  def id(self, value):
+    self._id = value
+
+  @dimension(str)
+  def name(self):
+    return self._name
+
+  @name.setter
+  def name(self, value):
+    self._name = value
+
   def __init__(self, id, name):
     self.id = id
     self.name = name
@@ -29,29 +86,43 @@ class Person(object):
 
 @join(Person, Card, Transaction)
 class RedAlert(object):
+  @dimension(Person)
+  def p(self):
+    return self._p
+
+  @p.setter
+  def p(self, value):
+    self._p = value
+
+  @dimension(Card)
+  def c(self):
+    return self._c
+
+  @c.setter
+  def c(self, value):
+    self._c = value
+
+  @dimension(Transaction)
+  def t(self):
+    return self._t
+
+  @t.setter
+  def t(self, value):
+    self._t = value
+
   def __init__(self, p, c, t):
     self.p = p
     self.c = c
     self.t = t
 
   @staticmethod
-  def __query__(persons, cards, transactions):
-    return [RedAlert.Create(p, c, t) 
-     for p in persons 
-     for c in cards 
-     for t in transactions
-     if RedAlert.__predicate__(p, c, t)]
-
-  @staticmethod
   def __predicate__(p, c, t):
     return c.owner == p.id and t.card == c.id and t.amount > 2000
 
   def Protect(self):
-    #Functions Dont work!! Have to manipulate variables directly.
-    #self.t.flag()
-    #self.c.hold()
-    #self.p.notify()
-    self.c.holdstate = True
+    self.t.flag()
+    self.c.hold()
+    self.p.notify()
 
 
 p1 = Person(0, "Vishnu")
@@ -63,19 +134,10 @@ t1 = Transaction(1, 100)
 t2 = Transaction(2, 1000)
 t3 = Transaction(0, 10000)
 
-with RedAlert(universe = dataframe(([p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]))) as ras:
-  for ra in ras.All():
+with dataframe() as df:
+  for ra in df.add(RedAlert, [p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]):
     ra.Protect()
 
 for c in [c1p1, c2p1, c1p2]:
   if c.holdstate:
     print "Card " + str(c.id) + " is under hold"
-
-try:
-  RedAlert.Create(p1, c1p1, t1)
-except TypeError:
-  print "Creating a incorrect RedAlert did not work"
-
-
-# Requirements: Constructor and __predicate__ functions
-# of Join class (RedAlert) must have same arguments
