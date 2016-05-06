@@ -1,4 +1,6 @@
-from pcc.attributes import spacetime_property
+from attributes import spacetime_property
+from set import PCCMeta
+
 class union(object):
   def __init__(self, *types):
     # Classes that it is going to be a union of.
@@ -28,6 +30,7 @@ class union(object):
     # The pcc union class being cooked right here.
     class _Union(object):
       __realname__ = actual_class.__name__
+      __metaclass__ = PCCMeta(actual_class)
       __dependent_type__ = True
       __ENTANGLED_TYPES__ = self.types
       __PCC_BASE_TYPE__ = False

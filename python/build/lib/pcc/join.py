@@ -1,5 +1,5 @@
 ﻿from set import PCCMeta
-from pcc.attributes import spacetime_property
+from attributes import spacetime_property
 
 class join(object):
   def __init__(self, *classes):
@@ -36,12 +36,12 @@ class join(object):
         return actual_class
 
       @staticmethod
-      def __query__(*args, **kwargs):
+      def __pcc_query__(*args, **kwargs):
+        params = kwargs["param"] if "param" in kwargs else tuple()
         if hasattr(actual_class, "__query__"):
-          return actual_class.__query__(*args)
+          return actual_class.__query__(*tuple(args + params))
         
         collections = _Join.__create_permutation(args)
-        params = kwargs["param"] if "param" in kwargs else tuple()
         return [item for item in collections if actual_class.__predicate__(*tuple(item + params))]
       
       @staticmethod
@@ -50,6 +50,6 @@ class join(object):
 
       @staticmethod
       def __create_pcc__(change_type_fn, *args, **kwargs):
-        return [actual_class(*item) for item in _Join.__query__(*args, **kwargs)]
+        return [actual_class(*item) for item in _Join.__pcc_query__(*args, **kwargs)]
     
     return _Join

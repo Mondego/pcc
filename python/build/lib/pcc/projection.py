@@ -1,4 +1,5 @@
 ﻿from set import pcc_set, PCCMeta
+
 class projection(object):
   def __init__(self, of_class, *dimensions):
     # Class that it is going to be a projection of.
@@ -25,7 +26,7 @@ class projection(object):
       __pcc_projection__ = True
       
       __dimensions__ = actual_class.__dimensions__ if hasattr(actual_class, "__dimensions__") else set()
-
+      
       @staticmethod
       def Class():
         # Not sure if this should be exposed, 

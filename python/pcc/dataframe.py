@@ -1,4 +1,5 @@
-﻿from pcc.attributes import spacetime_property
+﻿from attributes import spacetime_property
+
 class dataframe(object):
   def __init__(self, lock = None):
     self.__lock = lock

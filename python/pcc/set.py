@@ -1,22 +1,25 @@
 ﻿from attributes import primarykey, dimension, spacetime_property
+from types import FunctionType
 
 def PCCMeta(cooked_cls):
   class _PCCMeta(type):
     def __new__(cls, name, bases, dict):
       result = super(_PCCMeta, cls).__new__(cls, name, bases, dict)
-      result.__dimensions__ = set()
-      result.__dimensionmap__ = {}
-      result.__dimensions_name__ = set()
-      result.__primarykey__ = None
-      cooked_cls.__dimensions__ = set()
-      cooked_cls.__dimensions_name__ = set()
-      cooked_cls.__dimensionmap__ = {}
-      cooked_cls.__primarykey__ = None
+      result.__dimensions__ = set() if not hasattr(result, "__dimensions__") else result.__dimensions__
+      result.__dimensionmap__ = {} if not hasattr(result, "__dimensionmap__") else result.__dimensionmap__
+      result.__dimensions_name__ = set() if not hasattr(result, "__dimensions_name__") else result.__dimensions_name__
+      result.__primarykey__ = None if not hasattr(result, "__primarykey__") else result.__primarykey__
+      cooked_cls.__dimensions__ = set() if not hasattr(cooked_cls, "__dimensions__") else cooked_cls.__dimensions__
+      cooked_cls.__dimensions_name__ = set() if not hasattr(cooked_cls, "__dimensions_name__") else cooked_cls.__dimensions_name__
+      cooked_cls.__dimensionmap__ = {} if not hasattr(cooked_cls, "__dimensionmap__") else cooked_cls.__dimensionmap__
+      cooked_cls.__primarykey__ = None if not hasattr(cooked_cls, "__primarykey__") else cooked_cls.__primarykey__
       values = set()
       for attr in dir(cooked_cls):
         try:
           if isinstance(getattr(cooked_cls, attr), spacetime_property):
             values.add(getattr(cooked_cls, attr))
+          elif isinstance(getattr(cooked_cls, attr), FunctionType):
+            setattr(result, attr, staticmethod(getattr(cooked_cls, attr)))
         except AttributeError:
           continue
       
@@ -47,7 +50,7 @@ def pcc_set(actual_class):
     __pcc_bases__ = set()
     __ENTANGLED_TYPES__ = []
     __start_tracking__ = False
-    
+
     def __init__(self, *args, **kwargs):
       self._primarykey = None
       self.__start_tracking__ = False

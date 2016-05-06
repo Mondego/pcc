@@ -1,4 +1,6 @@
-﻿from pcc.attributes import spacetime_property
+﻿from attributes import spacetime_property
+from set import PCCMeta
+
 class subset(object):
   def __init__(self, of_class):
     # Class that it is going to be a subset of.
@@ -19,6 +21,7 @@ class subset(object):
     # The pcc subset class being cooked right here.
     class _Subset(object):
       __realname__ = actual_class.__name__
+      __metaclass__ = PCCMeta(actual_class)
       __dependent_type__ = True
       __ENTANGLED_TYPES__ = [self.type]
       __PCC_BASE_TYPE__ = False
@@ -28,6 +31,7 @@ class subset(object):
       __start_tracking__ = False
       __dimensions__ = actual_class.__dimensions__ if hasattr(actual_class, "__dimensions__") else set()
       __dimensions_name__ = actual_class.__dimensions_name__ if hasattr(actual_class, "__dimensions_name__") else set()
+      
       @staticmethod
       def Class():
         # Not sure if this should be exposed,
