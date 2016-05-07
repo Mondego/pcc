@@ -4,13 +4,11 @@ import csv
 import random
 import math
 
-from threading import Thread
-
 from pcc.attributes import dimension
 from pcc.dataframe import dataframe
 from pcc.join import join
 from pcc.subset import subset
-from pcc.parameter import parameter
+from pcc.parameterize import parameterize
 
 class flower(object):
      @dimension(float)
@@ -69,7 +67,7 @@ class flower(object):
          self.fl_type = tp
          self.predicted_type = None
 
-@parameter(flower, int)
+@parameterize(flower, int)
 @subset(flower)
 class knn(object):
     @staticmethod
@@ -81,12 +79,11 @@ class knn(object):
     
     @staticmethod
     def __query__(training_flowers, test, k):
-        final_items = sorted([tr_f for tr_f in training_flowers], key = lambda x: knn.euclideanDistance(test, x))
-        return [final_items[i] for i in range(len(final_items)) if knn.__predicate__(i, k)]
+        return sorted([tr_f for tr_f in training_flowers], key = lambda x: knn.euclideanDistance(test, x))[:k]
         
     @staticmethod
-    def __predicate__(index, k):
-        return index < k
+    def __predicate__(train, test, k):
+        return True
 
 def loadDataset(filename, split, trainingSet=[] , testSet=[]):
     with open(filename, 'rb') as csvfile:
@@ -116,12 +113,6 @@ def getAccuracy(testSet):
             correct += 1
     return (correct/float(len(testSet))) * 100.0
 
-def findResults(testSet, trainingSet, k):
-    for one_test in testSet:
-        with dataframe() as df:
-            knns = df.add(knn, trainingSet, params = (one_test, k))
-            one_test.predicted_type = getResponse(knns)
-
 def main():
     trainingSet = []
     testSet = []
@@ -131,13 +122,11 @@ def main():
     print 'Test set: ' + repr(len(testSet))
     predictions = []
     k = 3
-    THREADS = 4
-    threads = []
-    for i in range(THREADS):
-        threads.append(Thread(target = findResults, args = (testSet[i::THREADS], trainingSet, k)))
-        threads[-1].start()
-    for i in range(THREADS):
-        threads[i].join()
+    for one_test in testSet:
+        with dataframe() as df:
+            knns = df.add(knn, trainingSet, params = (one_test, k))
+            one_test.predicted_type = getResponse(knns)
+            print('> predicted=' + repr(one_test.predicted_type) + ', actual=' + repr(one_test.fl_type))
     accuracy = getAccuracy(testSet)
     print('Accuracy: ' + repr(accuracy) + '%')
 
