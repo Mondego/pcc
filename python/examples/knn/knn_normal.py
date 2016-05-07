@@ -1,4 +1,5 @@
 # Example of kNN implemented from Scratch in Python
+# From http://machinelearningmastery.com/tutorial-to-implement-k-nearest-neighbors-in-python-from-scratch/
  
 import csv
 import random
