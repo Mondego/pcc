@@ -1,4 +1,9 @@
-﻿from attributes import primarykey, dimension, spacetime_property
+﻿'''
+Create on Feb 27, 2016
+
+@author: Rohan Achar
+'''
+from attributes import primarykey, dimension, spacetime_property
 from types import FunctionType
 
 def PCCMeta(cooked_cls):

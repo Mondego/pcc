@@ -1,4 +1,9 @@
-﻿from attributes import spacetime_property
+﻿'''
+Create on Feb 27, 2016
+
+@author: Rohan Achar
+'''
+from attributes import spacetime_property
 from set import PCCMeta
 
 class subset(object):

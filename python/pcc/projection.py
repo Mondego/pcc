@@ -1,4 +1,9 @@
-﻿from set import pcc_set, PCCMeta
+﻿'''
+Create on Feb 27, 2016
+
+@author: Rohan Achar
+'''
+from set import pcc_set, PCCMeta
 
 class projection(object):
     def __init__(self, of_class, *dimensions):

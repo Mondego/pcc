@@ -1,4 +1,9 @@
-﻿from pcc.subset import subset
+﻿'''
+Create on Feb 27, 2016
+
+@author: Rohan Achar
+'''
+from pcc.subset import subset
 from pcc.parameter import parameter
 from pcc.dataframe import dataframe
 from pcc.attributes import dimension

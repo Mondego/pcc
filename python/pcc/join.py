@@ -1,4 +1,9 @@
-﻿from set import PCCMeta
+﻿'''
+Create on Feb 27, 2016
+
+@author: Rohan Achar
+'''
+from set import PCCMeta
 from attributes import spacetime_property
 
 class join(object):

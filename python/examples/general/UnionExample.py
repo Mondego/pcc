@@ -1,3 +1,8 @@
+'''
+Create on Feb 27, 2016
+
+@author: Rohan Achar
+'''
 from pcc.dataframe import dataframe
 from pcc.union import union
 from pcc.attributes import dimension
