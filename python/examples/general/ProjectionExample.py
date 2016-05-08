@@ -3,9 +3,9 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from pcc.projection import projection
-from pcc.dataframe import dataframe
-from pcc.attributes import dimension
+from pcc import projection
+from pcc import dataframe
+from pcc import dimension
 
 class Car(object):
     @dimension(int)

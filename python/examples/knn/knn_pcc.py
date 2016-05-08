@@ -9,11 +9,11 @@ import csv
 import random
 import math
 
-from pcc.attributes import dimension
-from pcc.dataframe import dataframe
-from pcc.join import join
-from pcc.subset import subset
-from pcc.parameterize import parameterize
+from pcc import dimension
+from pcc import dataframe
+from pcc import join
+from pcc import subset
+from pcc import parameter
 
 class flower(object):
      @dimension(float)
@@ -72,7 +72,7 @@ class flower(object):
          self.fl_type = tp
          self.predicted_type = None
 
-@parameterize(flower, int)
+@parameter(flower, int)
 @subset(flower)
 class knn(object):
     @staticmethod

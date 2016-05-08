@@ -3,10 +3,10 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from pcc.join import join
-from pcc.subset import subset
-from pcc.dataframe import dataframe
-from pcc.attributes import dimension
+from pcc import join
+from pcc import subset
+from pcc import dataframe
+from pcc import dimension
 
 class Transaction(object):
     @dimension(int)

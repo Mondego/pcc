@@ -3,12 +3,13 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from pcc.attributes import dimension
-from pcc.dataframe import dataframe
-from pcc.subset import subset
-from pcc.parameter import parameter
-from pcc.join import join
-from pcc.union import union
+from pcc import dimension
+from pcc import dataframe
+from pcc import subset
+from pcc import parameter
+from pcc import join
+from pcc import union
+import pcc
 
 import random
 from mwmatching import maxWeightMatching
@@ -260,47 +261,46 @@ def BuildMst(cities, paths):
     randomstart = random.choice(cities)
     randomstart.isconnected = True
     while True:
-        with dataframe() as df:
-            # Collect all Nodes that are part of the forest.
-            connected_cities = df.add(ConnectedCity, cities)
-            # If all nodes are part of the forest exit loop.
-            if len(connected_cities) == len(cities):
-                break
-            # Find all paths that are have not been chosen.
-            disconnected_paths = df.add(DisconnectedPath, paths)
-            # Find all the paths that are not chosen 
-            # but can be connected to the existing forest.
-            all_nearby_discon_paths = df.add(NearByDisconnectedPath, disconnected_paths, params = (connected_cities,))
-            if len(all_nearby_discon_paths) != 0:
-                # Choose the path with the least weight.
-                best_choice_path = sorted(all_nearby_discon_paths, key = lambda x: x.distance)[0]
-                # Join it to the forest.
-                best_choice_path.isconnected = True
-                best_choice_path.city1.isconnected = True
-                best_choice_path.city2.isconnected = True
+        # Collect all Nodes that are part of the forest.
+        connected_cities = pcc.create(ConnectedCity, cities)
+        # If all nodes are part of the forest exit loop.
+        if len(connected_cities) == len(cities):
+            break
+        # Find all paths that are have not been chosen.
+        disconnected_paths = pcc.create(DisconnectedPath, paths)
+        # Find all the paths that are not chosen 
+        # but can be connected to the existing forest.
+        all_nearby_discon_paths = pcc.create(NearByDisconnectedPath, disconnected_paths, params = (connected_cities,))
+        if len(all_nearby_discon_paths) != 0:
+            # Choose the path with the least weight.
+            best_choice_path = sorted(all_nearby_discon_paths, key = lambda x: x.distance)[0]
+            # Join it to the forest.
+            best_choice_path.isconnected = True
+            best_choice_path.city1.isconnected = True
+            best_choice_path.city2.isconnected = True
 
 def PrintTSPPath(cities, paths):
     # Step 1: Building a Minimun spanning tree using Prim's Algorithm
     BuildMst(cities, paths)
-    with dataframe() as df:
-        MST = df.add(ConnectedPath, paths)
-        # Step 2: Find all cities in the MST that have odd degree (O)
-        O = df.add(CityWithOddDegree, cities, params = (MST,))
-        # Step 3: Find the induced subgraph given by the vertices from O
-        not_MST_paths = df.add(DisconnectedPath, paths)
-        subgraph = df.add(PathsWithGivenCities, not_MST_paths, params = (O,))
-        # Step 4: Find the Minimum weight perfect matching M in the subgraph
-        M = df.add(min_weight_perfect_match, subgraph)
-        # Step 5: Combining the edges of M and T to form a connected multigraph H 
-        # in which each vertex has even degree
-        H = df.add(multigraph, M, MST)
-        # Step 6: Form an Eulerian circuit in H.
-        eulertour = df.add(EulerTour, cities, params = (H,))
-        # Step 7: Making the circuit found in previous step into a Hamiltonian 
-        # circuit by skipping repeated vertices (shortcutting).
-        finaltour = df.add(HamiltonianTour, eulertour)
-        # Printing out the resulting tour.
-        PrintConnections(finaltour)
+    
+    MST = pcc.create(ConnectedPath, paths)
+    # Step 2: Find all cities in the MST that have odd degree (O)
+    O = pcc.create(CityWithOddDegree, cities, params = (MST,))
+    # Step 3: Find the induced subgraph given by the vertices from O
+    not_MST_paths = pcc.create(DisconnectedPath, paths)
+    subgraph = pcc.create(PathsWithGivenCities, not_MST_paths, params = (O,))
+    # Step 4: Find the Minimum weight perfect matching M in the subgraph
+    M = pcc.create(min_weight_perfect_match, subgraph)
+    # Step 5: Combining the edges of M and T to form a connected multigraph H 
+    # in which each vertex has even degree
+    H = pcc.create(multigraph, M, MST)
+    # Step 6: Form an Eulerian circuit in H.
+    eulertour = pcc.create(EulerTour, cities, params = (H,))
+    # Step 7: Making the circuit found in previous step into a Hamiltonian 
+    # circuit by skipping repeated vertices (shortcutting).
+    finaltour = pcc.create(HamiltonianTour, eulertour)
+    # Printing out the resulting tour.
+    PrintConnections(finaltour)
 
 # To generate random input
 cities, paths = CreateRandomGraph(10)

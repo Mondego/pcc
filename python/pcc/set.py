@@ -43,6 +43,9 @@ def PCCMeta(cooked_cls):
                 if hasattr(value, "_primarykey") and getattr(value, "_primarykey") != None:
                     result.__primarykey__ = value
                     cooked_cls.__primarykey__ = value
+                    setattr(cooked_cls, value._name, value)
+            for dimension in cooked_cls.__dimensions__:
+                setattr(cooked_cls, dimension._name, dimension)
             return result
     return _PCCMeta
 

@@ -3,10 +3,10 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from pcc.subset import subset
-from pcc.parameter import parameter
-from pcc.dataframe import dataframe
-from pcc.attributes import dimension
+from pcc import subset
+from pcc import parameter
+from pcc import dataframe
+from pcc import dimension
 
 from pygame.locals import *
 import pygame, sys, os
