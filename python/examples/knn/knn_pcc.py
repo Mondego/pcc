@@ -10,10 +10,10 @@ import random
 import math
 
 from pcc import dimension
-from pcc import dataframe
 from pcc import join
 from pcc import subset
 from pcc import parameter
+import pcc
 
 class flower(object):
      @dimension(float)
@@ -90,6 +90,9 @@ class knn(object):
     def __predicate__(train, test, k):
         return True
 
+    def vote(self):
+        return self.fl_type
+
 def loadDataset(filename, split, trainingSet=[] , testSet=[]):
     with open(filename, 'rb') as csvfile:
         lines = csv.reader(csvfile)
@@ -104,9 +107,9 @@ def loadDataset(filename, split, trainingSet=[] , testSet=[]):
 def getResponse(knns):
         classVotes = {}
         for one_neighbour in knns:
-            response = one_neighbour.fl_type
+            response = one_neighbour.vote()
             classVotes[response] = classVotes.setdefault(response, 0) + 1 
-            
+
         sortedVotes = sorted(classVotes.iteritems(), key = lambda x: x[1], reverse = True)
         return sortedVotes[0][0]
 
@@ -128,10 +131,9 @@ def main():
     predictions = []
     k = 3
     for one_test in testSet:
-        with dataframe() as df:
-            knns = df.add(knn, trainingSet, params = (one_test, k))
-            one_test.predicted_type = getResponse(knns)
-            print('> predicted=' + repr(one_test.predicted_type) + ', actual=' + repr(one_test.fl_type))
+        knns = pcc.create(knn, trainingSet, params = (one_test, k))
+        one_test.predicted_type = getResponse(knns)
+        print('> predicted=' + repr(one_test.predicted_type) + ', actual=' + repr(one_test.fl_type))
     accuracy = getAccuracy(testSet)
     print('Accuracy: ' + repr(accuracy) + '%')
 
