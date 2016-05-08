@@ -215,59 +215,85 @@ class CitiesInTour(object):
                 return True
         return False
 
-@join(EulerTour, Path)
+@subset(EulerTour)
+class ReorderedTour(Path):
+    @staticmethod
+    def swap_cities(path):
+        path.city1, path.city2 = path.city2, path.city1
+
+    @staticmethod
+    def __query__(tour):
+        for i in range(len(tour) - 1):
+            if not ReorderedTour.__predicate__(tour[i], tour[i+1]):
+                if tour[i].city1 == tour[i+1].city1:
+                    ReorderedTour.swap_cities(tour[i])
+                elif tour[i].city2 == tour[i+1].city2:
+                    ReorderedTour.swap_cities(tour[i + 1])
+                else:
+                    ReorderedTour.swap_cities(tour[i])
+                    ReorderedTour.swap_cities(tour[i + 1])
+        return tour
+
+    @staticmethod
+    def __predicate__(tour1, tour2):
+        return tour1.city2 == tour2.city1
+
+@parameter(list, Path)
+@subset(ReorderedTour)
+class RemainingTour(Path):
+    '''
+      A subset Tour, from at least index provided and 
+      which does not being by going to cities in list
+    '''
+    @staticmethod
+    def __query__(tour, cities):
+        city_names = set([city.name for city in cities])
+        for i in range(len(tour)):
+            if RemainingTour.__predicate__(tour[i], city_names):
+                return tour[i:]
+        return []
+
+    @staticmethod
+    def __predicate__(path, city_names):
+        return path.city2.name not in city_names
+
+
+@join(ReorderedTour, Path)
 class ShortenedEulerTour(Path):
     '''
-        A join of Euler Tour and Path copied to the dimensions of Path (via inheritence)
+        A join of Reordered Tour and Path copied to the dimensions of Path (via inheritence)
         that represents the complete tour the travelling salesman takes.
     '''
     def __init__(self, path):
         self.city1, self.city2, self.distance = path.city1, path.city2, path.distance
 
     @staticmethod
-    def __query__(euler_paths, all_paths):
-        origin = [(path.city1, path.city2, path.distance) for path in euler_paths]
+    def __query__(reworked, all_paths):
         all_path_dict = {}
         for path in all_paths:
             all_path_dict.setdefault(path.city1.name, {})[path.city2.name] = path
-
-        reworked = []
-        for i in range(len(euler_paths) - 1):
-            city1, city2 = euler_paths[i].city1, euler_paths[i].city2
-            nextcity1, nextcity2 = euler_paths[i + 1].city1, euler_paths[i + 1].city2
-            if city1 == nextcity2:
-                euler_paths[i + 1].city1, euler_paths[i + 1].city2 = (nextcity2, nextcity1)
-                euler_paths[i].city1, euler_paths[i].city2 = (city2, city1)
-            elif city2 == nextcity2:
-                euler_paths[i + 1].city1, euler_paths[i + 1].city2 = (nextcity2, nextcity1)
-            elif city1 == nextcity1:
-                euler_paths[i].city1, euler_paths[i].city2 = (city2, city1)
-            reworked.append(euler_paths[i])
-        reworked.append(euler_paths[-1])
+        
         seen = set()
         shortcut = []
-        i = 0
-        while i < len(reworked) - 1:
-            city1 = reworked[i].city1
-            city2 = reworked[i].city2
-            seen.add(city1)
-            if city2 not in seen:
-                shortcut.append(reworked[i])
-                seen.add(city2)
-                i += 1
-                continue
-            while city2 in seen and i < len(reworked) - 1:
-                i += 1
-                city2 = reworked[i].city2
-            if city2 not in seen:
-                if city1.name in all_path_dict and city2.name in all_path_dict[city1.name]:
-                    path = all_path_dict[city1.name][city2.name] 
+        with dataframe() as df:
+            remaining = df.add(RemainingTour, reworked, params = (seen,))
+            if len(remaining) != 0:
+                current_city = remaining[0].city1
+            while len(remaining) != 0:
+                if remaining[0].city1 != current_city:
+                    if (current_city.name in all_path_dict 
+                        and remaining[0].city2.name in all_path_dict[current_city.name]):
+                        current_path = all_path_dict[current_city.name][remaining[0].city2.name] 
+                    else:
+                        current_path = all_path_dict[current_city.name][remaining[0].city1.name]
+                        ReorderedTour.swap_cities(current_path)
                 else:
-                    path = all_path_dict[city2.name][city1.name]
-                    path.city1, path.city2 = path.city2, path.city1
-                shortcut.append(path)
-                seen.add(city2)
-                i += 1
+                    current_path = remaining[0]
+                seen.add(current_city)
+                seen.add(current_path.city2)
+                shortcut.append(current_path)
+                current_city = current_path.city2
+                remaining = df.add(RemainingTour, remaining[1:], params = (seen,))
         return shortcut
 
     def display(self):
@@ -341,6 +367,8 @@ def PrintTSPPath(cities, paths):
         H = df.add(multigraph, M, MST)
         # Step 6: Form an Eulerian circuit in H.
         eulertour = df.add(EulerTour, H, params = (cities,))
+        # Rework EulerTour ordering [(1,2), (3,2)] -> [(1,2), (2,3)],
+        eulertour = df.add(ReorderedTour, eulertour)
         # Step 7: Making the circuit found in previous step into a Hamiltonian 
         # circuit by skipping repeated vertices (shortcutting).
         finaltour = df.add(ShortenedEulerTour, eulertour, paths)
