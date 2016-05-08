@@ -127,34 +127,33 @@ class CityWithOddDegree(object):
     def __predicate__(pcs):
         return len(pcs) % 2 == 1 
 
-@parameter(CityWithOddDegree, ConnectedPath)
-@subset(Path)
+@parameter(CityWithOddDegree)
+@subset(DisconnectedPath)
 class PathsWithGivenCities(Path):
     ''' 
         Subclass of Path, 
         Class to find subgraph of given graph using only given vertices 
     '''
     @staticmethod
-    def __query__(paths, cods, con_path):
+    def __query__(paths, cods):
         cities = set([cod.name for cod in cods])
-        return [path for path in paths if PathsWithGivenCities.__predicate__(path, cities, con_path)]
+        return [path for path in paths if PathsWithGivenCities.__predicate__(path, cities)]
 
     @staticmethod
-    def __predicate__(path, cities, conpaths):
-        return path.city1.name in cities and path.city2.name in cities and path not in conpaths
+    def __predicate__(path, cities):
+        return path.city1.name in cities and path.city2.name in cities
 
-@parameter(PathsWithGivenCities)
-@subset(Path)
+@subset(PathsWithGivenCities)
 class min_weight_perfect_match(Path):
     '''
         Subset of path, paths that make up the minimun weighted perfect matching edges
         using the given vertices.
     '''
     @staticmethod
-    def __query__(paths, subgraph_paths):
+    def __query__(subgraph_paths):
         objs = maxWeightMatching([(int(p.city1.name), int(p.city2.name), 1-p.distance) for p in subgraph_paths], True)
         req_paths = [(str(i), str(objs[i])) for i in range(len(objs)) if objs[i] != -1]
-        return [path for path in paths for req_path in req_paths if min_weight_perfect_match.__predicate__(path, req_path)]
+        return [path for path in subgraph_paths for req_path in req_paths if min_weight_perfect_match.__predicate__(path, req_path)]
 
     @staticmethod
     def __predicate__(path, req_path):
@@ -165,15 +164,14 @@ class multigraph(Path):
     ''' A Union of two graphs '''
     pass
 
-@parameter(City)
-@subset(multigraph)
-class EulerTour(Path):
+@parameter(multigraph)
+@subset(City)
+class EulerTour(object):
     ''' 
-        A subset of edges in order of the Euler Tour Route.
-        Starting from the given vertex.
+        A subset of cities in order of the Euler Tour Route.
     '''
     @staticmethod
-    def __query__(paths, cities):
+    def __query__(cities, paths):
         for start_city in cities:
             totake = {}
             travel = []
@@ -185,13 +183,13 @@ class EulerTour(Path):
             visited.add(city.name)
             while len(totake[city]) > 0:
                 next_path = totake[city].pop()
-                travel.append(next_path)
+                travel.append(city)
                 city = next_path.city1 if city == next_path.city2 else next_path.city2
                 visited.add(city.name)
                 totake[city].remove(next_path)
-            with dataframe() as df:
-                if len(df.add(CitiesInTour, cities, params = (travel,))) == len(cities):
-                    return travel
+            travel.append(city)
+            if len(set(travel)) == len(cities):
+                return travel
         return []
 
     @staticmethod
@@ -201,103 +199,28 @@ class EulerTour(Path):
     def display(self):
         print "Travelling from: %s to %s with cost %d" % (self.city1.name, self.city2.name, self.distance)
 
-@parameter(EulerTour)
-@subset(City)
-class CitiesInTour(object):
-    '''
-        Subset of cities that are visited
-        by the euler tour.
-    '''
-    @staticmethod
-    def __predicate__(c, tour):
-        for path in tour:
-            if c.name in set([path.city1.name, path.city2.name]):
-                return True
-        return False
-
 @subset(EulerTour)
-class ReorderedTour(Path):
-    @staticmethod
-    def swap_cities(path):
-        path.city1, path.city2 = path.city2, path.city1
-
-    @staticmethod
-    def __query__(tour):
-        for i in range(len(tour) - 1):
-            if not ReorderedTour.__predicate__(tour[i], tour[i+1]):
-                if tour[i].city1 == tour[i+1].city1:
-                    ReorderedTour.swap_cities(tour[i])
-                elif tour[i].city2 == tour[i+1].city2:
-                    ReorderedTour.swap_cities(tour[i + 1])
-                else:
-                    ReorderedTour.swap_cities(tour[i])
-                    ReorderedTour.swap_cities(tour[i + 1])
-        return tour
-
-    @staticmethod
-    def __predicate__(tour1, tour2):
-        return tour1.city2 == tour2.city1
-
-@parameter(list, Path)
-@subset(ReorderedTour)
-class RemainingTour(Path):
+class HamiltonianTour(object):
     '''
-      A subset Tour, from at least index provided and 
-      which does not being by going to cities in list
-    '''
-    @staticmethod
-    def __query__(tour, cities):
-        city_names = set([city.name for city in cities])
-        for i in range(len(tour)):
-            if RemainingTour.__predicate__(tour[i], city_names):
-                return tour[i:]
-        return []
-
-    @staticmethod
-    def __predicate__(path, city_names):
-        return path.city2.name not in city_names
-
-
-@join(ReorderedTour, Path)
-class ShortenedEulerTour(Path):
-    '''
-        A join of Reordered Tour and Path copied to the dimensions of Path (via inheritence)
-        that represents the complete tour the travelling salesman takes.
+        A subset of cities that represents the 
+        complete tour the travelling salesman takes.
     '''
     def __init__(self, path):
         self.city1, self.city2, self.distance = path.city1, path.city2, path.distance
 
     @staticmethod
-    def __query__(reworked, all_paths):
-        all_path_dict = {}
-        for path in all_paths:
-            all_path_dict.setdefault(path.city1.name, {})[path.city2.name] = path
-        
+    def __query__(cities):
         seen = set()
-        shortcut = []
-        with dataframe() as df:
-            remaining = df.add(RemainingTour, reworked, params = (seen,))
-            if len(remaining) != 0:
-                current_city = remaining[0].city1
-            while len(remaining) != 0:
-                if remaining[0].city1 != current_city:
-                    if (current_city.name in all_path_dict 
-                        and remaining[0].city2.name in all_path_dict[current_city.name]):
-                        current_path = all_path_dict[current_city.name][remaining[0].city2.name] 
-                    else:
-                        current_path = all_path_dict[current_city.name][remaining[0].city1.name]
-                        ReorderedTour.swap_cities(current_path)
-                else:
-                    current_path = remaining[0]
-                seen.add(current_city)
-                seen.add(current_path.city2)
-                shortcut.append(current_path)
-                current_city = current_path.city2
-                remaining = df.add(RemainingTour, remaining[1:], params = (seen,))
-        return shortcut
+        result = []
+        for city in cities:
+            if HamiltonianTour.__predicate__(city, seen):
+                result.append(city)
+                seen.add(city)
+        return result
 
-    def display(self):
-        print "Travelling from: %s to %s with cost %d" % (self.city1.name, self.city2.name, self.distance)
+    @staticmethod
+    def __predicate__(city, seen):
+        return city not in seen
                 
 ############ I/O Functions #################
 def CreateRandomGraph(number):
@@ -312,11 +235,11 @@ def CreateRandomGraph(number):
                                 if i!=j]
     return cities, paths
 
-def PrintConnections(paths):
-    if paths == []:
+def PrintConnections(cities):
+    if cities == []:
         print "No Tours Found"
-    for cp in paths:
-        cp.display()
+    for cp in cities:
+        print "Traveling to city: ", cp.name
 
 def PrintPath(paths):
     for p in paths:
@@ -359,19 +282,18 @@ def PrintTSPPath(cities, paths):
         # Step 2: Find all cities in the MST that have odd degree (O)
         O = df.add(CityWithOddDegree, cities, params = (MST,))
         # Step 3: Find the induced subgraph given by the vertices from O
-        subgraph = df.add(PathsWithGivenCities, paths, params = (O, MST))
+        not_MST_paths = df.add(DisconnectedPath, paths)
+        subgraph = df.add(PathsWithGivenCities, not_MST_paths, params = (O,))
         # Step 4: Find the Minimum weight perfect matching M in the subgraph
-        M = df.add(min_weight_perfect_match, paths, params =(subgraph,))
+        M = df.add(min_weight_perfect_match, subgraph)
         # Step 5: Combining the edges of M and T to form a connected multigraph H 
         # in which each vertex has even degree
         H = df.add(multigraph, M, MST)
         # Step 6: Form an Eulerian circuit in H.
-        eulertour = df.add(EulerTour, H, params = (cities,))
-        # Rework EulerTour ordering [(1,2), (3,2)] -> [(1,2), (2,3)],
-        eulertour = df.add(ReorderedTour, eulertour)
+        eulertour = df.add(EulerTour, cities, params = (H,))
         # Step 7: Making the circuit found in previous step into a Hamiltonian 
         # circuit by skipping repeated vertices (shortcutting).
-        finaltour = df.add(ShortenedEulerTour, eulertour, paths)
+        finaltour = df.add(HamiltonianTour, eulertour)
         # Printing out the resulting tour.
         PrintConnections(finaltour)
 
