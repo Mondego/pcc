@@ -5,18 +5,19 @@ Create on Feb 27, 2016
 '''
 from attributes import primarykey, dimension, spacetime_property
 from types import FunctionType
+from copy import deepcopy
 
 def PCCMeta(cooked_cls):
     class _PCCMeta(type):
         def __new__(cls, name, bases, dict):
             result = super(_PCCMeta, cls).__new__(cls, name, bases, dict)
-            result.__dimensions__ = set() if not hasattr(result, "__dimensions__") else result.__dimensions__
-            result.__dimensionmap__ = {} if not hasattr(result, "__dimensionmap__") else result.__dimensionmap__
-            result.__dimensions_name__ = set() if not hasattr(result, "__dimensions_name__") else result.__dimensions_name__
+            result.__dimensions__ = set() if not hasattr(result, "__dimensions__") else set(result.__dimensions__)
+            result.__dimensionmap__ = {} if not hasattr(result, "__dimensionmap__") else deepcopy(result.__dimensionmap__)
+            result.__dimensions_name__ = set() if not hasattr(result, "__dimensions_name__") else set(result.__dimensions_name__)
             result.__primarykey__ = None if not hasattr(result, "__primarykey__") else result.__primarykey__
-            cooked_cls.__dimensions__ = set() if not hasattr(cooked_cls, "__dimensions__") else cooked_cls.__dimensions__
-            cooked_cls.__dimensions_name__ = set() if not hasattr(cooked_cls, "__dimensions_name__") else cooked_cls.__dimensions_name__
-            cooked_cls.__dimensionmap__ = {} if not hasattr(cooked_cls, "__dimensionmap__") else cooked_cls.__dimensionmap__
+            cooked_cls.__dimensions__ = set() if not hasattr(cooked_cls, "__dimensions__") else set(cooked_cls.__dimensions__)
+            cooked_cls.__dimensions_name__ = set() if not hasattr(cooked_cls, "__dimensions_name__") else set(cooked_cls.__dimensions_name__)
+            cooked_cls.__dimensionmap__ = {} if not hasattr(cooked_cls, "__dimensionmap__") else deepcopy(cooked_cls.__dimensionmap__)
             cooked_cls.__primarykey__ = None if not hasattr(cooked_cls, "__primarykey__") else cooked_cls.__primarykey__
             values = set()
             for attr in dir(cooked_cls):
@@ -67,4 +68,5 @@ def pcc_set(actual_class):
         @staticmethod
         def Class():
             return actual_class
+
     return _set
