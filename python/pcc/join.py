@@ -20,7 +20,7 @@ class join(object):
             __dependent_type__ = True
             __ENTANGLED_TYPES__ = self.types
             __PCC_BASE_TYPE__ = False
-            __pcc_bases__ = set([self.types])
+            __pcc_bases__ = set(self.types)
             for tp in self.types:
                  if hasattr(tp, "__pcc_bases__"):
                         __pcc_bases__.update(tp.__pcc_bases__)
