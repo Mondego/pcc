@@ -63,6 +63,11 @@ def pcc_set(actual_class):
         def __init__(self, *args, **kwargs):
             self._primarykey = None
             self.__start_tracking__ = False
+            for dimension in actual_class.__dimensions__:
+                try:
+                    getattr(self, dimension._name)
+                except AttributeError:
+                    setattr(self, dimension._name, None)
             return super(_set, self).__init__(*args, **kwargs)
         
         @staticmethod

@@ -28,21 +28,8 @@ def load_image(fullname, colorkey=None):
         image.set_colorkey(colorkey, RLEACCEL)
     return image, image.get_rect()
 
-class CarSprite(pygame.sprite.Sprite):
-    def __init__(self, car):
-        self.car = car
-        pygame.sprite.Sprite.__init__(self) 
-        self.image, self.rect = load_image('images/car-small.gif',-1)
-     
-    def update(self):
-        oldx, oldy, oldz = self.car.old_position
-        x, y, z = self.car.position
-        if x != oldx or y != oldy:
-            self.rect.move_ip((x - oldx, y - oldy))
-            self.car.old_position = self.car.position
-    
-
-class Car(object):
+class Car(pygame.sprite.Sprite):
+    # The class that shows the image of a car.
     FINAL_POSITION = 500
     SPEED = 10
     @dimension(str)
@@ -70,14 +57,24 @@ class Car(object):
         self._velocity = value
 
     def __init__(self, position):
-        self.old_position = position
+        self.old_position = position # Old position is not a dimension.
         self.position = position
         self.velocity = None
         self.ID = hash(self)
+        pygame.sprite.Sprite.__init__(self) 
+        self.image, self.rect = load_image('images/car-small.gif',-1) # Not dimensions
+
+    def update(self):
+        oldx, oldy, oldz = self.old_position
+        x, y, z = self.position
+        if x != oldx or y != oldy:
+            self.rect.move_ip((x - oldx, y - oldy))
+            self.old_position = self.position
     
-        
+
 @subset(Car)
 class InactiveCar(Car):
+    # Car that is not moving, Velocity is zero
     @staticmethod
     def __predicate__(c):
         return c.velocity == (0, 0, 0) or c.velocity == None
@@ -87,6 +84,7 @@ class InactiveCar(Car):
 
 @subset(Car)
 class ActiveCar(Car):
+    # car that is moving, velocity is not zero
     @staticmethod
     def __predicate__(c):
         return not (c.velocity == (0, 0, 0) or c.velocity == None)
@@ -99,19 +97,8 @@ class ActiveCar(Car):
     def Stop(self):
         self.position, self.velocity = (0,0,0), (0,0,0)
 
-class PedestrianSprites(pygame.sprite.Sprite):
-    def __init__(self, ped):
-        self.ped = ped
-        pygame.sprite.Sprite.__init__(self) 
-        self.image, self.rect = load_image('images/man-walking-small.gif',-1)
-        self.rect.move_ip((self.ped.X, self.ped.Y))
-
-    def update(self):
-        if self.ped.X != self.ped.oldX or self.ped.Y != self.ped.oldY:
-            self.rect.move_ip((self.ped.X - self.ped.oldX, self.ped.Y - self.ped.oldY)) 
-            self.ped.oldX, self.ped.oldY = self.ped.X, self.ped.Y
-                    
-class Pedestrian(object):
+class Pedestrian(pygame.sprite.Sprite):
+# base pedestrian class 
     INITIAL_POSITION = (400, 0)
     SPEED = 10
     
@@ -142,7 +129,10 @@ class Pedestrian(object):
     def __init__(self):
         self.ID = hash(self)
         self.X, self.Y = Pedestrian.INITIAL_POSITION
-        self.oldX, self.oldY = Pedestrian.INITIAL_POSITION
+        self.oldX, self.oldY = Pedestrian.INITIAL_POSITION # not dimensions
+        pygame.sprite.Sprite.__init__(self) 
+        self.image, self.rect = load_image('images/man-walking-small.gif',-1) # Not dimensions
+        self.rect.move_ip((self.X, self.Y))
 
     def Move(self):
         self.X -= Pedestrian.SPEED
@@ -155,14 +145,23 @@ class Pedestrian(object):
     def SetPosition(self, x):
         self.X = x
 
+    def update(self):
+        if self.X != self.oldX or self.Y != self.oldY:
+            self.rect.move_ip((self.X - self.oldX, self.Y - self.oldY)) 
+            self.oldX, self.oldY = self.X, self.Y
+                    
+
+    
 @subset(Pedestrian)
 class StoppedPedestrian(Pedestrian):
+    # A person that is not moving
     @staticmethod
     def __predicate__(p):
         return p.X, p.Y == Pedestrian.INITIAL_POSITION
 
 @subset(Pedestrian)
 class Walker(Pedestrian):
+    # A person who is walking.
     @staticmethod
     def __predicate__(p):
         return p.X, p.Y != Pedestrian.INITIAL_POSITION
@@ -170,6 +169,7 @@ class Walker(Pedestrian):
 @parameter(list)
 @subset(Pedestrian)
 class PedestrianInDanger(Pedestrian):
+    # A person who is in danger of colliding with a car
     @staticmethod
     def __predicate__(p, cars):
         for c in cars:
@@ -182,9 +182,9 @@ class PedestrianInDanger(Pedestrian):
         self.Y += 50
 
 class PyManMain(object):
-    """The Main PyMan Class - This class handles the main 
-    initialization and creating of the Game."""
-    
+    # Launches the GFX window for the application
+    # Renders the cars, and pedestrians, and animates their
+    # movements based on the position in the car.
     def __init__(self, width=640,height=480):
         """Initialize"""
         """Initialize PyGame"""
@@ -193,8 +193,7 @@ class PyManMain(object):
         self.width = width
         self.height = height
         """Create the Screen"""
-        self.screen = pygame.display.set_mode((self.width
-                                                                                    ,self.height))
+        self.screen = pygame.display.set_mode((self.width, self.height))
         self.PresentSprites = []
         self.NewSprites = []
 
@@ -214,7 +213,7 @@ class PyManMain(object):
             events = pygame.event.get(pygame.QUIT)
             if events:
                 sys.exit(0)
-            _sleep(0.5)
+            _sleep(1)
 
     def LoadNewSprites(self):
         if self.NewSprites:
@@ -224,18 +223,25 @@ class PyManMain(object):
     def RegisterSpriteForRender(self, sp):
         self.NewSprites.append(sp)
 
+def register(id, items, MainWindow):
+    for item in items:
+        if item.ID == id:
+            MainWindow.RegisterSpriteForRender(item)
+            return
 
-def startEngines(cars, MainWindow, carsprites):
+def StartInactiveCars(cars, MainWindow):
+    # Starts inactive cars every 5 secs
     while True:
         with dataframe(carlock) as df:
             iacs = df.add(InactiveCar, cars)
             for car in iacs:
                 car.Start()
-                MainWindow.RegisterSpriteForRender(carsprites[car.ID])
+                register(car.ID, cars, MainWindow)
                 break
         _sleep(5)
 
-def movecars(cars, MainWindow):
+def MoveActiveCars(cars, MainWindow):
+    # Moves active cars every 300 ms
     while True:
         with dataframe(carlock) as df:
             acs = df.add(ActiveCar, cars)
@@ -243,30 +249,31 @@ def movecars(cars, MainWindow):
                 car.Move()
                 _sleep(0.3)
 
-def CruiseControl(cars, MainWindow):
-    carsprites = dict([(car.ID, CarSprite(car)) for car in cars]) 
-    engines = Thread(target = startEngines, args = (cars, MainWindow, carsprites))
-    engines.daemon = True
-    engines.start()
+def CarWorkerControl(cars, MainWindow):
+    # Starts the car related threads
+    start_car_thread = Thread(target = StartInactiveCars, args = (cars, MainWindow))
+    start_car_thread.daemon = True
+    start_car_thread.start()
 
-    drivetrain = Thread(target = movecars, args = (cars, MainWindow))
-    drivetrain.daemon = True
-    drivetrain.start()
+    move_car_thread = Thread(target = MoveActiveCars, args = (cars, MainWindow))
+    move_car_thread.daemon = True
+    move_car_thread.start()
 
-    engines.join()
-    drivetrain.join()
+    start_car_thread.join()
+    move_car_thread.join()
 
-def startWalking(peds, MainWindow, pedsprites):
+def StartPedestrian(peds, MainWindow):
+    # Make a pedestrian walk every 3 secs.
     while True:
         with dataframe(pedlock) as df:
-            sps = df.add(StoppedPedestrian, peds)
-            for ped in sps:
-                MainWindow.RegisterSpriteForRender(pedsprites[ped.ID])
+            for ped in df.add(StoppedPedestrian, peds):
+                register(ped.ID, peds, MainWindow)
                 ped.Move()
                 break
         _sleep(3)
 
-def movepeds(peds, cars, MainWindow):
+def MovePedestrian(peds, cars, MainWindow):
+    # Nake a Walker move.
     while True:
         with dataframe(pedlock) as df:
             pids = df.add(PedestrianInDanger, peds, params = (cars,))
@@ -277,29 +284,29 @@ def movepeds(peds, cars, MainWindow):
                 wk.Move()
         _sleep(0.5)
 
-def WalkingControl(peds, cars, MainWindow):
-    pedsprites = dict([(ped.ID, PedestrianSprites(ped)) for ped in peds]) 
-    walkers = Thread(target = startWalking, args = (peds, MainWindow, pedsprites))
-    walkers.daemon = True
-    walkers.start()
+def PedestrianWorkerControl(peds, cars, MainWindow):
+    # starts the pedestrian related threads
+    start_ped_thread = Thread(target = StartPedestrian, args = (peds, MainWindow))
+    start_ped_thread.daemon = True
+    start_ped_thread.start()
 
-    pedmovers = Thread(target = movepeds, args = (peds, cars, MainWindow))
-    pedmovers.daemon = True
-    pedmovers.start()
+    move_walker_thread = Thread(target = MovePedestrian, args = (peds, cars, MainWindow))
+    move_walker_thread.daemon = True
+    move_walker_thread.start()
 
-    walkers.join()
-    pedmovers.join()
+    start_ped_thread.join()
+    move_walker_thread.join()
 
 
 
 if __name__ == "__main__":
     MainWindow = PyManMain()
     cars = [Car((0,0,0)), Car((0,0,0)), Car((0,0,0)), Car((0,0,0))]
-    carController = Thread(target = CruiseControl, args = (cars, MainWindow))
+    carController = Thread(target = CarWorkerControl, args = (cars, MainWindow))
     carController.daemon = True
     
     pedestrians = [Pedestrian()]
-    pedController = Thread(target = WalkingControl, args = (pedestrians, cars, MainWindow))
+    pedController = Thread(target = PedestrianWorkerControl, args = (pedestrians, cars, MainWindow))
     pedController.daemon = True
     
     gfx = Thread(target = MainWindow.MainLoop)
@@ -308,5 +315,4 @@ if __name__ == "__main__":
     gfx.start()
     carController.start()
     pedController.start()
-    
     gfx.join()
