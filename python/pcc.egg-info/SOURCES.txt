@@ -3,6 +3,7 @@ pcc/__init__.py
 pcc/attributes.py
 pcc/create.py
 pcc/dataframe.py
+pcc/isa.py
 pcc/join.py
 pcc/parameter.py
 pcc/projection.py

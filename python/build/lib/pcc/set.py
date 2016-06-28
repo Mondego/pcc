@@ -12,12 +12,10 @@ def PCCMeta(cooked_cls):
         def __new__(cls, name, bases, dict):
             result = super(_PCCMeta, cls).__new__(cls, name, bases, dict)
             result.__dimensions__ = set() if not hasattr(result, "__dimensions__") else set(result.__dimensions__)
-            result.__dimensionmap__ = {} if not hasattr(result, "__dimensionmap__") else deepcopy(result.__dimensionmap__)
             result.__dimensions_name__ = set() if not hasattr(result, "__dimensions_name__") else set(result.__dimensions_name__)
             result.__primarykey__ = None if not hasattr(result, "__primarykey__") else result.__primarykey__
             cooked_cls.__dimensions__ = set() if not hasattr(cooked_cls, "__dimensions__") else set(cooked_cls.__dimensions__)
             cooked_cls.__dimensions_name__ = set() if not hasattr(cooked_cls, "__dimensions_name__") else set(cooked_cls.__dimensions_name__)
-            cooked_cls.__dimensionmap__ = {} if not hasattr(cooked_cls, "__dimensionmap__") else deepcopy(cooked_cls.__dimensionmap__)
             cooked_cls.__primarykey__ = None if not hasattr(cooked_cls, "__primarykey__") else cooked_cls.__primarykey__
             values = set()
             for attr in dir(cooked_cls):
@@ -36,10 +34,8 @@ def PCCMeta(cooked_cls):
             for value in values:
                 if hasattr(value, "_dimension"):
                     result.__dimensions__.add(value)
-                    result.__dimensionmap__[value._name] = value
                     result.__dimensions_name__.add(value._name)
                     cooked_cls.__dimensions__.add(value)
-                    cooked_cls.__dimensionmap__[value._name] = value
                     cooked_cls.__dimensions_name__.add(value._name)
                 if hasattr(value, "_primarykey") and getattr(value, "_primarykey") != None:
                     result.__primarykey__ = value
