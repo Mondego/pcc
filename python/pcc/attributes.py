@@ -1,4 +1,4 @@
-﻿'''
+'''
 Create on Feb 27, 2016
 
 @author: Rohan Achar
@@ -64,7 +64,7 @@ class spacetime_property(property):
             if type_name == "dependent":
                 return
             elif type_name == "object":
-                store_value = value.__dict__
+                store_value = dict(value.__dict__)
 
             spacetime_property.change_tracker.setdefault(
                 currentThread().getName(), RecursiveDictionary()).setdefault(
