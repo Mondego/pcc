@@ -49,10 +49,19 @@ class RecursiveDictionary(dict):
                 
         def iter_rec_update(self, iterator):
                 for (key, value) in iterator:
-                        if key in self and \
-                             isinstance(self[key], dict) and isinstance(value, dict):
+                        if key in self: 
+                            if isinstance(self[key], dict) and isinstance(value, dict):
                                 self[key] = RecursiveDictionary(self[key])
                                 self[key].rec_update(value)
+                            elif isinstance(self[key], list) and isinstance(value, list):
+                                self[key].extend(value)
+                            elif isinstance(self[key], set) and isinstance(value, set):
+                                self[key].update(value)
+                            elif hasattr(self[key], "__dict__") and hasattr(value, "__dict__"):
+                                self[key].__dict__ = RecursiveDictionary(self[key].__dict__)
+                                self[key].__dict__.rec_update(value.__dict__)
+                            else:
+                                self[key] = value
                         else:
                                 self[key] = value
         

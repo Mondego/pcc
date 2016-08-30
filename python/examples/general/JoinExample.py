@@ -8,6 +8,12 @@ from pcc import dataframe
 from pcc import dimension
 
 class Transaction(object):
+    @primarykey(str)
+    def id(self): return self._id
+
+    @id.setter
+    def id(self, value): self._id = value
+
     @dimension(int)
     def card(self):
         return self._card
@@ -32,6 +38,12 @@ class Transaction(object):
         print "Whoa " + str(self.card) + "! You can't spend that much!"
 
 class Card(object):
+    @primarykey(str)
+    def id(self): return self._id
+
+    @id.setter
+    def id(self, value): self._id = value
+
     @dimension(int)
     def id(self):
         return self._id
@@ -66,6 +78,12 @@ class Card(object):
         print "Hold it card " + str(self.id) + "!"
 
 class Person(object):
+    @primarykey(str)
+    def id(self): return self._id
+
+    @id.setter
+    def id(self, value): self._id = value
+
     @dimension(int)
     def id(self):
         return self._id
@@ -91,6 +109,12 @@ class Person(object):
 
 @join(Person, Card, Transaction)
 class RedAlert(object):
+    @primarykey(str)
+    def id(self): return self._id
+
+    @id.setter
+    def id(self, value): self._id = value
+
     @dimension(Person)
     def p(self):
         return self._p
@@ -129,20 +153,20 @@ class RedAlert(object):
         self.c.hold()
         self.p.notify()
 
+if __name__ == "__main__":
+    p1 = Person(0, "Vishnu")
+    c1p1 = Card(0, 0)
+    c2p1 = Card(1, 0)
+    p2 = Person(1, "Indira")
+    c1p2 = Card(2, 1)
+    t1 = Transaction(1, 100)
+    t2 = Transaction(2, 1000)
+    t3 = Transaction(0, 10000)
 
-p1 = Person(0, "Vishnu")
-c1p1 = Card(0, 0)
-c2p1 = Card(1, 0)
-p2 = Person(1, "Indira")
-c1p2 = Card(2, 1)
-t1 = Transaction(1, 100)
-t2 = Transaction(2, 1000)
-t3 = Transaction(0, 10000)
+    with dataframe() as df:
+        for ra in df.add(RedAlert, [p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]):
+            ra.Protect()
 
-with dataframe() as df:
-    for ra in df.add(RedAlert, [p1, p2], [c1p1, c2p1, c1p2], [t1, t2, t3]):
-        ra.Protect()
-
-for c in [c1p1, c2p1, c1p2]:
-    if c.holdstate:
-        print "Card " + str(c.id) + " is under hold"
+    for c in [c1p1, c2p1, c1p2]:
+        if c.holdstate:
+            print "Card " + str(c.id) + " is under hold"

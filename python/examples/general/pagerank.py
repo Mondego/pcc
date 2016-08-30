@@ -74,27 +74,28 @@ def CreateNodesAndEdges():
     edges.append(Edge(nodes[3],nodes[2]))
     return nodes, edges
 
-nodes, edges = CreateNodesAndEdges()
-largest_change = 100
-allowed_delta = 0.001
-damp = 0.85
+if __name__ == "__main__":
+    nodes, edges = CreateNodesAndEdges()
+    largest_change = 100
+    allowed_delta = 0.001
+    damp = 0.85
 
-while largest_change > allowed_delta:
-    largest_change = 0.0
+    while largest_change > allowed_delta:
+        largest_change = 0.0
     
-    for n in nodes:
-        old = n.pagerank
-        sum = 0.0
-        with dataframe() as df:
-            inedges_of_n = df.add(InEdge, edges, params = (n,))
-            for inedge_of_n in inedges_of_n:
-                pg_contributor = inedge_of_n.start
-                outedges_of_contrib = df.add(OutEdge, edges, params = (pg_contributor,))
-                sum += pg_contributor.pagerank / len(outedges_of_contrib)
-        n.pagerank = ((1.0 - damp) / len(nodes)) + (damp * sum)
-        diff = n.pagerank - old
-        if diff > largest_change:
-            largest_change = diff
+        for n in nodes:
+            old = n.pagerank
+            sum = 0.0
+            with dataframe() as df:
+                inedges_of_n = df.add(InEdge, edges, params = (n,))
+                for inedge_of_n in inedges_of_n:
+                    pg_contributor = inedge_of_n.start
+                    outedges_of_contrib = df.add(OutEdge, edges, params = (pg_contributor,))
+                    sum += pg_contributor.pagerank / len(outedges_of_contrib)
+            n.pagerank = ((1.0 - damp) / len(nodes)) + (damp * sum)
+            diff = n.pagerank - old
+            if diff > largest_change:
+                largest_change = diff
 
-for n in nodes:
-    print n.id, n.pagerank
+    for n in nodes:
+        print n.id, n.pagerank
