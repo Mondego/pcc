@@ -13,8 +13,10 @@ from cache import Cache
 class DimensionType(object):
     Literal = "literal"
     Object = "object"
+    ForeignKey = "fkey"
     Collection = "list"
     Dictionary = "dict"
+    Unknown = "unknown"
 
 class ObjectChanges(object):
     New = "new"
@@ -67,6 +69,14 @@ class dataframe(object):
 
         self.fake_class_map = {}
 
+        self.record_map = {}
+
+        self.start_recording = False
+
+        self.current_buffer = RecursiveDictionary()
+
+        self.current_record = RecursiveDictionary()
+
     def __get_depends(self, tp):
         if hasattr(tp, "__pcc_bases__"):
             return tp.__pcc_bases__
@@ -90,8 +100,11 @@ class dataframe(object):
         if type(obj) is not tp:
             raise TypeError("Object type and type given do not match")
 
+    def __convert_to_dim_map(self, obj):
+        return dict([(dim, getattr(obj, dim._name)) for dim in obj.__dimensions__ if hasattr(obj, dim._name)])
+
     
-    def __append(self, tp, obj):
+    def __append(self, tp, obj, push_to_subscribers = False):
         self.__check_validity(tp, obj)
 
         # all clear to insert.
@@ -109,6 +122,8 @@ class dataframe(object):
         # Set the object state by reference to the original object's symbol table
         obj.__dict__ = self.current_state[groupname][id]
         self.object_map.setdefault(tpname, RecursiveDictionary())[id] = obj
+        if self.start_recording:
+           self.record(Event.New, tpname, id, self.__convert_to_dim_map(obj), push_to_subscribers)
         return groupname, id
     
     def __create_fake_class(self):
@@ -161,7 +176,37 @@ class dataframe(object):
                          ObjectType.UnknownType]).intersection(
                              categories)) > 0)
 
-    def __adjust_pcc(self, objs, groupname):
+    def __record_pcc_changes(self, new_objs_map, old_memberships, push_to_subscribers = False):
+        id_map = {}
+
+        for othertp, new_objs in new_objs_map.items():
+            id_map[othertp] = set()
+            for new_obj in new_objs:
+                try:
+                    id_map[othertp].add(new_obj.__primarykey__)
+                except AttributeError:
+                    # It's a join, no ID in join. :|
+                    new_obj.__primarykey__ = None # This should set it to new UUID
+                if new_obj.__primarykey__ not in old_memberships[othertp]:
+                    if self.start_recording:
+                        self.record(Event.New, othertp.__realname__, new_obj.__primarykey__, self.__convert_to_dim_map(new_obj), push_to_subscribers) 
+                else:
+                    # The dim changes should have already reached
+                    if self.start_recording:
+                        self.record(Event.Modification, othertp.__realname__, new_obj.__primarykey__, None, push_to_subscribers) 
+                self.object_map.setdefault(
+                    othertp.__realname__, 
+                    RecursiveDictionary())[new_obj.__primarykey__] = new_obj
+
+        for othertp in old_memberships:
+            for id in set(old_memberships[othertp]).difference(set(id_map[othertp])):
+                if self.start_recording:
+                    self.record(Event.Delete, othertp.__realname__, id, None, push_to_subscribers)
+                del self.object_map[othertp.__realname__][id]
+
+        return new_objs_map
+
+    def __adjust_pcc(self, objs, groupname, push_to_subscribers = False):
         can_be_created = []
         for othertp in self.group_to_members[groupname]:
             other_cats = self.categories[othertp.__realname__]
@@ -179,24 +224,12 @@ class dataframe(object):
                 if (othertpname in self.object_map 
                     and id in self.object_map[othertpname]):
                     old_memberships[othertp].add(id)
-
-        new_objs_map = self.__calculate_pcc(can_be_created, {groupname: objs}, None)
-        id_map = {}
+        new_objs_map = self.__record_pcc_changes(self.__calculate_pcc(can_be_created, {groupname: objs}, None), old_memberships)
         for othertp, new_objs in new_objs_map.items():
             for new_obj in new_objs:
-                id_map.setdefault(othertp, set()).add(new_obj.__primarykey__)
-                if new_obj.__primarykey__ not in old_memberships[othertp]:
-                    self.record(Event.New, othertp.__realname__, new_obj.__primarykey__) 
-                else:
-                    self.record(Event.Modification, othertp.__realname__, new_obj.__primarykey__)
                 self.object_map.setdefault(
                     othertp.__realname__, 
                     RecursiveDictionary())[new_obj.__primarykey__] = new_obj
-
-        for othertp in old_memberships:
-            for id in old_memberships[othertp].difference(set(id_map[othertp])):
-                self.record(Event.Delete, othertp.__realname__, id)
-                del self.object_map[othertp.__realname__][id]
 
     def __make_pcc(self, pcctype, relevant_objs, param_map, params, hasSingleton = False, hasCollection = False):
         universe = []
@@ -311,11 +344,55 @@ class dataframe(object):
             setattr(obj, dim, value)
         return obj, needs_second_pass
 
-    def __create_obj_from_map(self, final_objjson):
-        pass
+    def __get_obj_type(self, obj):
+        # both iteratable/dictionary + object type is messed up. Won't work.
+        try:
+            if hasattr(obj, "__dependent_type__"):
+                return DimensionType.ForeignKey
+            if dict in type(obj).mro():
+                return DimensionType.Dictionary
+            if hasattr(obj, "__iter__"):
+                #print obj
+                return DimensionType.Collection
+            if len(set([float, int, str, unicode, type(None)]).intersection(set(type(obj).mro()))) > 0:
+                return DimensionType.Literal
+            if hasattr(obj, "__dict__"):
+                return DimensionType.Object
+        except TypeError, e:
+            return DimensionType.Unknown
+        return DimensionType.Unknown
 
+    def __generate_dim(self, dim_change):
+        dim_type = self.__get_obj_type(dim_change)
+        if dim_type == DimensionType.Literal:
+            return {"type": dim_type, "value": dim_change}
+        if dim_type == DimensionType.Collection:
+            return {
+                "type": DimensionType.Collection,
+                "value": [self.__generate_dim(v) for v in dim_change]
+            }
+        if dim_type == DimensionType.Dictionary:
+            return {
+                "type": DimensionType.Dictionary,
+                "value": dict([(k, self.__generate_dim(v)) for k, v in dim_change.items()])
+            }
+        if dim_type == DimensionType.Object:
+            return {
+                "type": DimensionType.Object,
+                "value": self.__generate_dim(dim_change.__dict__)
+            }
+        if dim_type == DimensionType.ForeignKey:
+            return {
+                "type": DimensionType.ForeignKey,
+                "value": dim_change.__primarykey__
+            }
+        raise TypeError("Don't know how to deal with %s" % dim_change)
 
-    def add_type(self, tp, except_type = None):
+    def __report_dim_modification(self, id, name, value, groupname, push_to_subscribers = False):
+        if groupname in self.name2class and self.name2class[groupname] in self.group_to_members[groupname]:
+            self.record(Event.Modification, groupname, id, {name: value}, push_to_subscribers) 
+
+    def add_type(self, tp, except_type = None, push_to_subscribers = False):
         categories = self.__categorize(tp)
         # str name of the type.
         name = tp.__realname__
@@ -360,7 +437,9 @@ class dataframe(object):
         for dim in tp.__dimensions__:
             dim._groupname = key
             dim._touch_reclassifier = self.__adjust_pcc
-        
+            dim._report_changes = self.__report_dim_modification
+            dim._push_for_subs = push_to_subscribers
+
     def add_types(self, types):
         for tp in types:
             self.add_type(tp)
@@ -403,7 +482,7 @@ class dataframe(object):
             return self.object_map[tpname].values()
 
         groupkey = self.member_to_group[tpname]
-        return self.__calculate_pcc([tp], self.object_map, parameters)[tp]
+        return self.__record_pcc_changes(self.__calculate_pcc([tp], self.object_map, parameters), {tp: []})[tp]
 
     def delete(self, tp, obj):
         self.__check_validity(tp)
@@ -436,9 +515,6 @@ class dataframe(object):
         
         deletes = {}
         for groupname, groupchanges in all_changes.items():
-            if groupname not in self.group_to_members:
-                continue
-
             for id, obj_changes in groupchanges.items():
                 final_objjson = RecursiveDictionary()
                 new_obj = None
@@ -455,15 +531,18 @@ class dataframe(object):
                     final_objjson.rec_update(new_obj.__dict__)
                     self.current_state[groupname][id] = final_objjson
                     new_obj.__dict__ = final_objjson
+                    
                 for member, status in obj_changes["types"].items():
                     if not (member in self.member_to_group and self.member_to_group[member] == groupname):
                         continue
                     if status == ObjectChanges.New:
                         self.object_map.setdefault(member, RecursiveDictionary())[id] = change_type(new_obj, self.name2class[member])
+                        self.add_to_buffer(Event.New, member, id)
                     elif status == ObjectChanges.Mod:
+                        self.add_to_buffer(Event.Modification, member, id)
                         # Should get updated through current_state update when current_state changed.
-                        pass
                     elif status == ObjectChanges.Delete:
+                        self.add_to_buffer(Event.Delete, member, id)
                         deletes.setdefault(member, set()).add(id)
                     else:
                         raise Exception("Object change Status %s unknown" % status)
@@ -472,13 +551,18 @@ class dataframe(object):
         
         return needs_second_pass, nsp_items, deletes
 
-    def apply_all(self, obj_changes, record_change = False):
-        # {tp -> {id -> {__dict__ update}}}
-        needs_second_pass, nsp_items, deletes = self.__pass1_objs(obj_changes)
+    def apply_all(self, obj_changes, record_change = False, push_to_subscribers = False):
+        relevant_changes = {}
+        for groupname in obj_changes:
+            if groupname in self.group_to_members:
+                relevant_changes[groupname] = obj_changes[groupname]
+        needs_second_pass, nsp_items, deletes = self.__pass1_objs(relevant_changes)
         if needs_second_pass:
-            part_obj_map = self.__pass2_obj(obj_changes, part_obj_map)
+            # Not implemented yet.
+            part_obj_map = self.__pass2_obj(relevant_changes, nsp_items)
 
-        #self.record(part_obj_map, record_change)
+        if record_change:
+            self.current_record.rec_update(relevant_changes)
         group_id_map = {}
         remaining = {}
         deleted = {}
@@ -510,18 +594,69 @@ class dataframe(object):
                 if gcount == len(group_id_map[gname][id]):
                     del self.object_map[gname][id]
                     del self.current_state[gname][id]
-    
-    def record(self, event_type, tpname, id):
-        pass
+        if push_to_subscribers:
+            for name in relevant_changes:
+                for id in relevant_changes[name]:
+                    self.push_to_subscribers(name, id, relevant_changes[name][id])
 
-    def json_to_obj(self, objjson):
-        pass
+    def register_subscriber(self, subscribe_name, types):
+        for tp in types:
+            if tp.__realname__ in self.name2class:
+                self.subscriber_map.setdefault(tpname, set()).add(subscribe_name)
+
+    def unregister_subscriber(self, subscribe_name, types):
+        for tp in types:
+            if tp.__realname__ in self.name2class:
+                self.subscriber_map.setdefault(tpname, set()).remove(subscribe_name)
+
+    def push_to_subscribers(self, tpname, id, changes):
+        if tpname in self.subscriber_map:
+            for subscriber in self.subscriber_map[tpname]:
+                subscriber.record_using_json(tpname, id, change_type)
+
+    def record_using_json(self, tpname, id, changes, push_to_subscribers = False):
+        self.apply_all({tpname: {id: changes}}, True, push_to_subscribers)
+        
+    def record(self, event_type, tpname, id, dim_change = None, push_to_subscribers = True):
+        if not self.start_recording:
+            return
+        groupname = self.member_to_group[tpname]
+        self.current_record.setdefault(
+            groupname, RecursiveDictionary()).setdefault(
+                id, {"types": RecursiveDictionary()})["types"].rec_update({tpname: event_type})
+        if dim_change:
+            self.current_record[groupname][id].setdefault(
+                "dims", RecursiveDictionary()).rec_update(dict([(k._name, self.__generate_dim(v)) for k, v in dim_change.items()]))
+
+        if push_to_subscribers:
+            self.push_to_subscribers(tpname, id, self.current_record[groupname][id])
+
+    def get_record(self):
+        return self.current_record
+
+    def clear_record(self):
+        self.current_record = RecursiveDictionary()
+
+    def add_to_buffer(self, event_type, tpname, id):
+        self.current_buffer.setdefault(tpname, RecursiveDictionary({
+            Event.New: {},
+            Event.Modification: {},
+            Event.Delete: {}
+            }))[event_type].update({id: self.object_map[tpname][id]})
+
+    def clear_buffer(self):
+        self.current_buffer = RecursiveDictionary()
+                                                                                        
 
     def get_new(self, tp):
-        pass
+        tpname = tp.__realname__
+        return self.current_buffer[tpname][Event.New].values() if tpname in self.current_buffer else []
 
     def get_mod(self, tp):
-        pass
+        tpname = tp.__realname__
+        return self.current_buffer[tpname][Event.Modification].values() if tpname in self.current_buffer else []
 
     def get_deleted(self, tp):
-        pass
+        tpname = tp.__realname__
+        return self.current_buffer[tpname][Event.Delete].values() if tpname in self.current_buffer else []
+

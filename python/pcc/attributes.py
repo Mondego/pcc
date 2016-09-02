@@ -38,6 +38,8 @@ class spacetime_property(property):
         # the next 2 is only for dataframe use
         setattr(self, "_touch_reclassifier", None)
         setattr(self, "_groupname", None)
+        setattr(self, "_report_changes", None)
+        setattr(self, "_push_for_subs", None)
 
         property.__init__(self, fget, fset, fdel, doc)
 
@@ -58,6 +60,8 @@ class spacetime_property(property):
             return
         if self._touch_reclassifier and hasattr(obj, "__primarykey__") and obj.__primarykey__:
             self._touch_reclassifier({obj.__primarykey__: obj}, self._groupname)
+        if self._report_changes:    
+            self._report_changes(obj.__primarykey__, self, value, self._groupname, self._push_for_subs)
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
                 value = str(uuid.uuid4())
