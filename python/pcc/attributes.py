@@ -36,11 +36,7 @@ class spacetime_property(property):
         setattr(self, "_primarykey", None)
 
         # the next 2 is only for dataframe use
-        setattr(self, "_touch_reclassifier", None)
-        setattr(self, "_groupname", None)
-        setattr(self, "_report_changes", None)
-        setattr(self, "_push_for_subs", None)
-
+        setattr(self, "_dataframe_data", set())
         property.__init__(self, fget, fset, fdel, doc)
 
     def setter(self, fset):
@@ -58,10 +54,10 @@ class spacetime_property(property):
         property.__set__(self, obj, value)
         if not hasattr(obj, "__start_tracking__"):
             return
-        if self._touch_reclassifier and hasattr(obj, "__primarykey__") and obj.__primarykey__:
-            self._touch_reclassifier({obj.__primarykey__: obj}, self._groupname)
-        if self._report_changes:    
-            self._report_changes(obj.__primarykey__, self, value, self._groupname, self._push_for_subs)
+        if self._dataframe_data and hasattr(obj, "__primarykey__") and obj.__primarykey__:
+            for key, tr, rc, pfs in self._dataframe_data:
+                tr({obj.__primarykey__: obj}, key)
+                rc(obj.__primarykey__, self, value, key, pfs)
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
                 value = str(uuid.uuid4())

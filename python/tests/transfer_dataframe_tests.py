@@ -394,7 +394,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                     },
                     "types" :{
                         "ActiveCar" :"delete",
-                        "Car" :"modification",
+                        "Car" :"mod",
                         "RedActiveCar" :"delete"
                     }
                 },
@@ -407,7 +407,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                     },
                     "types" :{
                         "ActiveCar" :"delete",
-                        "Car" :"modification",
+                        "Car" :"mod",
                         "RedActiveCar" :"delete"
                     }
                 }
@@ -442,7 +442,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                     },
                     "types" :{
                         "ActiveCar" :"new",
-                        "Car" :"modification"
+                        "Car" :"mod"
                     }
                 },
                 "id2" :{
@@ -462,7 +462,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                     },
                     "types" :{
                         "ActiveCar" :"new",
-                        "Car" :"modification",
+                        "Car" :"mod",
                         "RedActiveCar" :"new"
                     }
                 },
@@ -474,8 +474,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"modification",
-                        "Car" :"modification"
+                        "ActiveCar" :"mod",
+                        "Car" :"mod"
                     }
                 },
                 "id4" :{
@@ -486,9 +486,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"modification",
-                        "Car" :"modification",
-                        "RedActiveCar" :"modification"
+                        "ActiveCar" :"mod",
+                        "Car" :"mod",
+                        "RedActiveCar" :"mod"
                     }
                 },
                 "id5" :{
@@ -499,10 +499,47 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"modification",
-                        "Car" :"modification",
-                        "RedActiveCar" :"modification"
+                        "ActiveCar" :"mod",
+                        "Car" :"mod",
+                        "RedActiveCar" :"mod"
                     }
                 }
             }
         })
+
+    def test_dataframe_transfer_changes3(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df1 = dataframe()
+        df1.add_types([Car, ActiveCar, RedActiveCar])
+        df1.extend(Car, cars)
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df2 = dataframe()
+        df2.add_types([Car, ActiveCar, RedActiveCar])
+        df2.extend(Car, cars) # So they are not linked by reference.
+        #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
+        
+        df1.start_recording = True
+        for c in df1.get(Car):
+            c.velocity += 1
+        self.assertFalse(len(df1.get(ActiveCar)) == len(df2.get(ActiveCar)))
+        #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
+        df2.apply_all(df1.get_record())
+        #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
+        self.assertTrue(len(df1.get(ActiveCar)) == len(df2.get(ActiveCar)))
+
+    def test_dataframe_transfer_changes4(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df1 = dataframe()
+        df1.add_types([Car, ActiveCar, RedActiveCar])
+        df1.extend(Car, cars)
+        df2 = dataframe()
+        df2.add_types([Car, ActiveCar, RedActiveCar])
+        df2.extend(Car, cars) # Linked by reference
+        
+        df1.start_recording = True
+        df2.start_recording = True
+        for c in df1.get(Car):
+            c.velocity += 1
+        self.assertTrue(df1.get_record() == df2.get_record())
+
+        

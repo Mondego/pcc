@@ -18,11 +18,6 @@ class DimensionType(object):
     Dictionary = "dict"
     Unknown = "unknown"
 
-class ObjectChanges(object):
-    New = "new"
-    Mod = "mod"
-    Delete = "delete"
-
 class ObjectType(object):
     UnknownType = "unknown type"
     PCCBase = "pcc base"
@@ -37,7 +32,7 @@ class ObjectType(object):
 class Event(object):
     Delete = "delete"
     New = "new"
-    Modification = "modification"
+    Modification = "mod"
 
 class dataframe(object):
     def __init__(self, lock=None):
@@ -435,10 +430,7 @@ class dataframe(object):
         
 
         for dim in tp.__dimensions__:
-            dim._groupname = key
-            dim._touch_reclassifier = self.__adjust_pcc
-            dim._report_changes = self.__report_dim_modification
-            dim._push_for_subs = push_to_subscribers
+            dim._dataframe_data.add((key, self.__adjust_pcc, self.__report_dim_modification, push_to_subscribers))
 
     def add_types(self, types):
         for tp in types:
@@ -535,13 +527,13 @@ class dataframe(object):
                 for member, status in obj_changes["types"].items():
                     if not (member in self.member_to_group and self.member_to_group[member] == groupname):
                         continue
-                    if status == ObjectChanges.New:
+                    if status == Event.New:
                         self.object_map.setdefault(member, RecursiveDictionary())[id] = change_type(new_obj, self.name2class[member])
                         self.add_to_buffer(Event.New, member, id)
-                    elif status == ObjectChanges.Mod:
+                    elif status == Event.Modification:
                         self.add_to_buffer(Event.Modification, member, id)
                         # Should get updated through current_state update when current_state changed.
-                    elif status == ObjectChanges.Delete:
+                    elif status == Event.Delete:
                         self.add_to_buffer(Event.Delete, member, id)
                         deletes.setdefault(member, set()).add(id)
                     else:
