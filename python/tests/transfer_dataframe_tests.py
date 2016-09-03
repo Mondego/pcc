@@ -542,4 +542,14 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
             c.velocity += 1
         self.assertTrue(df1.get_record() == df2.get_record())
 
+    def test_dataframe_apply_get_new(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df = dataframe()
+        df.add_types([Car, ActiveCar, RedActiveCar])
+        df.extend(Car, cars)
+        df.apply_all(update_json1)
+
+        self.assertTrue(len(df.get_new(ActiveCar)) == 2)
+        self.assertTrue(len(df.get_new(RedActiveCar)) == 1)
+        self.assertTrue(len(df.get_new(Car)) == 4)
         
