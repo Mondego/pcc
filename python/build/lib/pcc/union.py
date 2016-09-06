@@ -46,7 +46,8 @@ class union(object):
             __start_tracking__ = False
             __dimensions__ = actual_class.__dimensions__ if hasattr(actual_class, "__dimensions__") else set()
             __dimensions_name__ = actual_class.__dimensions_name__ if hasattr(actual_class, "__dimensions_name__") else set()
-            
+            __pcc_union__ = True
+
             @staticmethod
             def Class():
                 # Not sure if this should be exposed,
