@@ -8,7 +8,6 @@ from recursive_dictionary import RecursiveDictionary
 from create import create, change_type
 from uuid import uuid4
 from parameter import ParameterMode
-from cache import Cache
 
 class DimensionType(object):
     Literal = "literal"
