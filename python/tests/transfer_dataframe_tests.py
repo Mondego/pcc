@@ -56,6 +56,210 @@ def create_cars():
             Car("id5", 2, "RED")]
     return Car, ActiveCar, RedActiveCar, cars
 
+def create_complex_cartypes():
+    class Vector3(object):
+        def __init__(self, X=0.0, Y=0.0, Z=0.0):
+            self.X = X
+            self.Y = Y
+            self.Z = Z
+
+        # -----------------------------------------------------------------
+        def VectorDistanceSquared(self, other) :
+            dx = self.X - other.X
+            dy = self.Y - other.Y
+            dz = self.Z - other.Z
+            return dx * dx + dy * dy + dz * dz
+
+        # -----------------------------------------------------------------
+        def VectorDistance(self, other) :
+            return math.sqrt(self.VectorDistanceSquared(other))
+
+        # -----------------------------------------------------------------
+        def Length(self) :
+            return math.sqrt(self.VectorDistanceSquared(ZeroVector))
+
+        # -----------------------------------------------------------------
+        def LengthSquared(self) :
+            return self.VectorDistanceSquared(ZeroVector)
+
+        def AddVector(self, other) :
+            return Vector3(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
+
+        # -----------------------------------------------------------------
+        def SubVector(self, other) :
+            return Vector3(self.X - other.X, self.Y - other.Y, self.Z - other.Z)
+
+        # -----------------------------------------------------------------
+        def ScaleConstant(self, factor) :
+            return Vector3(self.X * factor, self.Y * factor, self.Z * factor)
+
+        # -----------------------------------------------------------------
+        def ScaleVector(self, scale) :
+            return Vector3(self.X * scale.X, self.Y * scale.Y, self.Z * scale.Z)
+
+        def ToList(self):
+            return [self.X, self.Y, self.Z]
+
+        def Rotate(self, rad):
+            heading = math.atan(self.Y/self.X)
+            return Vector3()
+
+        # -----------------------------------------------------------------
+        def Equals(self, other) :
+            if isinstance(other, Vector3):
+                return self.X == other.X and self.Y == other.Y and self.Z == other.Z
+            elif isinstance(other, tuple) or isinstance(other, list):
+                return (other[0] == self.X and other[1] == self.Y and other[2] == self.Z)
+
+        # -----------------------------------------------------------------
+        def ApproxEquals(self, other, tolerance) :
+            return self.VectorDistanceSquared(other) < (tolerance * tolerance)
+
+        def __json__(self):
+            return self.__dict__
+
+        def __str__(self):
+            return self.__dict__.__str__()
+
+        def __eq__(self, other):
+            return self.Equals(other)
+
+        def __ne__(self, other):
+            return not self.__eq__(other)
+
+        # -----------------------------------------------------------------
+        def __add__(self, other) :
+            return self.AddVector(other)
+
+        # -----------------------------------------------------------------
+        def __sub__(self, other) :
+            return self.SubVector(other)
+
+        # -----------------------------------------------------------------
+        def __mul__(self, factor) :
+            return self.ScaleConstant(factor)
+
+        # -----------------------------------------------------------------
+        def __div__(self, factor) :
+            return self.ScaleConstant(1.0 / factor)
+
+        @staticmethod
+        def __decode__(dic):
+            return Vector3(dic['X'], dic['Y'], dic['Z'])
+
+    ZeroVector = Vector3()
+
+    class Colors:
+        Red = 0
+        Green = 1
+        Blue = 2
+        Yellow = 3
+        Black = 4
+        White = 5
+        Grey = 6
+
+    @pcc_set
+    class Car(object):
+        '''
+        classdocs
+        '''
+        FINAL_POSITION = 700;
+        SPEED = 40;
+
+        @primarykey(str)
+        def ID(self):
+            return self._ID
+
+        @ID.setter
+        def ID(self, value):
+            self._ID = value
+
+        _Position = Vector3(0, 0, 0)
+        @dimension(Vector3)
+        def Position(self):
+            return self._Position
+
+        @Position.setter
+        def Position(self, value):
+            self._Position = value
+
+        _Velocity = Vector3(0, 0, 0)
+        @dimension(Vector3)
+        def Velocity(self):
+            return self._Velocity
+
+        @Velocity.setter
+        def Velocity(self, value):
+            self._Velocity = value
+
+        _Color = Colors.White
+        @dimension(Colors)
+        def Color(self):
+            return self._Color
+
+        @Color.setter
+        def Color(self, value):
+            self._Color = value
+
+        @dimension(int)
+        def Length(self):
+            return self._Length
+
+        @Length.setter
+        def Length(self, value):
+            self._Length = value
+
+        @dimension(int)
+        def Width(self):
+            return self._Width
+
+        @Width.setter
+        def Width(self, value):
+            self._Width = value
+
+    @subset(Car)
+    class InactiveCar(Car.Class()):
+        @staticmethod
+        def __query__(cars):
+            return [c for c in cars if InactiveCar.__predicate__(c)]
+
+        @staticmethod
+        def __predicate__(c):
+            return c.Position == Vector3(0,0,0)
+
+        def start(self):
+            logger.debug("[InactiveCar]: {0} starting".format(self.ID))
+            self.Velocity = Vector3(self.SPEED, 0, 0)
+
+    @subset(Car)
+    class ActiveCar(Car.Class()):
+        @staticmethod
+        def __query__(cars):  # @DontTrace
+            return [c for c in cars if ActiveCar.__predicate__(c)]
+
+        @staticmethod
+        def __predicate__(c):
+            return c.Velocity != Vector3(0,0,0)
+
+        def move(self):
+            self.Position = Vector3(self.Position.X + self.Velocity.X, self.Position.Y + self.Velocity.Y, self.Position.Z + self.Velocity.Z)
+            logger.debug("[ActiveCar]: Current velocity: {0}, New position {1}".format(self.Velocity, self.Position));
+
+            # End of ride
+            if (self.Position.X >= self.FINAL_POSITION or self.Position.Y >= self.FINAL_POSITION):
+                self.stop();
+
+        def stop(self):
+            logger.debug("[ActiveCar]: {0} stopping".format(self.ID));
+            self.Position.X = 0;
+            self.Position.Y = 0;
+            self.Position.Z = 0;
+            self.Velocity.X = 0;
+            self.Velocity.Y = 0;
+            self.Velocity.Z = 0;
+
+    return Car, InactiveCar, ActiveCar
+
 def create_cars_withobjects():
     class vector(object):
         def __init__(self, x, y, z):
@@ -405,7 +609,124 @@ update_json8 = {
                 }
             }    
         }
-
+update_json9 = '''{
+            "Car": {
+                "0fb70042-cb18-4d4c-8ec0-ddfe609f852a": {
+                    "dims": {
+                        "Color": {
+                            "type": "literal",
+                            "value": 5
+                        },
+                        "ID": {
+                            "type": "literal",
+                            "value": "0fb70042-cb18-4d4c-8ec0-ddfe609f852a"
+                        },
+                        "Length": {
+                            "type": "literal",
+                            "value": null
+                        },
+                        "Position": {
+                            "type": "object",
+                            "value": {
+                                    "X": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Y": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Z": {
+                                        "type": "literal",
+                                        "value": 0
+                                    }
+                                }
+                        },
+                        "Velocity": {
+                            "type": "object",
+                            "value": {
+                                    "X": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Y": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Z": {
+                                        "type": "literal",
+                                        "value": 0
+                                    }
+                            }
+                        },
+                        "Width": {
+                            "type": "literal",
+                            "value": null
+                        }
+                    },
+                    "types": {
+                        "Car": "new"
+                    }
+                },
+                "7ff34b19-7f30-4c5d-a246-f1668d3b89b9": {
+                    "dims": {
+                        "Color": {
+                            "type": "literal",
+                            "value": 5
+                        },
+                        "ID": {
+                            "type": "literal",
+                            "value": "7ff34b19-7f30-4c5d-a246-f1668d3b89b9"
+                        },
+                        "Length": {
+                            "type": "literal",
+                            "value": null
+                        },
+                        "Position": {
+                            "type": "object",
+                            "value": {
+                                    "X": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Y": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Z": {
+                                        "type": "literal",
+                                        "value": 0
+                                    }
+                                }
+                        },
+                        "Velocity": {
+                            "type": "object",
+                            "value": {
+                                    "X": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Y": {
+                                        "type": "literal",
+                                        "value": 0
+                                    },
+                                    "Z": {
+                                        "type": "literal",
+                                        "value": 0
+                                    }
+                            }
+                        },
+                        "Width": {
+                            "type": "literal",
+                            "value": null
+                        }
+                    },
+                    "types": {
+                        "Car": "new"
+                    }
+                }
+            }
+        }'''
                             
 
 class Test_dataframe_transfer_tests(unittest.TestCase):
@@ -802,3 +1123,15 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get(Car)) == 4)
         self.assertTrue(len(df.get(ActiveCar)) == 2)
         self.assertTrue(len(df.get(RedActiveCar)) == 1)
+
+    def test_dataframe_apply_all_new_full_objs(self):
+        Car, InactiveCar, ActiveCar = create_complex_cartypes()
+        df = dataframe()
+        df.add_types([Car, ActiveCar, InactiveCar])
+        df.apply_all(json.loads(update_json9))
+        self.assertTrue(len(df.get(Car)) == 2)
+        self.assertTrue(len(df.get(InactiveCar)) == 2)
+        self.assertTrue(len(df.get(ActiveCar)) == 0)
+        
+
+    

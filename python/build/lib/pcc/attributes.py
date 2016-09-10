@@ -55,9 +55,9 @@ class spacetime_property(property):
         if not hasattr(obj, "__start_tracking__"):
             return
         if self._dataframe_data and hasattr(obj, "__primarykey__") and obj.__primarykey__:
-            for key, tr, rc, pfs in self._dataframe_data:
+            for key, tr, rc in self._dataframe_data:
                 tr({obj.__primarykey__: obj}, key)
-                rc(obj.__primarykey__, self, value, key, pfs)
+                rc(obj.__primarykey__, self, value, key)
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
                 value = str(uuid.uuid4())

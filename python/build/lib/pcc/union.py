@@ -36,6 +36,8 @@ class union(object):
         # The pcc union class being cooked right here.
         class _Union(object):
             __realname__ = actual_class.__name__
+            actual_class.__realname__ = __realname__
+        
             __metaclass__ = PCCMeta(actual_class)
             __dependent_type__ = True
             __ENTANGLED_TYPES__ = self.types

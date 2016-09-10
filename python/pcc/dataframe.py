@@ -108,7 +108,7 @@ class dataframe(object):
         if ObjectType.PCCBase not in self.categories[tp.__realname__]:
             # Person not appending the right type of object
             raise TypeError("Cannot append type %s" % tp.__realname__)
-        if type(obj) is not tp:
+        if tp.__realname__ != obj.__class__.__realname__:
             raise TypeError("Object type and type given do not match")
 
     def __convert_to_dim_map(self, obj):
@@ -132,6 +132,7 @@ class dataframe(object):
 
         # Set the object state by reference to the original object's symbol table
         obj.__dict__ = self.current_state[groupname][id]
+        obj.__class__ = obj.__class__.Class() if hasattr(obj.__class__, "Class") else obj.__class__
         self.object_map.setdefault(tpname, RecursiveDictionary())[id] = obj
         if self.start_recording:
            self.record(Event.New, tpname, id, self.__convert_to_dim_map(obj))
@@ -394,7 +395,7 @@ class dataframe(object):
         if dim_type == DimensionType.Object:
             return {
                 "type": DimensionType.Object,
-                "value": self.__generate_dim(dim_change.__dict__)
+                "value": self.__generate_dim(dim_change.__dict__)["value"]
             }
         if dim_type == DimensionType.ForeignKey:
             return {
@@ -579,23 +580,25 @@ class dataframe(object):
         
         return needs_second_pass, nsp_items, deletes, part_obj_map
 
-    def __report_to_dataframes(self, obj_changes):
+    def __report_to_dataframes(self, obj_changes, except_df):
         possible_dfs = set()
         for tpname in obj_changes:
             if tpname not in self.tp_to_attached_df:
                 continue
-            for df in self.tp_to_attached_df[tpname]:
-                possible_dfs.add(df)
+            possible_dfs.update(self.tp_to_attached_df[tpname])
+            if except_df in possible_dfs:
+                possible_dfs.remove(except_df)
+                
         for df in possible_dfs:
             df.apply_all(obj_changes)
 
-    def apply_all(self, obj_changes, record_change = False):
+    def apply_all(self, obj_changes, except_df = None):
         obj_changes = RecursiveDictionary(obj_changes) if not type(obj_changes) == RecursiveDictionary else obj_changes
         if self.mode == DataframeModes.Master:
             # if master: send changes to all other dataframes attached.
             # apply changes to object_map, and currect_state
             # adjust pcc
-            self.__report_to_dataframes(obj_changes)
+            self.__report_to_dataframes(obj_changes, except_df)
             objmaps = self.__apply(obj_changes)
             for groupname, grpobjs in objmaps.items():
                 self.__adjust_pcc(grpobjs, groupname)

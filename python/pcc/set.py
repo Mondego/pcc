@@ -49,6 +49,8 @@ def PCCMeta(cooked_cls):
 def pcc_set(actual_class):
     class _set(actual_class):
         __realname__ = actual_class.__name__
+        actual_class.__realname__ = __realname__
+        
         __metaclass__ = PCCMeta(actual_class)
         __PCC_BASE_TYPE__ = True
         __dependent_type__ = True

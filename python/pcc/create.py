@@ -48,5 +48,5 @@ def change_type(obj, totype):
     new_obj = container()
 
     new_obj.__dict__ = obj.__dict__
-    new_obj.__class__ = totype
+    new_obj.__class__ = totype.Class()
     return new_obj

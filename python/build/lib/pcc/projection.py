@@ -19,6 +19,8 @@ class projection(object):
         # The pcc projection class being cooked right here. 
         class _Projection(actual_class):
             __realname__ = actual_class.__name__
+            actual_class.__realname__ = __realname__
+        
             __metaclass__ = PCCMeta(actual_class)
             __dependent_type__ = True
             __ENTANGLED_TYPES__ = [self.type]
