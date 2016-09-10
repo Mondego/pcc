@@ -9,6 +9,11 @@ from create import create, change_type
 from uuid import uuid4
 from parameter import ParameterMode
 
+class DataframeModes(object):
+    Master = "master"
+    ApplicationCache = "appcache"
+    Client = "client"
+
 class DimensionType(object):
     Literal = "literal"
     Object = "object"
@@ -34,7 +39,11 @@ class Event(object):
     Modification = "mod"
 
 class dataframe(object):
-    def __init__(self, lock=None):
+    def __init__(self, lock = None, mode = DataframeModes.Master):
+        self.mode = mode
+        # PCCs to be calculated only if it is in Master Mode.
+        self.calculate_pcc = (mode == DataframeModes.Master)
+
         # group key (always string fullanme of type) to members of group.  For example: car -> activecar,
         # inactivecar, redcar, etc etc.
         self.group_to_members = {}
@@ -71,6 +80,14 @@ class dataframe(object):
 
         self.current_record = RecursiveDictionary()
 
+        self.attached_dataframes = set()
+
+        self.tp_to_attached_df = {}
+
+        self.df_to_tp = {}
+
+        self.observing_types = set()
+
     def __get_depends(self, tp):
         if hasattr(tp, "__pcc_bases__"):
             return tp.__pcc_bases__
@@ -86,7 +103,7 @@ class dataframe(object):
         if not hasattr(tp, "__realname__"): 
             # Fail to add new obj, because tp was incompatible, or not found.
             raise TypeError("Type %s cannot be inserted into Dataframe, declare it as pcc_set." % tp.__class__.__name__)
-        if not tp.__realname__ in self.member_to_group:
+        if not tp.__realname__ in self.observing_types:
             raise TypeError("Type %s cannot be inserted into Dataframe, register it first." % tp.__realname__) 
         if ObjectType.PCCBase not in self.categories[tp.__realname__]:
             # Person not appending the right type of object
@@ -98,7 +115,7 @@ class dataframe(object):
         return dict([(dim, getattr(obj, dim._name)) for dim in obj.__dimensions__ if hasattr(obj, dim._name)])
 
     
-    def __append(self, tp, obj, push_to_subscribers = False):
+    def __append(self, tp, obj):
         self.__check_validity(tp, obj)
 
         # all clear to insert.
@@ -117,7 +134,7 @@ class dataframe(object):
         obj.__dict__ = self.current_state[groupname][id]
         self.object_map.setdefault(tpname, RecursiveDictionary())[id] = obj
         if self.start_recording:
-           self.record(Event.New, tpname, id, self.__convert_to_dim_map(obj), push_to_subscribers)
+           self.record(Event.New, tpname, id, self.__convert_to_dim_map(obj))
         return groupname, id
     
     def __create_fake_class(self):
@@ -170,7 +187,7 @@ class dataframe(object):
                          ObjectType.UnknownType]).intersection(
                              categories)) > 0)
 
-    def __record_pcc_changes(self, new_objs_map, old_memberships, push_to_subscribers = False):
+    def __record_pcc_changes(self, new_objs_map, old_memberships):
         id_map = {}
 
         for othertp, new_objs in new_objs_map.items():
@@ -182,25 +199,27 @@ class dataframe(object):
                     # It's a join, no ID in join. :|
                     new_obj.__primarykey__ = None # This should set it to new UUID
                 if new_obj.__primarykey__ not in old_memberships[othertp]:
-                    if self.start_recording:
-                        self.record(Event.New, othertp.__realname__, new_obj.__primarykey__, self.__convert_to_dim_map(new_obj), push_to_subscribers) 
+                    if self.start_recording or othertp.__realname__ in self.tp_to_attached_df:
+                        self.record(Event.New, othertp.__realname__, new_obj.__primarykey__, self.__convert_to_dim_map(new_obj)) 
                 else:
                     # The dim changes should have already reached
-                    if self.start_recording:
-                        self.record(Event.Modification, othertp.__realname__, new_obj.__primarykey__, None, push_to_subscribers) 
+                    if self.start_recording or self.member_to_group[othertp.__realname__] in self.tp_to_attached_df:
+                        self.record(Event.Modification, othertp.__realname__, new_obj.__primarykey__, None) 
                 self.object_map.setdefault(
                     othertp.__realname__, 
                     RecursiveDictionary())[new_obj.__primarykey__] = new_obj
 
         for othertp in old_memberships:
             for id in set(old_memberships[othertp]).difference(set(id_map[othertp])):
-                if self.start_recording:
-                    self.record(Event.Delete, othertp.__realname__, id, None, push_to_subscribers)
+                if self.start_recording or self.member_to_group[othertp.__realname__] in self.tp_to_attached_df:
+                    self.record(Event.Delete, othertp.__realname__, id, None)
                 del self.object_map[othertp.__realname__][id]
 
         return new_objs_map
 
-    def __adjust_pcc(self, objs, groupname, push_to_subscribers = False):
+    def __adjust_pcc(self, objs, groupname):
+        if not self.calculate_pcc:
+            return
         can_be_created = []
         for othertp in self.group_to_members[groupname]:
             other_cats = self.categories[othertp.__realname__]
@@ -281,6 +300,8 @@ class dataframe(object):
         pccs[pcctype] = self.__make_pcc(pcctype, relevant_objs, param_collection_objs, params, hasSingleton, hasCollection)
 
     def __calculate_pcc(self, pcctypes, universe, params):
+        if not self.calculate_pcc:
+           return {} 
         pccs = {}
         for pcctype in pcctypes:
             self.__construct_pccs(pcctype, pccs, universe, params)
@@ -382,11 +403,21 @@ class dataframe(object):
             }
         raise TypeError("Don't know how to deal with %s" % dim_change)
 
-    def __report_dim_modification(self, id, name, value, groupname, push_to_subscribers = False):
+    def __report_dim_modification(self, id, name, value, groupname):
         if groupname in self.name2class and self.name2class[groupname] in self.group_to_members[groupname]:
-            self.record(Event.Modification, groupname, id, {name: value}, push_to_subscribers) 
+            self.record(Event.Modification, groupname, id, {name: value}) 
 
-    def add_type(self, tp, except_type = None, push_to_subscribers = False):
+    def connect(self, new_df):
+        # If I connect the current states, the __dict__ of objects in the two dataframes will be in reference.
+        for tpname in new_df.observing_types:
+            self.tp_to_attached_df.setdefault(tpname, set()).add(new_df)
+        self.df_to_tp[new_df] = new_df.observing_types
+        self.attached_dataframes.add(new_df)
+        new_df.current_state = self.current_state
+        new_df.object_map = self.object_map
+        new_df.record_using_objmap(new_df.object_map)
+
+    def add_type(self, tp, except_type = None, tracking=False, not_member=False):
         categories = self.__categorize(tp)
         # str name of the type.
         name = tp.__realname__
@@ -397,6 +428,9 @@ class dataframe(object):
         # add type to map
         self.name2class[name] = tp
 
+        if not not_member:
+            self.observing_types.add(name)
+
         # getting all the dependencies that tp depends on (results are in string form)
         depend_types = self.__get_depends(tp)
         self.depends_map[name] = depend_types
@@ -406,7 +440,7 @@ class dataframe(object):
             if dtpname == except_type:
                 raise TypeError("Cyclic reference detected in definition of %s" % name)
             if dtpname not in self.name2class:
-                self.add_type(dtp, except_type = name)
+                self.add_type(dtp, except_type = name, not_member=True)
             if ObjectType.Impure in self.categories[dtpname]:
                 categories.add(ObjectType.Impure)
 
@@ -429,9 +463,9 @@ class dataframe(object):
         
 
         for dim in tp.__dimensions__:
-            dim._dataframe_data.add((key, self.__adjust_pcc, self.__report_dim_modification, push_to_subscribers))
+            dim._dataframe_data.add((key, self.__adjust_pcc, self.__report_dim_modification))
 
-    def add_types(self, types):
+    def add_types(self, types, tracking=False):
         for tp in types:
             self.add_type(tp)
 
@@ -466,12 +500,15 @@ class dataframe(object):
     def get(self, tp, parameters=None):
 
         tpname = tp.__realname__
-        if tpname not in self.name2class:
+        if tpname not in self.observing_types:
             raise TypeError("Type %s not registered" % tpname)
         
-        if not self.__is_impure(tp, self.categories[tp.__realname__]):
+        if not self.__is_impure(tp, self.categories[tp.__realname__]) and tpname in self.object_map:
             return self.object_map[tpname].values()
 
+        if not self.calculate_pcc:
+            # Not calculating pcc if Client/Cache mode
+            return []
         groupkey = self.member_to_group[tpname]
         return self.__record_pcc_changes(self.__calculate_pcc([tp], self.object_map, parameters), {tp: []})[tp]
 
@@ -522,9 +559,9 @@ class dataframe(object):
                     final_objjson.rec_update(new_obj.__dict__)
                     self.current_state[groupname][id] = final_objjson
                     new_obj.__dict__ = final_objjson
-                    
+                    part_obj_map.setdefault(groupname, {})[id] = new_obj
                 for member, status in obj_changes["types"].items():
-                    if not (member in self.member_to_group and self.member_to_group[member] == groupname):
+                    if not (member in self.member_to_group and self.member_to_group[member] == groupname and member in self.observing_types):
                         continue
                     if status == Event.New:
                         self.object_map.setdefault(member, RecursiveDictionary())[id] = change_type(new_obj, self.name2class[member])
@@ -540,20 +577,67 @@ class dataframe(object):
 
 
         
-        return needs_second_pass, nsp_items, deletes
+        return needs_second_pass, nsp_items, deletes, part_obj_map
 
-    def apply_all(self, obj_changes, record_change = False, push_to_subscribers = False):
+    def __report_to_dataframes(self, obj_changes):
+        possible_dfs = set()
+        for tpname in obj_changes:
+            if tpname not in self.tp_to_attached_df:
+                continue
+            for df in self.tp_to_attached_df[tpname]:
+                possible_dfs.add(df)
+        for df in possible_dfs:
+            df.apply_all(obj_changes)
+
+    def apply_all(self, obj_changes, record_change = False):
+        obj_changes = RecursiveDictionary(obj_changes) if not type(obj_changes) == RecursiveDictionary else obj_changes
+        if self.mode == DataframeModes.Master:
+            # if master: send changes to all other dataframes attached.
+            # apply changes to object_map, and currect_state
+            # adjust pcc
+            self.__report_to_dataframes(obj_changes)
+            objmaps = self.__apply(obj_changes)
+            for groupname, grpobjs in objmaps.items():
+                self.__adjust_pcc(grpobjs, groupname)
+            return
+        elif self.mode == DataframeModes.ApplicationCache:
+            # if cache: 
+            # forward relevant changes to record
+            if not self.start_recording:
+                return
+            for groupname in obj_changes:
+                if groupname in self.group_to_members:
+                    for id in obj_changes[groupname]:
+
+                        finaltpmap = RecursiveDictionary([(tpname, obj_changes[groupname][id]["types"][tpname]) for tpname in obj_changes[groupname][id]["types"] 
+                                           if tpname in self.member_to_group and self.member_to_group[tpname] == groupname and tpname in self.observing_types])
+                        if len(finaltpmap) > 0:
+                            # There are records to process
+                            if "dims" in obj_changes[groupname][id]:
+                                dims_releveant = RecursiveDictionary([(dim, obj_changes[groupname][id]["dims"][dim]) for dim in obj_changes[groupname][id]["dims"]
+                                                       if hasattr(self.fake_class_map[groupname], dim)])
+                                self.current_record.setdefault(groupname, RecursiveDictionary()).setdefault(id, RecursiveDictionary()).rec_update(RecursiveDictionary({"types": finaltpmap, "dims": dims_releveant}))
+            return
+
+        elif self.mode == DataframeModes.Client:
+            # if master
+            # apply changes to object_map, and currect_state
+            self.__apply(obj_changes)
+        else:
+            raise TypeError("Unknown dataframe mode %s" % self.mode)
+        return
+
+    def __apply(self, obj_changes):
         relevant_changes = {}
+        part_obj_map = {}
         for groupname in obj_changes:
             if groupname in self.group_to_members:
                 relevant_changes[groupname] = obj_changes[groupname]
-        needs_second_pass, nsp_items, deletes = self.__pass1_objs(relevant_changes)
+        needs_second_pass, nsp_items, deletes, part_obj_map = self.__pass1_objs(relevant_changes)
         if needs_second_pass:
             # Not implemented yet.
             part_obj_map = self.__pass2_obj(relevant_changes, nsp_items)
 
-        if record_change:
-            self.current_record.rec_update(relevant_changes)
         group_id_map = {}
         remaining = {}
         deleted = {}
@@ -585,42 +669,32 @@ class dataframe(object):
                 if gcount == len(group_id_map[gname][id]):
                     del self.object_map[gname][id]
                     del self.current_state[gname][id]
-        if push_to_subscribers:
-            for name in relevant_changes:
-                for id in relevant_changes[name]:
-                    self.push_to_subscribers(name, id, relevant_changes[name][id])
+        return part_obj_map
 
-    def register_subscriber(self, subscribe_name, types):
-        for tp in types:
-            if tp.__realname__ in self.name2class:
-                self.subscriber_map.setdefault(tpname, set()).add(subscribe_name)
+    def record_using_json(self, tpname, id, changes, ):
+        self.apply_all({tpname: {id: changes}}, True)
+    
+    def record_using_objmap(self, objmap):
+        for tpname in objmap:
+            if tpname not in self.observing_types:
+                continue
+            for id in objmap[tpname]:
+                self.record(Event.New, tpname, id, self.__convert_to_dim_map(objmap[tpname][id]))     
 
-    def unregister_subscriber(self, subscribe_name, types):
-        for tp in types:
-            if tp.__realname__ in self.name2class:
-                self.subscriber_map.setdefault(tpname, set()).remove(subscribe_name)
+    def record(self, event_type, tpname, id, dim_change = None):
+        if self.start_recording:
+            groupname = self.member_to_group[tpname]
+            self.current_record.setdefault(
+                groupname, RecursiveDictionary()).setdefault(
+                    id, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({tpname: event_type}))
+            if dim_change:
+                self.current_record[groupname][id].setdefault(
+                    "dims", RecursiveDictionary()).rec_update(dict([(k._name, self.__generate_dim(v)) for k, v in dim_change.items()]))
 
-    def push_to_subscribers(self, tpname, id, changes):
-        if tpname in self.subscriber_map:
-            for subscriber in self.subscriber_map[tpname]:
-                subscriber.record_using_json(tpname, id, change_type)
-
-    def record_using_json(self, tpname, id, changes, push_to_subscribers = False):
-        self.apply_all({tpname: {id: changes}}, True, push_to_subscribers)
-        
-    def record(self, event_type, tpname, id, dim_change = None, push_to_subscribers = True):
-        if not self.start_recording:
-            return
-        groupname = self.member_to_group[tpname]
-        self.current_record.setdefault(
-            groupname, RecursiveDictionary()).setdefault(
-                id, {"types": RecursiveDictionary()})["types"].rec_update({tpname: event_type})
-        if dim_change:
-            self.current_record[groupname][id].setdefault(
-                "dims", RecursiveDictionary()).rec_update(dict([(k._name, self.__generate_dim(v)) for k, v in dim_change.items()]))
-
-        if push_to_subscribers:
-            self.push_to_subscribers(tpname, id, self.current_record[groupname][id])
+        if tpname in self.tp_to_attached_df:
+            for df in self.tp_to_attached_df[tpname]:
+                if df.start_recording:
+                    df.record(event_type, tpname, id, dim_change)
 
     def get_record(self):
         return self.current_record
@@ -637,7 +711,14 @@ class dataframe(object):
 
     def clear_buffer(self):
         self.current_buffer = RecursiveDictionary()
-                                                                                        
+         
+    def clear_all(self):
+        self.clear_buffer()
+        self.clear_record()
+        for tp in self.current_state:
+            self.current_state[tp] = RecursiveDictionary()
+        for tp in self.object_map:
+            self.object_map[tp] = RecursiveDictionary()                                                                               
 
     def get_new(self, tp):
         tpname = tp.__realname__

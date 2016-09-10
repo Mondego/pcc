@@ -4,7 +4,7 @@ from pcc.attributes import dimension, primarykey
 from pcc.set import pcc_set
 from pcc.subset import subset
 from pcc.impure import impure
-from pcc.dataframe import dataframe
+from pcc.dataframe import dataframe, DataframeModes
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
     
@@ -101,7 +101,7 @@ update_json1 = {
                         },
                         "velocity": {
                             "type": "literal",
-                            "value": "0"
+                            "value": 0
                         },
                         "color": {
                             "type": "literal",
@@ -120,7 +120,7 @@ update_json1 = {
                         },
                         "velocity": {
                             "type": "literal",
-                            "value": "0"
+                            "value": 0
                         },
                         "color": {
                             "type": "literal",
@@ -140,7 +140,7 @@ update_json1 = {
                         },
                         "velocity": {
                             "type": "literal",
-                            "value": "1"
+                            "value": 1
                         },
                         "color": {
                             "type": "literal",
@@ -161,7 +161,50 @@ update_json1 = {
                         },
                         "velocity": {
                             "type": "literal",
-                            "value": "2"
+                            "value": 2
+                        },
+                        "color": {
+                            "type": "literal",
+                            "value": "RED"
+                        },
+                    },
+                }
+            }    
+        }
+resp_json1 = {
+            "Car": {
+                "id3": {
+                    "types": {
+                        "ActiveCar": "new"
+                    },
+                    "dims": {
+                        "id": {
+                            "type": "literal",
+                            "value": "id3"
+                        },
+                        "velocity": {
+                            "type": "literal",
+                            "value": 1
+                        },
+                        "color": {
+                            "type": "literal",
+                            "value": "GREEN"
+                        }
+                    }
+                },
+                "id4": {
+                    "types": {
+                        "ActiveCar": "new",
+                        "RedActiveCar": "new"
+                    },
+                    "dims": {
+                        "id": {
+                            "type": "literal",
+                            "value": "id4"
+                        },
+                        "velocity": {
+                            "type": "literal",
+                            "value": 2
                         },
                         "color": {
                             "type": "literal",
@@ -249,7 +292,7 @@ update_json6 = {
                     "dims": {
                         "velocity": {
                             "type": "literal",
-                            "value": "0"
+                            "value": 0
                         }
                     }
                 }
@@ -282,6 +325,87 @@ update_json7 = {
                 }
             }    
         }
+update_json8 = {
+            "Car": {
+                "id1": {
+                    "types": {
+                        "Car": "new"
+                    },
+                    "dims": {
+                        "id": {
+                            "type": "literal",
+                            "value": "id1"
+                        },
+                        "velocity": {
+                            "type": "literal",
+                            "value": 0
+                        },
+                        "color": {
+                            "type": "literal",
+                            "value": "BLUE"
+                        }
+                    }
+                },
+                "id2": {
+                    "types": {
+                        "Car": "new"
+                    },
+                    "dims": {
+                        "id": {
+                            "type": "literal",
+                            "value": "id2"
+                        },
+                        "velocity": {
+                            "type": "literal",
+                            "value": 0
+                        },
+                        "color": {
+                            "type": "literal",
+                            "value": "RED"
+                        }
+                    }
+                },
+                "id3": {
+                    "types": {
+                        "Car": "new"
+                    },
+                    "dims": {
+                        "id": {
+                            "type": "literal",
+                            "value": "id3"
+                        },
+                        "velocity": {
+                            "type": "literal",
+                            "value": 1
+                        },
+                        "color": {
+                            "type": "literal",
+                            "value": "GREEN"
+                        }
+                    }
+                },
+                "id4": {
+                    "types": {
+                        "Car": "new"
+                    },
+                    "dims": {
+                        "id": {
+                            "type": "literal",
+                            "value": "id4"
+                        },
+                        "velocity": {
+                            "type": "literal",
+                            "value": 2
+                        },
+                        "color": {
+                            "type": "literal",
+                            "value": "RED"
+                        },
+                    },
+                }
+            }    
+        }
+
                             
 
 class Test_dataframe_transfer_tests(unittest.TestCase):
@@ -331,7 +455,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         try:
             df.get(Car)
             self.fail()
-        except KeyError:
+        except TypeError:
             self.assertTrue(True)
         
     def test_dataframe_apply_delete1(self):
@@ -605,3 +729,76 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get_new(RedActiveCar)) == 0)
         self.assertTrue(len(df.get_mod(RedActiveCar)) == 0)
         self.assertTrue(len(df.get_deleted(RedActiveCar)) == 1)  
+
+    def test_dataframe_apply_between_master_slaves1(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df_m = dataframe()
+        df_s = dataframe(mode = DataframeModes.ApplicationCache)
+        df_m.add_types([Car, ActiveCar, RedActiveCar])
+        df_s.add_types([Car, ActiveCar, RedActiveCar])
+        df_m.connect(df_s)
+        df_s.start_recording = True
+        df_m.apply_all(update_json1)
+        #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        self.assertTrue(df_s.get_record() == update_json1)
+        self.assertTrue(df_s.get(Car) == df_m.get(Car))
+        self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
+        self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
+
+    def test_dataframe_apply_between_master_slaves2(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df_m = dataframe()
+        df_s = dataframe(mode = DataframeModes.ApplicationCache)
+        df_m.add_types([Car, ActiveCar, RedActiveCar])
+        df_s.add_types([ActiveCar, RedActiveCar])
+        df_m.connect(df_s)
+        df_s.start_recording = True
+        df_m.apply_all(update_json1)
+        #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        self.assertTrue(df_s.get_record() == resp_json1)
+        try:
+            df_s.get(Car)
+            self.fail("Didn't catch exception at previous line")
+        except TypeError:
+            self.assertTrue(True)
+        self.assertTrue(len(df_m.get(Car)) == 4)
+        self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
+        self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
+    
+    def test_dataframe_apply_between_master_slaves3(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df_m = dataframe()
+        df_s = dataframe(mode = DataframeModes.ApplicationCache)
+        df_m.add_types([Car, ActiveCar, RedActiveCar])
+        df_s.add_types([ActiveCar, RedActiveCar])
+        df_m.connect(df_s)
+        df_s.start_recording = True
+        df_m.apply_all(update_json8)
+        #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        self.assertTrue(df_s.get_record() == resp_json1)
+        try:
+            df_s.get(Car)
+            self.fail("Didn't catch exception at previous line")
+        except TypeError:
+            self.assertTrue(True)
+        self.assertTrue(len(df_m.get(Car)) == 4)
+        self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
+        self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
+        
+    def test_dataframe_apply_to_client1(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df = dataframe(mode = DataframeModes.Client)
+        df.add_types([Car, ActiveCar, RedActiveCar])
+        df.apply_all(update_json8)
+        self.assertTrue(len(df.get(Car)) == 4)
+        self.assertTrue(len(df.get(ActiveCar)) == 0)
+        self.assertTrue(len(df.get(RedActiveCar)) == 0)
+
+    def test_dataframe_apply_to_client2(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df = dataframe(mode = DataframeModes.Client)
+        df.add_types([Car, ActiveCar, RedActiveCar])
+        df.apply_all(update_json1)
+        self.assertTrue(len(df.get(Car)) == 4)
+        self.assertTrue(len(df.get(ActiveCar)) == 2)
+        self.assertTrue(len(df.get(RedActiveCar)) == 1)

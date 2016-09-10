@@ -8,7 +8,6 @@ from recursive_dictionary import RecursiveDictionary
 from create import create, change_type
 from uuid import uuid4
 from parameter import ParameterMode
-from cache import Cache
 
 class DimensionType(object):
     Literal = "literal"
@@ -35,7 +34,8 @@ class Event(object):
     Modification = "mod"
 
 class dataframe(object):
-    def __init__(self, lock=None):
+    def __init__(self, lock=None, dont_calculate_pcc = False):
+        self.dont_calculate_pcc = dont_calculate_pcc
         # group key (always string fullanme of type) to members of group.  For example: car -> activecar,
         # inactivecar, redcar, etc etc.
         self.group_to_members = {}
@@ -202,6 +202,8 @@ class dataframe(object):
         return new_objs_map
 
     def __adjust_pcc(self, objs, groupname, push_to_subscribers = False):
+        if self.dont_calculate_pcc:
+            return
         can_be_created = []
         for othertp in self.group_to_members[groupname]:
             other_cats = self.categories[othertp.__realname__]
@@ -282,6 +284,8 @@ class dataframe(object):
         pccs[pcctype] = self.__make_pcc(pcctype, relevant_objs, param_collection_objs, params, hasSingleton, hasCollection)
 
     def __calculate_pcc(self, pcctypes, universe, params):
+        if self.dont_calculate_pcc:
+           return {} 
         pccs = {}
         for pcctype in pcctypes:
             self.__construct_pccs(pcctype, pccs, universe, params)
@@ -387,7 +391,11 @@ class dataframe(object):
         if groupname in self.name2class and self.name2class[groupname] in self.group_to_members[groupname]:
             self.record(Event.Modification, groupname, id, {name: value}, push_to_subscribers) 
 
-    def add_type(self, tp, except_type = None, push_to_subscribers = False):
+    def connect(self, new_df):
+        # If I connect the current states, the __dict__ of objects in the two dataframes will be in reference.
+        new_df.current_state = self.current_state
+
+    def add_type(self, tp, except_type = None, push_to_subscribers = False, tracking=False):
         categories = self.__categorize(tp)
         # str name of the type.
         name = tp.__realname__
@@ -432,7 +440,7 @@ class dataframe(object):
         for dim in tp.__dimensions__:
             dim._dataframe_data.add((key, self.__adjust_pcc, self.__report_dim_modification, push_to_subscribers))
 
-    def add_types(self, types):
+    def add_types(self, types, tracking=False):
         for tp in types:
             self.add_type(tp)
 
@@ -638,7 +646,14 @@ class dataframe(object):
 
     def clear_buffer(self):
         self.current_buffer = RecursiveDictionary()
-                                                                                        
+         
+    def clear_all(self):
+        self.clear_buffer()
+        self.clear_record()
+        for tp in self.current_state:
+            self.current_state[tp] = RecursiveDictionary()
+        for tp in self.object_map:
+            self.object_map[tp] = RecursiveDictionary()                                                                               
 
     def get_new(self, tp):
         tpname = tp.__realname__
