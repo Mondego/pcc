@@ -173,6 +173,7 @@ class dataframe(object):
             all_categories.add(ObjectType.Union)
         if hasattr(tp, "__pcc_param__") and tp.__pcc_param__:
             all_categories.add(ObjectType.Param)
+            all_categories.add(ObjectType.Impure)
         if hasattr(tp, "__pcc_isa__") and tp.__pcc_isa__:
             all_categories.add(ObjectType.ISA)
         if hasattr(tp, "__pcc_impure__") and tp.__pcc_impure__:
@@ -192,6 +193,8 @@ class dataframe(object):
         return new_obj
 
     def __is_impure(self, tp, categories):
+        if self.mode == DataframeModes.Client:
+            return False
         return (len(set([ObjectType.Join,
                          ObjectType.Impure,
                          ObjectType.Param,
@@ -224,11 +227,12 @@ class dataframe(object):
                     othertpname, 
                     RecursiveDictionary())[new_obj.__primarykey__] = new_obj
 
-        for othertp in new_objs_map:
+        for othertp in old_memberships:
+            othertpname = othertp.__realname__
             for id in set(old_memberships[othertp]).difference(set(id_map[othertp])):
-                if self.start_recording or self.member_to_group[othertpname] in self.tp_to_attached_df:
-                    self.add_to_record_cache(Event.Delete, othertp.__realname__, id, None)
-                del self.object_map[othertp.__realname__][id]
+                if self.start_recording or othertpname in self.tp_to_attached_df:
+                    self.add_to_record_cache(Event.Delete, othertpname, id, None)
+                del self.object_map[othertpname][id]
 
         return new_objs_map
 
@@ -246,14 +250,12 @@ class dataframe(object):
                 can_be_created.append(othertp)
 
         old_memberships = {}
-        for id in objs:
-            for othertp in can_be_created:
-                old_memberships[othertp] = set()
-                othertpname = othertp.__realname__
-                if (othertpname in self.known_objects 
-                    and id in self.known_objects[othertpname]):
-                    old_memberships[othertp].add(id)
-        
+        for othertp in can_be_created:
+            othertpname = othertp.__realname__
+            old_set = old_memberships.setdefault(othertp, set())
+            if (othertpname in self.known_objects):
+                old_set.update(set([id for id in self.known_objects[othertpname] if id in objs]))
+            
         new_objs_map = self.__record_pcc_changes(self.__calculate_pcc(can_be_created, {groupname: objs}, None),
                                                  old_memberships,
                                                  {groupname: original_changes} if original_changes else None)
@@ -273,7 +275,7 @@ class dataframe(object):
         # Why? Random, couldnt think of a better way
 
         if hasCollection:
-            for tp in pcctype.__parameter_types__:
+            for tp in pcctype.__parameter_types__[ParameterMode.Collection]:
                 param_list.append(param_map[tp])
         if hasSingleton:
             param_list.extend(params)
@@ -781,7 +783,8 @@ class dataframe(object):
                 tp = self.name2class[tpname]
                 with self.lock:
                     objs = self.__calculate_pcc([tp], self.object_map, parameters, True)
-                self.__record_pcc_changes(objs, {}.fromkeys(objs, []))
+                    known_members = dict([(tp, self.known_objects[tp.__realname__] if tp.__realname__ in self.known_objects else []) for tp in objs])
+                self.__record_pcc_changes(objs, known_members)
                 self.apply_records_in_cache()
         
         return self.current_record
