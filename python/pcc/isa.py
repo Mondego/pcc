@@ -10,4 +10,5 @@ class isa(object):
     if hasattr(actual_class, "__isa__"):
       actual_class.__isa__.add(of_cls)
       actual_class.__dimensions__.update(set(dimensions))
+    actual_class.__pcc_isa__ = True
     return actual_class

@@ -26,6 +26,8 @@ class subset(object):
         # The pcc subset class being cooked right here.
         class _Subset(object):
             __realname__ = actual_class.__name__
+            actual_class.__realname__ = __realname__
+        
             __metaclass__ = PCCMeta(actual_class)
             __dependent_type__ = True
             __ENTANGLED_TYPES__ = [self.type]
@@ -36,7 +38,8 @@ class subset(object):
             __start_tracking__ = False
             __dimensions__ = actual_class.__dimensions__ if hasattr(actual_class, "__dimensions__") else set()
             __dimensions_name__ = actual_class.__dimensions_name__ if hasattr(actual_class, "__dimensions_name__") else set()
-            
+            __pcc_subset__ = True
+
             @staticmethod
             def Class():
                 # Not sure if this should be exposed,

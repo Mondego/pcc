@@ -32,9 +32,11 @@ class spacetime_property(property):
         setattr(self, "_type", tp)
         setattr(self, "_dimension", True)
         setattr(self, "_name", fget.func_name)
-        setattr(self, "change", {})
+        setattr(self, "change", dict())
         setattr(self, "_primarykey", None)
 
+        # the next 2 is only for dataframe use
+        setattr(self, "_dataframe_data", set())
         property.__init__(self, fget, fset, fdel, doc)
 
     def setter(self, fset):
@@ -50,15 +52,19 @@ class spacetime_property(property):
 
     def __set__(self, obj, value, bypass = False):
         property.__set__(self, obj, value)
-        if not hasattr(obj, "__start_tracking__") or not spacetime_property.GLOBAL_TRACKER:
+        if not hasattr(obj, "__start_tracking__"):
             return
+        if self._dataframe_data and hasattr(obj, "__primarykey__") and obj.__primarykey__:
+            for key, tr, rc in self._dataframe_data:
+                tr({obj.__primarykey__: obj}, key)
+                rc(obj.__primarykey__, self, value, key)
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
                 value = str(uuid.uuid4())
                 obj._primarykey = self
             property.__set__(self, obj, value)
             return
-        if not self._primarykey and "_primarykey" != self._name:
+        if not self._primarykey and "_primarykey" != self._name and spacetime_property.GLOBAL_TRACKER:
             type_name = get_type(value)
             store_value = value
             if type_name == "dependent":
@@ -69,7 +75,7 @@ class spacetime_property(property):
             spacetime_property.change_tracker.setdefault(
                 currentThread().getName(), RecursiveDictionary()).setdefault(
                     obj.__class__, RecursiveDictionary()).setdefault(
-                        obj.__primarykey__, {})[self._name] = store_value
+                        obj.__primarykey__, dict())[self._name] = store_value
         else:
             setattr(obj, self._name, value, bypass = True)
 

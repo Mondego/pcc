@@ -8,6 +8,12 @@ from pcc import dataframe
 from pcc import dimension
 
 class Transaction(object):
+    @primarykey(str)
+    def id(self): return self._id
+
+    @id.setter
+    def id(self, value): self._id = value
+
     @dimension(int)
     def card(self):
         return self._card
@@ -50,14 +56,14 @@ class HighValueTransaction(Transaction):
     def flag(self):
         self.suspicious = True
 
+if __name__ == "__main__":
+    t1 = Transaction(1, 100)
+    t2 = Transaction(2, 1000)
+    t3 = Transaction(0, 10000)
 
-t1 = Transaction(1, 100)
-t2 = Transaction(2, 1000)
-t3 = Transaction(0, 10000)
+    with dataframe() as df:
+        for hvt in df.add(HighValueTransaction, [t1, t2, t3]):
+            hvt.flag()
 
-with dataframe() as df:
-    for hvt in df.add(HighValueTransaction, [t1, t2, t3]):
-        hvt.flag()
-
-for t in [t1, t2, t3]:
-    t.declare()
+    for t in [t1, t2, t3]:
+        t.declare()

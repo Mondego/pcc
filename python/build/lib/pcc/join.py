@@ -16,11 +16,13 @@ class join(object):
         # actual_class the class that is being passed from application.
         class _Join(object):
             __realname__ = actual_class.__name__
+            actual_class.__realname__ = __realname__
             __metaclass__ = PCCMeta(actual_class)
             __dependent_type__ = True
             __ENTANGLED_TYPES__ = self.types
             __PCC_BASE_TYPE__ = False
             __pcc_bases__ = set(self.types)
+            __pcc_join__ = True
             for tp in self.types:
                  if hasattr(tp, "__pcc_bases__"):
                         __pcc_bases__.update(tp.__pcc_bases__)
