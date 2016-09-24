@@ -461,7 +461,7 @@ class dataframe(object):
 
     def add_type(self, tp, except_type = None, tracking=False, not_member=False):
         with self.lock:
-            self.__add_type(self, tp, except_type, tracking, not_member)
+            self.__add_type(tp, except_type, tracking, not_member)
 
     def __add_type(self, tp, except_type = None, tracking=False, not_member=False):
         categories = self.__categorize(tp)

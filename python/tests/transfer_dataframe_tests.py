@@ -7,6 +7,7 @@ from pcc.impure import impure
 from pcc.dataframe import dataframe, DataframeModes
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
+from pcc.projection import projection
     
 import unittest, json
 
@@ -291,6 +292,46 @@ def create_cars_withobjects():
             self.color = col
 
     return Car
+
+def CreateProjectionTypesAndObjects():
+    @pcc_set
+    class Car(object):
+        @primarykey(int)
+        def oid(self): return self._id
+        @oid.setter
+        def oid(self, value): self._id = value
+        @dimension(int)
+        def owner(self): return self._owner
+        @owner.setter
+        def owner(self, value): self._owner = value
+        @dimension(int)
+        def location(self): return self._location
+        @location.setter
+        def location(self, value): self._location = value
+        @dimension(int)
+        def velocity(self): return self._velocity
+        @velocity.setter
+        def velocity(self, value): self._velocity = value
+
+        def __init__(self, id, owner, location, velocity):
+            (self.id, self.owner, self.location, self.velocity) = (id, owner, location, velocity)
+
+        def change_owner(self, owner, license):
+            self.owner, self.license = owner, license
+
+        def details(self):
+            return (self.id, self.owner, self.location, self.velocity)
+
+    @projection(Car, Car.oid, Car.location, Car.velocity)
+    class CarForPedestrian(object):
+        pass
+
+    car1 = Car(1, "Murugan", "himalaya", 299792458)
+    car2 = Car(2, "Shiva", "himalaya", 299792459)
+
+    return Car, CarForPedestrian, [car1, car2] 
+
+
 
 update_json1 = {
             "Car": {
@@ -727,7 +768,99 @@ update_json9 = '''{
                 }
             }
         }'''
-                            
+update_json10 = '''{
+    "Car": {
+        "586d5e49-2da7-4318-a09b-795744be9867": {
+            "dims": {
+                "location": {
+                    "type": 0,
+                    "value": "himalaya"
+                },
+                "oid": {
+                    "type": 0,
+                    "value": "586d5e49-2da7-4318-a09b-795744be9867"
+                },
+                "owner": {
+                    "type": 0,
+                    "value": "Shiva"
+                },
+                "velocity": {
+                    "type": 0,
+                    "value": 299792459
+                }
+            },
+            "types": {
+                "Car": 1
+            }
+        },
+        "8b2658fb-ab86-4e00-96bc-31952d8eb38f": {
+            "dims": {
+                "location": {
+                    "type": 0,
+                    "value": "himalaya"
+                },
+                "oid": {
+                    "type": 0,
+                    "value": "8b2658fb-ab86-4e00-96bc-31952d8eb38f"
+                },
+                "owner": {
+                    "type": 0,
+                    "value": "Murugan"
+                },
+                "velocity": {
+                    "type": 0,
+                    "value": 299792458
+                }
+            },
+            "types": {
+                "Car": 1
+            }
+        }
+    }
+}
+'''                      
+resp_json10 = {
+    "Car": {
+        "586d5e49-2da7-4318-a09b-795744be9867": {
+            "dims": {
+                "location": {
+                    "type": 0,
+                    "value": "himalaya"
+                },
+                "oid": {
+                    "type": 0,
+                    "value": "586d5e49-2da7-4318-a09b-795744be9867"
+                },
+                "velocity": {
+                    "type": 0,
+                    "value": 299792459
+                }
+            },
+            "types": {
+                "CarForPedestrian": 1
+            }
+        },
+        "8b2658fb-ab86-4e00-96bc-31952d8eb38f": {
+            "dims": {
+                "location": {
+                    "type": 0,
+                    "value": "himalaya"
+                },
+                "oid": {
+                    "type": 0,
+                    "value": "8b2658fb-ab86-4e00-96bc-31952d8eb38f"
+                },
+                "velocity": {
+                    "type": 0,
+                    "value": 299792458
+                }
+            },
+            "types": {
+                "CarForPedestrian": 1
+            }
+        }
+    }
+}
 
 class Test_dataframe_transfer_tests(unittest.TestCase):
     def test_dataframe_apply_all_new(self):
@@ -1132,6 +1265,29 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(InactiveCar)) == 2)
         self.assertTrue(len(df.get(ActiveCar)) == 0)
-        
 
+    def test_dataframe_apply_projections(self):
+        Car, CarForPedestrian, cars = CreateProjectionTypesAndObjects()
+        df = dataframe()
+        df.add_types([Car, CarForPedestrian])
+        df.apply_all(json.loads(update_json10))
+        self.assertTrue(len(df.get(Car)) == 2)
+        self.assertTrue(len(df.get(CarForPedestrian)) == 2)
+        for c in df.get(CarForPedestrian):
+            self.assertFalse(hasattr(c, "owner"))
+            self.assertTrue(hasattr(c, "location"))
+        
+    def test_dataframe_apply_projections_cache(self):
+        Car, CarForPedestrian, cars = CreateProjectionTypesAndObjects()
+        df = dataframe()
+        df.add_types([Car, CarForPedestrian])
+        df_cache = dataframe(mode = DataframeModes.ApplicationCache)
+        df_cache.add_type(CarForPedestrian)
+        df_cache.start_recording = True
+        df.connect(df_cache)
+        df.apply_all(json.loads(update_json10))
+        self.assertTrue(len(df.get(Car)) == 2)
+        self.assertTrue(len(df.get(CarForPedestrian)) == 2)
+        #print json.dumps(df_cache.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        self.assertTrue(df_cache.get_record() == resp_json10)
     

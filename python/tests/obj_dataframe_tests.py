@@ -7,6 +7,7 @@ from pcc.impure import impure
 from pcc.dataframe import dataframe
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
+from pcc.projection import projection
     
 import unittest
 
@@ -310,6 +311,45 @@ def _join_example_data():
     t4 = Transaction(3, 10000)
     return Person, Card, Transaction, RedAlert, [p1, p2, p3], [c1p1, c2p1, c1p2, c1p3], [t1, t2, t3, t4]
 
+def _CreateProjectionTypesAndObjects():
+    @pcc_set
+    class Car(object):
+        @primarykey(int)
+        def oid(self): return self._id
+        @oid.setter
+        def oid(self, value): self._id = value
+        @dimension(int)
+        def owner(self): return self._owner
+        @owner.setter
+        def owner(self, value): self._owner = value
+        @dimension(int)
+        def location(self): return self._location
+        @location.setter
+        def location(self, value): self._location = value
+        @dimension(int)
+        def velocity(self): return self._velocity
+        @velocity.setter
+        def velocity(self, value): self._velocity = value
+
+        def __init__(self, id, owner, location, velocity):
+            (self.id, self.owner, self.location, self.velocity) = (id, owner, location, velocity)
+
+        def change_owner(self, owner, license):
+            self.owner, self.license = owner, license
+
+        def details(self):
+            return (self.id, self.owner, self.location, self.velocity)
+
+    @projection(Car, Car.oid, Car.location, Car.velocity)
+    class CarForPedestrian(object):
+        pass
+
+    car1 = Car(1, "Murugan", "himalaya", 299792458)
+    car2 = Car(2, "Shiva", "himalaya", 299792459)
+
+    return Car, CarForPedestrian, [car1, car2] 
+
+
 
 class Test_dataframe_object_tests(unittest.TestCase):
     def test_base_set_addition(self):
@@ -427,3 +467,19 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.get(RedActiveCar)[0].velocity = 0
         self.assertTrue(len(df.get(RedActiveCar)) == 1)
         self.assertTrue(len(df.get(ActiveCar)) == 2)
+
+    def test_projection_get(self):
+        Car, CarForPedestrian, cars = _CreateProjectionTypesAndObjects()
+        df = dataframe()
+        df.add_types([Car, CarForPedestrian])
+        df.extend(Car, cars)
+        self.assertTrue(len(df.object_map[CarForPedestrian.__realname__]) == 2)
+        cars_p = df.get(CarForPedestrian)
+        self.assertTrue(len(cars_p) == 2)
+        for c in cars_p:
+            self.assertTrue(hasattr(c, "location"))
+            self.assertTrue(hasattr(c, "velocity"))
+            self.assertTrue(hasattr(c, "oid"))
+            self.assertFalse(hasattr(c, "owner"))
+
+    
