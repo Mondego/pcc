@@ -14,11 +14,11 @@ def _load_edge_nodes():
     @pcc_set
     class Node(object):
         @primarykey(int)
-        def id(self):
+        def oid(self):
             return self._id
 
-        @id.setter
-        def id(self, value):
+        @oid.setter
+        def oid(self, value):
             self._id = value
     
         @dimension(float)
@@ -29,17 +29,17 @@ def _load_edge_nodes():
         def pagerank(self, value):
             self._pagerank = value
 
-        def __init__(self, id, pagerank):
-            self.id, self.pagerank = id, pagerank
+        def __init__(self, oid, pagerank):
+            self.oid, self.pagerank = oid, pagerank
 
     @pcc_set
     class Edge(object):
         @primarykey(int)
-        def id(self):
+        def oid(self):
             return self._id
 
-        @id.setter
-        def id(self, value):
+        @oid.setter
+        def oid(self, value):
             self._id = value
     
         @dimension(Node)
@@ -65,8 +65,8 @@ def _load_edge_nodes():
 
 def _CreateNodesAndEdges():
     Node, Edge = _load_edge_nodes()
-    nodes = []
-    edges = []
+    nodes = list()
+    edges = list()
     for i in range(4):
         nodes.append(Node(i, 0.25))
 
@@ -82,10 +82,10 @@ def _subset_classes():
     @pcc_set
     class Transaction(object):
         @primarykey(str)
-        def id(self): return self._id
+        def oid(self): return self._id
 
-        @id.setter
-        def id(self, value): self._id = value
+        @oid.setter
+        def oid(self, value): self._id = value
 
         @dimension(int)
         def card(self):
@@ -140,24 +140,24 @@ def _CreateInAndOutEdgeTypes(Edge, Node):
     class InEdge(Edge):
         @staticmethod
         def __predicate__(e, n):
-            return e.end.id == n.id
+            return e.end.oid == n.oid
 
     @parameter(Node, mode = ParameterMode.Singleton)
     @subset(Edge)
     class OutEdge(Edge):
         @staticmethod
         def __predicate__(e, n):
-            return e.start.id == n.id
+            return e.start.oid == n.oid
     return InEdge, OutEdge
 
 def _join_example_data():
     @pcc_set
     class Transaction(object):
         @primarykey(str)
-        def id(self): return self._id
+        def oid(self): return self._id
 
-        @id.setter
-        def id(self, value): self._id = value
+        @oid.setter
+        def oid(self, value): self._id = value
 
         @dimension(int)
         def card(self):
@@ -194,11 +194,11 @@ def _join_example_data():
     @pcc_set
     class Card(object):
         @primarykey(int)
-        def id(self):
+        def oid(self):
             return self._id
 
-        @id.setter
-        def id(self, value):
+        @oid.setter
+        def oid(self, value):
             self._id = value
         
         @dimension(bool)
@@ -217,8 +217,8 @@ def _join_example_data():
         def owner(self, value):
             self._owner = value
         
-        def __init__(self, id, owner):
-            self.id = id
+        def __init__(self, oid, owner):
+            self.oid = oid
             self.owner = owner
             self.holdstate = False
 
@@ -228,11 +228,11 @@ def _join_example_data():
     @pcc_set
     class Person(object):
         @primarykey(int)
-        def id(self):
+        def oid(self):
             return self._id
 
-        @id.setter
-        def id(self, value):
+        @oid.setter
+        def oid(self, value):
             self._id = value
 
         @dimension(str)
@@ -243,8 +243,8 @@ def _join_example_data():
         def name(self, value):
             self._name = value
 
-        def __init__(self, id, name):
-            self.id = id
+        def __init__(self, oid, name):
+            self.oid = oid
             self.name = name
 
         def notify(self):
@@ -253,10 +253,10 @@ def _join_example_data():
     @join(Person, Card, Transaction)
     class RedAlert(object):
         @primarykey(str)
-        def id(self): return self._id
+        def oid(self): return self._id
 
-        @id.setter
-        def id(self, value): self._id = value
+        @oid.setter
+        def oid(self, value): self._id = value
 
         @dimension(Person)
         def p(self):
@@ -289,7 +289,7 @@ def _join_example_data():
 
         @staticmethod
         def __predicate__(p, c, t):
-            return c.owner == p.id and t.card == c.id and t.amount > 2000
+            return c.owner == p.oid and t.card == c.oid and t.amount > 2000
 
         def Protect(self):
             self.t.flag()
@@ -385,10 +385,10 @@ class Test_dataframe_object_tests(unittest.TestCase):
         @pcc_set
         class Car(object):
             @primarykey(str)
-            def id(self): return self._id
+            def oid(self): return self._id
 
-            @id.setter
-            def id(self, value): self._id = value
+            @oid.setter
+            def oid(self, value): self._id = value
 
             @dimension(int)
             def velocity(self): return self._velocity

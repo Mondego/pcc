@@ -32,7 +32,7 @@ class spacetime_property(property):
         setattr(self, "_type", tp)
         setattr(self, "_dimension", True)
         setattr(self, "_name", fget.func_name)
-        setattr(self, "change", {})
+        setattr(self, "change", dict())
         setattr(self, "_primarykey", None)
 
         # the next 2 is only for dataframe use
@@ -75,7 +75,7 @@ class spacetime_property(property):
             spacetime_property.change_tracker.setdefault(
                 currentThread().getName(), RecursiveDictionary()).setdefault(
                     obj.__class__, RecursiveDictionary()).setdefault(
-                        obj.__primarykey__, {})[self._name] = store_value
+                        obj.__primarykey__, dict())[self._name] = store_value
         else:
             setattr(obj, self._name, value, bypass = True)
 

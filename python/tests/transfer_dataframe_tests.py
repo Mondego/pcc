@@ -14,10 +14,10 @@ def create_cars():
     @pcc_set
     class Car(object):
         @primarykey(str)
-        def id(self): return self._id
+        def oid(self): return self._id
 
-        @id.setter
-        def id(self, value): self._id = value
+        @oid.setter
+        def oid(self, value): self._id = value
 
         @dimension(int)
         def velocity(self): return self._velocity
@@ -31,8 +31,8 @@ def create_cars():
         @color.setter
         def color(self, value): self._color = value
 
-        def __init__(self, id, vel, col):
-            self.id = id
+        def __init__(self, oid, vel, col):
+            self.oid = oid
             self.velocity = vel
             self.color = col
 
@@ -268,10 +268,10 @@ def create_cars_withobjects():
     @pcc_set
     class Car(object):
         @primarykey(str)
-        def id(self): return self._id
+        def oid(self): return self._id
 
-        @id.setter
-        def id(self, value): self._id = value
+        @oid.setter
+        def oid(self, value): self._id = value
 
         @dimension(vector)
         def velocity(self): return self._velocity
@@ -285,8 +285,8 @@ def create_cars_withobjects():
         @color.setter
         def color(self, value): self._color = value
 
-        def __init__(self, id, vel, col):
-            self.id = id
+        def __init__(self, oid, vel, col):
+            self.oid = oid
             self.velocity = vel
             self.color = col
 
@@ -296,79 +296,79 @@ update_json1 = {
             "Car": {
                 "id1": {
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id1"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 0
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "BLUE"
                         }
                     }
                 },
                 "id2": {
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id2"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 0
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "RED"
                         }
                     }
                 },
                 "id3": {
                     "types": {
-                        "Car": "new",
-                        "ActiveCar": "new"
+                        "Car": 1,
+                        "ActiveCar": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id3"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 1
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "GREEN"
                         }
                     }
                 },
                 "id4": {
                     "types": {
-                        "Car": "new",
-                        "ActiveCar": "new",
-                        "RedActiveCar": "new"
+                        "Car": 1,
+                        "ActiveCar": 1,
+                        "RedActiveCar": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id4"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 2
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "RED"
                         },
                     },
@@ -379,39 +379,39 @@ resp_json1 = {
             "Car": {
                 "id3": {
                     "types": {
-                        "ActiveCar": "new"
+                        "ActiveCar": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id3"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 1
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "GREEN"
                         }
                     }
                 },
                 "id4": {
                     "types": {
-                        "ActiveCar": "new",
-                        "RedActiveCar": "new"
+                        "ActiveCar": 1,
+                        "RedActiveCar": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id4"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 2
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "RED"
                         },
                     },
@@ -422,11 +422,11 @@ update_json2 = {
             "Car": {
                 "id2": {
                     "types": {
-                        "Car": "mod"
+                        "Car": 2
                     },
                     "dims": {
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "GREEN"
                         }
                     }
@@ -437,13 +437,13 @@ update_json3 = {
             "Car": {
                 "id2": {
                     "types": {
-                        "Car": "mod",
-                        "ActiveCar": "new",
-                        "RedActiveCar": "new"
+                        "Car": 2,
+                        "ActiveCar": 1,
+                        "RedActiveCar": 1
                     },
                     "dims": {
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "1"
                         }
                     }
@@ -454,20 +454,20 @@ update_json4 = {
             "Car": {
                 "id2": {
                     "types": {
-                        "ActiveCar": "new",
-                        "RedActiveCar": "new"
+                        "ActiveCar": 1,
+                        "RedActiveCar": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id2"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "1"
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "RED"
                         }
                     }
@@ -478,9 +478,9 @@ update_json5 = {
             "Car": {
                 "id4": {
                     "types": {
-                        "Car": "delete",
-                        "ActiveCar": "delete",
-                        "RedActiveCar": "delete"
+                        "Car": 0,
+                        "ActiveCar": 0,
+                        "RedActiveCar": 0
                     }
                 }
             }    
@@ -489,13 +489,13 @@ update_json6 = {
             "Car": {
                 "id4": {
                     "types": {
-                        "Car": "mod",
-                        "ActiveCar": "delete",
-                        "RedActiveCar": "delete"
+                        "Car": 2,
+                        "ActiveCar": 0,
+                        "RedActiveCar": 0
                     },
                     "dims": {
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 0
                         }
                     }
@@ -506,24 +506,24 @@ update_json7 = {
             "Car": {
                 "id1": {
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id1"
                         },
                         "velocity": {
-                            "type": "object",
+                            "type": 1,
                             "value": {
-                                "x": { "type": "literal", "value": 10 },
-                                "y": { "type": "literal", "value": 10 },
-                                "z": { "type": "literal", "value": 10 },
+                                "x": { "type": 0, "value": 10 },
+                                "y": { "type": 0, "value": 10 },
+                                "z": { "type": 0, "value": 10 },
                             }
                         },
                         "color": {
-                            "type": "list",
-                            "value": [{"type": "literal", "value": "BLUE"}]
+                            "type": 3,
+                            "value": [{"type": 0, "value": "BLUE"}]
                         }
                     }
                 }
@@ -533,76 +533,76 @@ update_json8 = {
             "Car": {
                 "id1": {
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id1"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 0
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "BLUE"
                         }
                     }
                 },
                 "id2": {
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id2"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 0
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "RED"
                         }
                     }
                 },
                 "id3": {
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id3"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 1
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "GREEN"
                         }
                     }
                 },
                 "id4": {
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     },
                     "dims": {
-                        "id": {
-                            "type": "literal",
+                        "oid": {
+                            "type": 0,
                             "value": "id4"
                         },
                         "velocity": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 2
                         },
                         "color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "RED"
                         },
                     },
@@ -614,115 +614,115 @@ update_json9 = '''{
                 "0fb70042-cb18-4d4c-8ec0-ddfe609f852a": {
                     "dims": {
                         "Color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 5
                         },
                         "ID": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "0fb70042-cb18-4d4c-8ec0-ddfe609f852a"
                         },
                         "Length": {
-                            "type": "literal",
+                            "type": 0,
                             "value": null
                         },
                         "Position": {
-                            "type": "object",
+                            "type": 1,
                             "value": {
                                     "X": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Y": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Z": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     }
                                 }
                         },
                         "Velocity": {
-                            "type": "object",
+                            "type": 1,
                             "value": {
                                     "X": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Y": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Z": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     }
                             }
                         },
                         "Width": {
-                            "type": "literal",
+                            "type": 0,
                             "value": null
                         }
                     },
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     }
                 },
                 "7ff34b19-7f30-4c5d-a246-f1668d3b89b9": {
                     "dims": {
                         "Color": {
-                            "type": "literal",
+                            "type": 0,
                             "value": 5
                         },
                         "ID": {
-                            "type": "literal",
+                            "type": 0,
                             "value": "7ff34b19-7f30-4c5d-a246-f1668d3b89b9"
                         },
                         "Length": {
-                            "type": "literal",
+                            "type": 0,
                             "value": null
                         },
                         "Position": {
-                            "type": "object",
+                            "type": 1,
                             "value": {
                                     "X": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Y": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Z": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     }
                                 }
                         },
                         "Velocity": {
-                            "type": "object",
+                            "type": 1,
                             "value": {
                                     "X": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Y": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     },
                                     "Z": {
-                                        "type": "literal",
+                                        "type": 0,
                                         "value": 0
                                     }
                             }
                         },
                         "Width": {
-                            "type": "literal",
+                            "type": 0,
                             "value": null
                         }
                     },
                     "types": {
-                        "Car": "new"
+                        "Car": 1
                     }
                 }
             }
@@ -833,27 +833,27 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                 "id4" :{
                     "dims" :{
                         "velocity" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :0
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"delete",
-                        "Car" :"mod",
-                        "RedActiveCar" :"delete"
+                        "ActiveCar" :0,
+                        "Car" :2,
+                        "RedActiveCar" :0
                     }
                 },
                 "id5" :{
                     "dims" :{
                         "velocity" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :0
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"delete",
-                        "Car" :"mod",
-                        "RedActiveCar" :"delete"
+                        "ActiveCar" :0,
+                        "Car" :2,
+                        "RedActiveCar" :0
                     }
                 }
             }
@@ -873,80 +873,80 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                 "id1" :{
                     "dims" :{
                         "color" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :"BLUE"
                         },
-                        "id" :{
-                            "type" :"literal",
+                        "oid" :{
+                            "type" :0,
                             "value" :"id1"
                         },
                         "velocity" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :1
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"new",
-                        "Car" :"mod"
+                        "ActiveCar" :1,
+                        "Car" :2
                     }
                 },
                 "id2" :{
                     "dims" :{
                         "color" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :"RED"
                         },
-                        "id" :{
-                            "type" :"literal",
+                        "oid" :{
+                            "type" :0,
                             "value" :"id2"
                         },
                         "velocity" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :1
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"new",
-                        "Car" :"mod",
-                        "RedActiveCar" :"new"
+                        "ActiveCar" :1,
+                        "Car" :2,
+                        "RedActiveCar" :1
                     }
                 },
                 "id3" :{
                     "dims" :{
                         "velocity" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :2
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"mod",
-                        "Car" :"mod"
+                        "ActiveCar" :2,
+                        "Car" :2
                     }
                 },
                 "id4" :{
                     "dims" :{
                         "velocity" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :2
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"mod",
-                        "Car" :"mod",
-                        "RedActiveCar" :"mod"
+                        "ActiveCar" :2,
+                        "Car" :2,
+                        "RedActiveCar" :2
                     }
                 },
                 "id5" :{
                     "dims" :{
                         "velocity" :{
-                            "type" :"literal",
+                            "type" :0,
                             "value" :3
                         }
                     },
                     "types" :{
-                        "ActiveCar" :"mod",
-                        "Car" :"mod",
-                        "RedActiveCar" :"mod"
+                        "ActiveCar" :2,
+                        "Car" :2,
+                        "RedActiveCar" :2
                     }
                 }
             }

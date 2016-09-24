@@ -55,7 +55,7 @@ def pcc_set(actual_class):
         __PCC_BASE_TYPE__ = True
         __dependent_type__ = True
         __pcc_bases__ = set()
-        __ENTANGLED_TYPES__ = []
+        __ENTANGLED_TYPES__ = list()
         __start_tracking__ = False
 
         def __init__(self, *args, **kwargs):

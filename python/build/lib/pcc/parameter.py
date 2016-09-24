@@ -20,7 +20,7 @@ class parameter(object):
         if len(pcc_class.mro()) < 2:
             raise TypeError("Parameter type must derive from some type")
         if not hasattr(pcc_class, "__parameter_types__"):
-            pcc_class.__parameter_types__ = {}
-        pcc_class.__parameter_types__.setdefault(self._mode, []).extend(self._types)
+            pcc_class.__parameter_types__ = dict()
+        pcc_class.__parameter_types__.setdefault(self._mode, list()).extend(self._types)
         pcc_class.__pcc_param__ = True
         return pcc_class
