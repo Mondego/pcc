@@ -98,6 +98,8 @@ class dataframe(object):
         self.lock = lock
 
         self.temp_record = list()
+
+        self.__join_types = set()
             
         
     def __get_depends(self, tp):
@@ -418,29 +420,33 @@ class dataframe(object):
             return DimensionType.Unknown
         return DimensionType.Unknown
 
-    def __generate_dim(self, dim_change):
+    def __generate_dim(self, dim_change, foreign_keys):
         dim_type = self.__get_obj_type(dim_change)
         if dim_type == DimensionType.Literal:
             return {"type": dim_type, "value": dim_change}
         if dim_type == DimensionType.Collection:
             return {
                 "type": DimensionType.Collection,
-                "value": [self.__generate_dim(v) for v in dim_change]
+                "value": [self.__generate_dim(v, foreign_keys) for v in dim_change]
             }
         if dim_type == DimensionType.Dictionary:
             return {
                 "type": DimensionType.Dictionary,
-                "value": dict([(k, self.__generate_dim(v)) for k, v in dim_change.items()])
+                "value": dict([(k, self.__generate_dim(v, foreign_keys)) for k, v in dim_change.items()])
             }
         if dim_type == DimensionType.Object:
             return {
                 "type": DimensionType.Object,
-                "value": self.__generate_dim(dim_change.__dict__)["value"]
+                "value": self.__generate_dim(dim_change.__dict__, foreign_keys)["value"]
             }
         if dim_type == DimensionType.ForeignKey:
+            key, group, fk_type = dim_change.__primarykey__, self.member_to_group[dim_change.__class__.__name__], dim_change.__class__.__name__
+            foreign_keys.append((key, group))
             return {
                 "type": DimensionType.ForeignKey,
-                "value": dim_change.__primarykey__
+                "value": key,
+                "groupname": group,
+                "pcc_type": fk_type
             }
         raise TypeError("Don't know how to deal with %s" % dim_change)
 
@@ -507,6 +513,8 @@ class dataframe(object):
         self.current_state.setdefault(key, RecursiveDictionary())
         self.fake_class_map.setdefault(key, self.__create_fake_class()).add_dims(tp.__dimensions__)
         
+        if ObjectType.Join in categories:
+            self.__join_types.add(name)
 
         for dim in tp.__dimensions__:
             dim._dataframe_data.add((key, self.__adjust_pcc, self.__report_dim_modification))
@@ -558,6 +566,9 @@ class dataframe(object):
         with self.lock:
             if not self.__is_impure(tp, self.categories[tp.__realname__]) and tpname in self.object_map:
                 return self.object_map[tpname].values()
+
+        if hasattr(tp, "__PCC_BASE_TYPE__") and tp.__PCC_BASE_TYPE__:
+            return list()
 
         if not self.calculate_pcc:
             # Not calculating pcc if Client/Cache mode
@@ -776,10 +787,18 @@ class dataframe(object):
                     groupname, RecursiveDictionary()).setdefault(
                         oid, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({tpname: event_type}))
                 if dim_change:
+                    fks = []
                     self.current_record[groupname][oid].setdefault(
                         "dims", RecursiveDictionary()).rec_update(dict([(k if already_converted else k._name, 
-                                                                         v if already_converted else self.__generate_dim(v)) 
+                                                                         v if already_converted else self.__generate_dim(v, fks)) 
                                                                         for k, v in dim_change.items()]))
+                    for fk, fk_type, group in fks:
+                        if group in self.known_objects:
+                            fk_event_type = Event.New if fk not in self.known_objects[group] else Event.Modification
+                            fk_dims = None
+                            if fk_event_type == Event.New and group in self.object_map and fk in self.object_map[group]:
+                                fk_dims = self.__convert_to_dim_map(self.object_map[group][fk])
+                            self.record(fk_event_type, fk_type, fk_dims)
 
         if tpname in self.tp_to_attached_df:
             for df in self.tp_to_attached_df[tpname]:
@@ -849,3 +868,26 @@ class dataframe(object):
         tpname = tp.__realname__
         return self.current_buffer[tpname][Event.Delete].values() if tpname in self.current_buffer else list()
 
+    def clear_join_objects(self):
+        for tpname in self.__join_types:
+            if tpname in self.object_map:
+                self.object_map[tpname].clear()
+            if tpname in self.known_objects:
+                self.known_objects[tpname].clear()
+
+    def serialize_all(self):
+        new_record = {}
+        with self.lock:
+            old_state = self.start_recording
+            old_current_record = self.get_record()
+            self.clear_record()
+            self.start_recording = True
+            for tpname in self.object_map:
+                for oid in self.object_map[tpname]:
+                    self.record(Event.New, tpname, oid, self.__convert_to_dim_map(self.object_map[tpname][oid]))
+            self.apply_records_in_cache()
+            new_record = self.get_record()
+            self.current_record = old_current_record
+            self.start_recording = old_state
+
+        return new_record

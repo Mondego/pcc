@@ -1291,3 +1291,15 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         #print json.dumps(df_cache.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
         self.assertTrue(df_cache.get_record() == resp_json10)
     
+    def test_dataframe_apply_serialize_all(self):
+        Car, CarForPedestrian, cars = CreateProjectionTypesAndObjects()
+        df = dataframe()
+        df.add_types([Car, CarForPedestrian])
+        df.extend(Car, cars)
+        serialized = df.serialize_all()
+        self.assertTrue(len(serialized) == 1)
+        self.assertTrue("Car" in serialized)
+        self.assertTrue(len(serialized["Car"]) == 2)
+        for oid, obj in serialized["Car"].items():
+            self.assertTrue(len(obj["dims"]) == 4)
+            self.assertTrue(len(obj["types"]) == 2)
