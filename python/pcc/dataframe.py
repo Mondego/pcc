@@ -150,6 +150,7 @@ class dataframe(object):
         obj.__dict__ = self.current_state[groupname][oid]
         obj.__class__ = obj.__class__.Class() if hasattr(obj.__class__, "Class") else obj.__class__
         self.object_map.setdefault(tpname, RecursiveDictionary())[oid] = obj
+        self.object_map[tpname][oid].__start_tracking__ = True
         if self.start_recording:
            self.add_to_record_cache(Event.New, tpname, oid, self.__convert_to_dim_map(obj))
         return groupname, oid
@@ -241,6 +242,7 @@ class dataframe(object):
                 self.object_map.setdefault(
                     othertpname, 
                     RecursiveDictionary())[new_obj.__primarykey__] = new_obj
+                new_obj.__start_tracking__ = True
 
         for othertp in old_memberships:
             # Finding all the objects that were removed from the type in this operation.
@@ -282,6 +284,7 @@ class dataframe(object):
                 self.object_map.setdefault(
                     othertp.__realname__, 
                     RecursiveDictionary())[new_obj.__primarykey__] = new_obj
+                new_obj.__start_tracking__ = True
 
     def __make_pcc(self, pcctype, relevant_objs, param_map, params, hasSingleton = False, hasCollection = False):
         universe = list()
@@ -601,8 +604,6 @@ class dataframe(object):
         self.add_to_record_cache(Event.Delete, tpname, oid)
         self.apply_records_in_cache()
 
-            
-
     def remove_types(self, types):
         for tp in types:
             self.remove_type(tp)
@@ -643,6 +644,7 @@ class dataframe(object):
                         continue
                     if status == Event.New or (status == Event.Modification and (member not in self.known_objects or oid not in self.known_objects[member])):
                         self.object_map.setdefault(member, RecursiveDictionary())[oid] = change_type(new_obj, self.name2class[member])
+                        self.object_map[member][oid].__start_tracking__ = True
                         self.add_to_buffer(Event.New, member, oid)
                     elif status == Event.Modification:
                         try:

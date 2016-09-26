@@ -55,9 +55,10 @@ class spacetime_property(property):
         if not hasattr(obj, "__start_tracking__"):
             return
         if self._dataframe_data and hasattr(obj, "__primarykey__") and obj.__primarykey__:
-            for key, tr, rc in self._dataframe_data:
-                tr({obj.__primarykey__: obj}, key)
-                rc(obj.__primarykey__, self, value, key)
+            if obj.__start_tracking__:
+                for key, tr, rc in self._dataframe_data:
+                    tr({obj.__primarykey__: obj}, key)
+                    rc(obj.__primarykey__, self, value, key)
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
                 value = str(uuid.uuid4())
@@ -76,8 +77,6 @@ class spacetime_property(property):
                 currentThread().getName(), RecursiveDictionary()).setdefault(
                     obj.__class__, RecursiveDictionary()).setdefault(
                         obj.__primarykey__, dict())[self._name] = store_value
-        else:
-            setattr(obj, self._name, value, bypass = True)
 
 class primarykey(object):
     def __init__(self, tp = None, default = True):
