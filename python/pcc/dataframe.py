@@ -867,6 +867,9 @@ class dataframe(object):
         self.current_record = RecursiveDictionary()
 
     def add_to_buffer(self, event_type, tpname, oid):
+        if event_type == Event.Delete:
+            # Preserve the privacy of the deleted obj. It's off the grid.
+            self.object_map[tpname][oid].__start_tracking__ = False
         self.current_buffer.setdefault(tpname, RecursiveDictionary({
             Event.New: dict(),
             Event.Modification: dict(),
