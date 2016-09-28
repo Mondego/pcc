@@ -100,6 +100,8 @@ class dataframe(object):
         self.temp_record = list()
 
         self.__join_types = set()
+
+        self.deleted_objs = RecursiveDictionary()
             
         
     def __get_depends(self, tp):
@@ -116,12 +118,12 @@ class dataframe(object):
     def __check_validity(self, tp, obj):
         if not hasattr(tp, "__realname__"): 
             # Fail to add new obj, because tp was incompatible, or not found.
-            raise TypeError("Type %s cannot be inserted into Dataframe, declare it as pcc_set." % tp.__class__.__name__)
+            raise TypeError("Type %s cannot be inserted/deleted into Dataframe, declare it as pcc_set." % tp.__class__.__name__)
         if not tp.__realname__ in self.observing_types:
-            raise TypeError("Type %s cannot be inserted into Dataframe, register it first." % tp.__realname__) 
+            raise TypeError("Type %s cannot be inserted/deleted into Dataframe, register it first." % tp.__realname__) 
         if ObjectType.PCCBase not in self.categories[tp.__realname__]:
             # Person not appending the right type of object
-            raise TypeError("Cannot append type %s" % tp.__realname__)
+            raise TypeError("Cannot insert/delete type %s" % tp.__realname__)
         if tp.__realname__ != obj.__class__.__realname__:
             raise TypeError("Object type and type given do not match")
         if not hasattr(obj, "__primarykey__"):
@@ -586,7 +588,7 @@ class dataframe(object):
 
     def delete(self, tp, obj):
         with self.lock:
-            self.__check_validity(tp)
+            self.__check_validity(tp, obj)
             # all clear to delete
             oid = obj.__primarykey__
             tpname = tp.__realname__
@@ -623,6 +625,8 @@ class dataframe(object):
         deletes = dict()
         for groupname, groupchanges in all_changes.items():
             for oid, obj_changes in groupchanges.items():
+                if groupname in self.deleted_objs and oid in self.deleted_objs:
+                    continue
                 final_objjson = RecursiveDictionary()
                 new_obj = None
                 nsp_items = dict()
@@ -694,6 +698,7 @@ class dataframe(object):
             # adjust pcc
             with self.lock:
                 objmaps = self.__apply(obj_changes)
+            self.apply_records_in_cache()
             self.__report_to_dataframes(obj_changes, except_df)
             for groupname, grpobjs in objmaps.items():
                 self.__adjust_pcc(grpobjs, groupname, obj_changes[groupname] if groupname in obj_changes else None)
@@ -745,7 +750,7 @@ class dataframe(object):
             if tpname in self.group_to_members:
                 othertps = [t.__realname__ 
                             for t in self.group_to_members[tpname] 
-                            if t.__realname__ in deletes and t.__realname__ is not tpname]
+                            if t.__realname__ in deletes and t.__realname__ != tpname]
                 for oid in deletes[tpname]:
                     del self.object_map[tpname][oid]
                     deleted.setdefault(tpname, set()).add(oid)
@@ -753,6 +758,7 @@ class dataframe(object):
                         if oid in deletes[othertpname]:
                             del self.object_map[othertpname][oid]
                             deleted.setdefault(othertpname, set()).add(oid)
+                    self.add_to_record_cache(Event.Delete, tpname, oid)
                     del self.current_state[tpname][oid]
             else:
                 for oid in deletes[tpname]:
@@ -763,12 +769,14 @@ class dataframe(object):
             for oid in remaining[tpname]:
                 del self.object_map[tpname][oid]
                 group_id_map.setdefault(self.member_to_group[tpname], dict()).setdefault(oid, set()).add(tpname)
+                self.add_to_record_cache(Event.Delete, tpname, oid)
         for gname in group_id_map:
             gcount = len(self.group_to_members[gname])
             for oid in group_id_map[gname]:
                 if gcount == len(group_id_map[gname][oid]):
                     del self.object_map[gname][oid]
                     del self.current_state[gname][oid]
+                    self.add_to_record_cache(Event.Delete, gname, oid)
         return part_obj_map
 
     def record_using_json(self, tpname, oid, changes):
@@ -785,6 +793,16 @@ class dataframe(object):
         if self.start_recording:
             with self.lock:
                 groupname = self.member_to_group[tpname]
+                if event_type == Event.Delete and tpname == self.member_to_group[tpname]:
+                    # it is its own key. Which means the obj is being deleted for good.
+                    # Purge all changes.
+                    if groupname in self.current_record and oid in self.current_record[groupname]:
+                        if "dims" in self.current_record[groupname][oid]:
+                            del self.current_record[groupname][oid]["dims"]
+                        for tp in self.current_record[groupname][oid]["types"]:
+                            self.current_record[groupname][oid]["types"][tp] = Event.Delete
+                    self.deleted_objs.setdefault(groupname, set()).add(oid)
+
                 self.current_record.setdefault(
                     groupname, RecursiveDictionary()).setdefault(
                         oid, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({tpname: event_type}))
@@ -834,7 +852,9 @@ class dataframe(object):
                     for oid, objchanges in tpitems.items():
                         for tp, change in objchanges["types"].items():
                             if change == Event.Delete:
-                                self.known_objects[tp].remove(oid)
+                                if tp in self.known_objects and oid in self.known_objects[tp]:
+                                    # If it was false, obj was deleted before it was pulled by the other app.
+                                    self.known_objects[tp].remove(oid)
                             elif change == Event.New:
                                 self.known_objects.setdefault(tp, set()).add(oid)
 
