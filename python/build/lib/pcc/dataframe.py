@@ -594,6 +594,7 @@ class dataframe(object):
             tpname = tp.__realname__
             groupname = self.member_to_group[tpname]
             del self.current_state[groupname][oid]
+            self.deleted_objs.setdefault(groupname, set()).add(oid)
             # delete from object_map too
             deleted_members = list()
             for member in self.group_to_members[groupname]:
@@ -790,19 +791,24 @@ class dataframe(object):
                 self.add_to_record_cache(Event.New, tpname, oid, self.__convert_to_dim_map(objmap[tpname][oid]))     
 
     def record(self, event_type, tpname, oid, dim_change = None, already_converted = False):
-        if self.start_recording:
-            with self.lock:
-                groupname = self.member_to_group[tpname]
-                if event_type == Event.Delete and tpname == self.member_to_group[tpname]:
-                    # it is its own key. Which means the obj is being deleted for good.
-                    # Purge all changes.
-                    if groupname in self.current_record and oid in self.current_record[groupname]:
-                        if "dims" in self.current_record[groupname][oid]:
-                            del self.current_record[groupname][oid]["dims"]
-                        for tp in self.current_record[groupname][oid]["types"]:
-                            self.current_record[groupname][oid]["types"][tp] = Event.Delete
-                    self.deleted_objs.setdefault(groupname, set()).add(oid)
+        with self.lock:
+            groupname = self.member_to_group[tpname]
+            if event_type == Event.Delete and tpname == self.member_to_group[tpname]:
+                # it is its own key. Which means the obj is being deleted for good.
+                # Purge all changes.
+                if groupname in self.current_record and oid in self.current_record[groupname]:
+                    if "dims" in self.current_record[groupname][oid]:
+                        del self.current_record[groupname][oid]["dims"]
+                    for tp in self.current_record[groupname][oid]["types"]:
+                        self.current_record[groupname][oid]["types"][tp] = Event.Delete
+                self.deleted_objs.setdefault(groupname, set()).add(oid)
 
+                
+        if self.start_recording:
+            if event_type != Event.Delete and tpname in self.deleted_objs and oid in self.deleted_objs[tpname]:
+                # This object is flagged for deletion. Throw this change away.
+                return
+            with self.lock:
                 self.current_record.setdefault(
                     groupname, RecursiveDictionary()).setdefault(
                         oid, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({tpname: event_type}))
