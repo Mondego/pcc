@@ -10,20 +10,16 @@ from uuid import uuid4
 from parameter import ParameterMode
 from multiprocessing import RLock
 
-BASE_TYPES = set([float, int, str, unicode, type(None)])
+import dataframe_changes_pb2 as df_proto
+from dataframe_changes_pb2 import Event, Record
+
+
+BASE_TYPES = set([])
 
 class DataframeModes(object):
     Master = 0
     ApplicationCache = 1
     Client = 2
-
-class DimensionType(object):
-    Literal = 0
-    Object = 1
-    ForeignKey = 2
-    Collection = 3
-    Dictionary = 4
-    Unknown = 5
 
 class ObjectType(object):
     UnknownType = 0
@@ -36,13 +32,8 @@ class ObjectType(object):
     Param = 7
     Impure = 8
 
-class Event(object):
-    Delete = 0
-    New = 1
-    Modification = 2
-
 class dataframe(object):
-    def __init__(self, lock = RLock(), mode = DataframeModes.Master, name = uuid4()):
+    def __init__(self, lock = RLock(), mode = DataframeModes.Master, name = str(uuid4())):
         self.mode = mode
         # PCCs to be calculated only if it is in Master Mode.
         self.calculate_pcc = (mode == DataframeModes.Master)
@@ -81,6 +72,7 @@ class dataframe(object):
 
         self.current_buffer = RecursiveDictionary()
 
+        # groupname -> {oid -> proto object representing changes.}
         self.current_record = RecursiveDictionary()
 
         self.attached_dataframes = set()
@@ -110,7 +102,7 @@ class dataframe(object):
         raise TypeError("Type %s needs to have some bases" % tp.__realname__)
 
     def __get_group_key(self, tp):
-        if tp.__PCC_BASE_TYPE__:
+        if tp.__PCC_BASE_TYPE__ or (hasattr(tp, "__pcc_join__") and tp.__pcc_join__):
             return tp.__realname__, tp
         else:
             return self.__get_group_key(list(tp.__pcc_bases__)[0])
@@ -139,7 +131,7 @@ class dataframe(object):
         # all clear to insert.
 
         if obj.__primarykey__ == None:
-            setattr(obj, tp.__primarykey__._name, uuid4())
+            setattr(obj, tp.__primarykey__._name, str(uuid4()))
 
         oid = obj.__primarykey__
         tpname = tp.__realname__
@@ -228,7 +220,7 @@ class dataframe(object):
                     id_map[othertp].add(new_obj.__primarykey__)
                 except AttributeError:
                     # It's a join, no ID in join. :|
-                    new_obj.__primarykey__ = None # This should set it to new UUID
+                    new_obj.__primarykey__ = str(uuid4()) # This should set it to new UUID
                 if new_obj.__primarykey__ not in old_memberships[othertp]:
                     # adding this object as a new entry to type othertp
                     if self.start_recording or othertpname in self.tp_to_attached_df:
@@ -355,104 +347,177 @@ class dataframe(object):
             self.__construct_pccs(pcctype, pccs, universe, params)
         return pccs
 
-    def __process_record(self, record, nsp):
-        if record["type"] == DimensionType.Literal:
-            return record["value"], False or nsp
-        if record["type"] == DimensionType.Object:
-            dict_value, nsp_new == self.__process_record({"type": DimensionType.Dictionary, "value": record["value"]}, nsp)
+    def __process_record(self, record):
+        if record.record_type == Record.INT:
+            return record.value.int_value
+        if record.record_type == Record.FLOAT:
+            return record.value.float_value
+        if record.record_type == Record.STRING:
+            return record.value.str_value
+        if record.record_type == Record.BOOL:
+            return record.value.bool_value
+        if record.record_type == Record.NULL:
+            return None
+            
+        if record.record_type == Record.OBJECT:
+            new_record = df_proto.Record()
+            new_record.record_type = Record.DICTIONARY
+            new_record.value.map.extend(record.value.object.object_map)
+                
+            dict_value = self.__process_record(new_record)
             value = self.__create_fake_class()()
-            # cannot set type of object (at least yet)
+            # Set type of object from record.value.object.type. Future work.
             value.__dict__ = dict_value
-            return value, nsp_new or nsp
-        if record["type"] == DimensionType.Collection:
+            return value
+        if record.record_type == Record.COLLECTION:
             # Assume it is list, as again, don't know this type
             value = list()
-            nsp_new = False
-            for rec in record["value"]:
-                v, nsp_new_part = self.__process_record(rec, nsp)
-                nsp_new = nsp_new or nsp_new_part
+            for rec in record.value.collection:
+                v = self.__process_record(rec)
                 value.append(v)
-            return value, nsp or nsp_new
-        if record["type"] == DimensionType.Dictionary:
+            return value
+        if record.record_type == Record.DICTIONARY:
             # Assume it is dictionary, as again, don't know this type
             value = dict()
-            nsp_new = False
-            for k, v in record["value"].items():
-                # Unfortunately for now k has to be string (json problem). 
-                # Sigh too many rules.
-                value[k], nsp_new_part = self.__process_record(v, nsp)
-                nsp_new = nsp_new or nsp_new_part
-            return value, nsp_new
-        raise TypeError("Do not know dimension type %s", record["type"])
+            for p in record.value.map:
+                k, v = p.key, p.value
+                value[self.__process_record(k)] = self.__process_record(v)
+            return value
+        if record.record_type == Record.FOREIGN_KEY:
+            groupname = record.value.foreign_key.group_key
+            oid = record.value.foreign_key.object_key
+            if groupname not in self.group_to_members:
+                # This type cannot be created, it is not registered with the DataframeModes
+                return None
+            actual_type_name = (record.value.foreign_key.actual_type.name
+                                 if record.value.foreign_key.actual_type.IsInitialized() else
+                                groupname)
+            actual_type_name, actual_type = (
+                            (actual_type_name, self.name2class[actual_type_name])
+                              if (actual_type_name in self.name2class) else
+                            (groupname, self.name2class[groupname]))
+            
+            if groupname in self.current_state and oid in self.current_state[groupname]:
+            # The object exists in one form or the other.
+                if actual_type_name in self.object_map and oid in self.object_map[actual_type_name]:
+                    # If the object already exists. Any new object will update that.
+                    return self.object_map[actual_type_name][oid]
+                # The group object exists, but not in the actual_type obj.
+            # The object does not exist, create a dummy one and the actual object will get updated 
+            # in some other group change in this iteration.
+            obj_state =  self.current_state.setdefault(groupname, RecursiveDictionary()).setdefault(oid, RecursiveDictionary())
+            obj = self.__create_fake_class()()
+            obj.__dict__ = obj_state
+            obj.__class__ = actual_type
+            self.object_map.setdefault(actual_type_name, RecursiveDictionary())[oid] = obj
+            return obj 
+            
+
+        raise TypeError("Do not know dimension type %s", record.record_type)
 
     def __build_dimension_obj(self, dim_received, groupname):
+        dim_map = RecursiveDictionary()
         fakeclass = self.fake_class_map[groupname]
         obj = fakeclass()
-        needs_second_pass = False
-        for dim, record in dim_received.items():
+        for dim_change in dim_received:
+            dim = dim_change.dimension_name
+            record = dim_change.value
+            dim_map[dim] = record
             if not hasattr(fakeclass, dim):
                 continue
-            if record["type"] == DimensionType.Object:
-                dict_value, nsp = self.__process_record({"type": DimensionType.Dictionary, "value": record["value"]}, False)
+            if record.record_type == Record.OBJECT:
+                new_record = df_proto.Record()
+                new_record.record_type = Record.DICTIONARY
+                new_record.value.map.extend(record.value.object.object_map)
+                dict_value = self.__process_record(new_record)
                 value = self.__create_fake_class()()
                 value.__dict__ = dict_value
                 value.__class__ = getattr(fakeclass, dim)._type
-            elif (record["type"] == DimensionType.Collection 
-                or record["type"] == DimensionType.Dictionary):
-                collect, nsp =  self.__process_record(record, False)
+            elif (record.record_type== Record.COLLECTION 
+                or record.record_type == Record.DICTIONARY):
+                collect = self.__process_record(record)
                 value = getattr(fakeclass, dim)._type(collect)
             else:    
-                value, nsp = self.__process_record(record, False)
-            needs_second_pass = needs_second_pass or nsp
+                value = self.__process_record(record)
             setattr(obj, dim, value)
-        return obj, needs_second_pass
+        return obj, dim_map
 
     def __get_obj_type(self, obj):
         # both iteratable/dictionary + object type is messed up. Won't work.
         try:
-            if hasattr(obj, "__dependent_type__"):
-                return DimensionType.ForeignKey
+            if obj.__class__.__name__ in self.member_to_group:
+                return Record.FOREIGN_KEY
             if dict in type(obj).mro():
-                return DimensionType.Dictionary
+                return Record.DICTIONARY
             if hasattr(obj, "__iter__"):
                 #print obj
-                return DimensionType.Collection
-            if len((BASE_TYPES).intersection(set(type(obj).mro()))) > 0:
-                return DimensionType.Literal
+                return Record.COLLECTION
+            obj_mro = set(type(obj).mro())
+            if int in obj_mro or long in obj_mro:
+                return Record.INT
+            if float in obj_mro:
+                return Record.FLOAT
+            if str in obj_mro or unicode in obj_mro:
+                return Record.STRING
+            if bool in obj_mro:
+                return Record.BOOL
+            if type(None) in obj_mro:
+                return Record.NULL
             if hasattr(obj, "__dict__"):
-                return DimensionType.Object
+                return Record.OBJECT
         except TypeError, e:
-            return DimensionType.Unknown
-        return DimensionType.Unknown
+            return -1
+        return -1
+
+    def __make_proto_pair(self, k, v):
+        p = df_proto.Value.Pair()
+        p.key.CopyFrom(k)
+        p.value.CopyFrom(v)
+        return p
 
     def __generate_dim(self, dim_change, foreign_keys):
         dim_type = self.__get_obj_type(dim_change)
-        if dim_type == DimensionType.Literal:
-            return {"type": dim_type, "value": dim_change}
-        if dim_type == DimensionType.Collection:
-            return {
-                "type": DimensionType.Collection,
-                "value": [self.__generate_dim(v, foreign_keys) for v in dim_change]
-            }
-        if dim_type == DimensionType.Dictionary:
-            return {
-                "type": DimensionType.Dictionary,
-                "value": dict([(k, self.__generate_dim(v, foreign_keys)) for k, v in dim_change.items()])
-            }
-        if dim_type == DimensionType.Object:
-            return {
-                "type": DimensionType.Object,
-                "value": self.__generate_dim(dim_change.__dict__, foreign_keys)["value"]
-            }
-        if dim_type == DimensionType.ForeignKey:
+        dim = df_proto.Record()
+        dim.record_type = dim_type
+        if dim_type == Record.INT:
+            dim.value.int_value = dim_change
+            return dim
+        if dim_type == Record.FLOAT:
+            dim.value.float_value = dim_change
+            return dim
+        if dim_type == Record.STRING:
+            dim.value.str_value = dim_change
+            return dim
+        if dim_type == Record.BOOL:
+            dim.value.bool_value = dim_change
+            return dim
+        if dim_type == Record.NULL:
+            return dim
+            
+        if dim_type == Record.COLLECTION:
+            dim.value.collection.extend([self.__generate_dim(v, foreign_keys) for v in dim_change])
+            return dim                
+        
+        if dim_type == Record.DICTIONARY:
+            dim.value.map.extend([
+                self.__make_proto_pair(self.__generate_dim(k, foreign_keys), self.__generate_dim(v, foreign_keys)) 
+                for k, v in dim_change.items()])
+            return dim
+            
+        if dim_type == Record.OBJECT:
+            dim.value.object.object_map.extend(
+                self.__generate_dim(dim_change.__dict__, foreign_keys).value.map)
+            # Can also set the type of the object here serialized. Future work. 
+            return dim
+
+        if dim_type == Record.FOREIGN_KEY:
             key, group, fk_type = dim_change.__primarykey__, self.member_to_group[dim_change.__class__.__name__], dim_change.__class__.__name__
-            foreign_keys.append((key, group))
-            return {
-                "type": DimensionType.ForeignKey,
-                "value": key,
-                "groupname": group,
-                "pcc_type": fk_type
-            }
+            foreign_keys.append((key, fk_type, group))
+            dim.value.foreign_key.group_key = group
+            dim.value.foreign_key.object_key = key
+            dim.value.foreign_key.actual_type.name = fk_type
+            return dim
+
         raise TypeError("Don't know how to deal with %s" % dim_change)
 
     def __report_dim_modification(self, oid, name, value, groupname):
@@ -554,11 +619,14 @@ class dataframe(object):
         self.apply_records_in_cache()
         
     def extend(self, tp, objs):
+        
         objmap = dict()
         with self.lock:
             for obj in objs:
                 groupname, oid = self.__append(tp, obj)
                 objmap[oid] = obj
+        if len(objmap) == 0:
+            return
         self.__adjust_pcc(objmap, groupname)
         self.apply_records_in_cache()
     
@@ -616,27 +684,26 @@ class dataframe(object):
         with self.lock:
             self.add_types(types)
     
-    def __pass1_objs(self, all_changes):
+    def __create_objs(self, all_changes):
         current_obj_map = RecursiveDictionary()
         part_obj_map = RecursiveDictionary()
-
-        needs_second_pass = False
-        nsp_items = RecursiveDictionary()
-        
+        group_changes_json = RecursiveDictionary()
         deletes = dict()
-        for groupname, groupchanges in all_changes.items():
-            for oid, obj_changes in groupchanges.items():
+
+        for groupchanges in all_changes.group_changes:
+            groupname = groupchanges.group_key
+            for obj_changes in groupchanges.object_changes:
+                oid = obj_changes.object_key
                 if groupname in self.deleted_objs and oid in self.deleted_objs:
                     continue
+                
                 final_objjson = RecursiveDictionary()
                 new_obj = None
-                nsp_items = dict()
-                if "dims" in obj_changes:
-                    new_obj, nsp = self.__build_dimension_obj(obj_changes["dims"], groupname)
-                    needs_second_pass = needs_second_pass or nsp
-                    if nsp:
-                        nsp_items.setdefault(groupname, set()).add(oid)
-
+                dim_map = RecursiveDictionary()
+                if len(obj_changes.dimension_changes) > 0:
+                    new_obj, dim_map = self.__build_dimension_obj(
+                        obj_changes.dimension_changes, 
+                        groupname)
                     if oid in self.current_state[groupname]:
                         # getting actual reference if it is there.
                         final_objjson = self.current_state[groupname][oid]
@@ -644,7 +711,13 @@ class dataframe(object):
                     self.current_state[groupname][oid] = final_objjson
                     new_obj.__dict__ = final_objjson
                     part_obj_map.setdefault(groupname, dict())[oid] = new_obj
-                for member, status in obj_changes["types"].items():
+                obj_change_json = group_changes_json.setdefault(groupname, RecursiveDictionary()).setdefault(oid, RecursiveDictionary())
+                if dim_map:
+                    obj_change_json["dims"] = dim_map 
+                for type_change in obj_changes.type_changes:
+                    member = type_change.type.name
+                    status = type_change.event
+                    obj_change_json.setdefault("types", RecursiveDictionary())[member] = status
                     if not (member in self.member_to_group and self.member_to_group[member] == groupname and member in self.observing_types):
                         continue
                     if status == Event.New or (status == Event.Modification and (member not in self.known_objects or oid not in self.known_objects[member])):
@@ -666,84 +739,22 @@ class dataframe(object):
 
 
         
-        return needs_second_pass, nsp_items, deletes, part_obj_map
+        return deletes, part_obj_map, group_changes_json
 
-    def __report_to_dataframes(self, obj_changes, except_df):
-        possible_dfs = set()
-        for tpname in obj_changes:
-            if tpname not in self.tp_to_attached_df:
-                continue
-            possible_dfs.update(self.tp_to_attached_df[tpname])
-            if except_df in possible_dfs:
-                possible_dfs.remove(except_df)
-                
-        for df in possible_dfs:
-            df.apply_all(obj_changes)
-
-    def add_to_record_cache(self, event_type, tpname, oid, dim_change = None, already_converted = False):
-        self.temp_record.append((event_type, tpname, oid, dim_change, already_converted))
-
-    def clear_record_cache(self):
-        self.temp_record = list()
-
-    def apply_records_in_cache(self):
-        for event_type, tpname, oid, dim_change, already_converted in self.temp_record:
-            self.record(event_type, tpname, oid, dim_change, already_converted)
-        self.clear_record_cache()
-
-    def apply_all(self, obj_changes, except_df = None):
-        obj_changes = RecursiveDictionary(obj_changes) if not type(obj_changes) == RecursiveDictionary else obj_changes
-        if self.mode == DataframeModes.Master:
-            # if master: send changes to all other dataframes attached.
-            # apply changes to object_map, and currect_state
-            # adjust pcc
-            with self.lock:
-                objmaps = self.__apply(obj_changes)
-            self.apply_records_in_cache()
-            self.__report_to_dataframes(obj_changes, except_df)
-            for groupname, grpobjs in objmaps.items():
-                self.__adjust_pcc(grpobjs, groupname, obj_changes[groupname] if groupname in obj_changes else None)
-        elif self.mode == DataframeModes.ApplicationCache:
-            # if cache: 
-            # forward relevant changes to record
-            if not self.start_recording:
-                return
-            for groupname in obj_changes:
-                if groupname in self.group_to_members:
-                    for oid in obj_changes[groupname]:
-
-                        finaltpmap = RecursiveDictionary([(tpname, obj_changes[groupname][oid]["types"][tpname]) for tpname in obj_changes[groupname][oid]["types"] 
-                                           if tpname in self.member_to_group and self.member_to_group[tpname] == groupname and tpname in self.observing_types])
-                        if len(finaltpmap) > 0:
-                            # There are records to process
-                            if "dims" in obj_changes[groupname][oid]:
-                                dims_releveant = RecursiveDictionary([(dim, obj_changes[groupname][oid]["dims"][dim]) for dim in obj_changes[groupname][oid]["dims"]
-                                                       if hasattr(self.fake_class_map[groupname], dim)])
-                                self.current_record.setdefault(groupname, RecursiveDictionary()).setdefault(oid, RecursiveDictionary()).rec_update(RecursiveDictionary({"types": finaltpmap, "dims": dims_releveant}))
-            return
-
-        elif self.mode == DataframeModes.Client:
-            # if master
-            # apply changes to object_map, and currect_state
-            # Shouldnt need a lock.
-            with self.lock:
-                self.__apply(obj_changes)
-        else:
-            raise TypeError("Unknown dataframe mode %s" % self.mode)
-        self.apply_records_in_cache()
-        return
-
-    def __apply(self, obj_changes):
+    def __apply(self, df_changes):
         relevant_changes = dict()
         part_obj_map = dict()
-        for groupname in obj_changes:
+        group_changes_json = RecursiveDictionary()
+        relevant_changes = df_proto.DataframeChanges()
+        c = []
+        for grp_changes in df_changes.group_changes:
+            groupname = grp_changes.group_key
             if groupname in self.group_to_members:
-                relevant_changes[groupname] = obj_changes[groupname]
-        needs_second_pass, nsp_items, deletes, part_obj_map = self.__pass1_objs(relevant_changes)
-        if needs_second_pass:
-            # Not implemented yet.
-            part_obj_map = self.__pass2_obj(relevant_changes, nsp_items)
-
+                c.append(grp_changes)
+        relevant_changes.group_changes.extend(c)
+        relevant_changes.types.extend(df_changes.types)
+        deletes, part_obj_map, group_changes_json = self.__create_objs(relevant_changes)
+        
         group_id_map = dict()
         remaining = dict()
         deleted = dict()
@@ -778,7 +789,110 @@ class dataframe(object):
                     del self.object_map[gname][oid]
                     del self.current_state[gname][oid]
                     self.add_to_record_cache(Event.Delete, gname, oid)
-        return part_obj_map
+        return part_obj_map, group_changes_json
+
+    def __report_to_dataframes(self, df_changes, except_df):
+        possible_dfs = set()
+        for grpchanges in df_changes.group_changes:
+            tpname = grpchanges.group_key
+            if tpname not in self.tp_to_attached_df:
+                continue
+            possible_dfs.update(self.tp_to_attached_df[tpname])
+            if except_df in possible_dfs:
+                possible_dfs.remove(except_df)
+                
+        for df in possible_dfs:
+            df.apply_all(df_changes)
+
+    def __convert_to_proto(self, current_record):
+        df_changes = df_proto.DataframeChanges()
+        for groupname in current_record:
+            groupchanges = df_changes.group_changes.add()
+            groupchanges.group_key = groupname
+            for oid, obj_changes_json in current_record[groupname].items():
+                obj_changes = groupchanges.object_changes.add()
+                # in the future, can pickle object id here.
+                obj_changes.object_key = oid
+                if "dims" in obj_changes_json:
+                    for d, record in obj_changes_json["dims"].items():
+                        dim_change = obj_changes.dimension_changes.add()
+                        dim_change.dimension_name = d
+                        dim_change.value.CopyFrom(record)
+                    
+                for t, status in obj_changes_json["types"].items():
+                    tp_change = obj_changes.type_changes.add()
+                    tp_change.type.name = t
+                    tp_change.event = status
+        return df_changes
+
+                        
+
+
+    def add_to_record_cache(self, event_type, tpname, oid, dim_change = None, already_converted = False):
+        self.temp_record.append((event_type, tpname, oid, dim_change, already_converted))
+
+    def clear_record_cache(self):
+        self.temp_record = list()
+
+    def apply_records_in_cache(self):
+        for event_type, tpname, oid, dim_change, already_converted in self.temp_record:
+            self.record(event_type, tpname, oid, dim_change, already_converted)
+        self.clear_record_cache()
+
+    def apply_all(self, df_changes, except_df = None):
+        if self.mode == DataframeModes.Master:
+            # if master: send changes to all other dataframes attached.
+            # apply changes to object_map, and currect_state
+            # adjust pcc
+            with self.lock:
+                objmaps, grp_changes = self.__apply(df_changes)
+            self.apply_records_in_cache()
+            self.__report_to_dataframes(df_changes, except_df)
+            for groupname, grpobjs in objmaps.items():
+                self.__adjust_pcc(grpobjs, groupname, grp_changes[groupname] if groupname in grp_changes else None)
+        elif self.mode == DataframeModes.ApplicationCache:
+            # if cache: 
+            # forward relevant changes to record
+            if not self.start_recording:
+                return
+            for groupchanges in df_changes.group_changes:
+                groupname = groupchanges.group_key
+                if groupname in self.group_to_members:
+                    for objchanges in groupchanges.object_changes:
+                        oid = objchanges.object_key
+
+                        finaltpmap = RecursiveDictionary(
+                            [
+                                (type_changes.type.name, type_changes.event) 
+                                for type_changes in objchanges.type_changes 
+                                if (type_changes.type.name in self.member_to_group 
+                                    and self.member_to_group[type_changes.type.name] == groupname 
+                                    and type_changes.type.name in self.observing_types)
+                            ]
+                        )
+                        if len(finaltpmap) > 0:
+                            # There are records to process
+                            if len(objchanges.dimension_changes) > 0:
+                                dims_releveant = RecursiveDictionary(
+                                    [
+                                        (dim.dimension_name, dim.value) 
+                                        for dim in objchanges.dimension_changes
+                                        if hasattr(self.fake_class_map[groupname], dim.dimension_name)
+                                    ]
+                                )
+                                self.current_record.setdefault(groupname, RecursiveDictionary()).setdefault(oid, RecursiveDictionary()).rec_update(RecursiveDictionary({"types": finaltpmap, "dims": dims_releveant}))
+            return
+
+        elif self.mode == DataframeModes.Client:
+            # if master
+            # apply changes to object_map, and currect_state
+            # Shouldnt need a lock.
+            with self.lock:
+                self.__apply(df_changes)
+        else:
+            raise TypeError("Unknown dataframe mode %s" % self.mode)
+        self.apply_records_in_cache()
+        return
 
     def record_using_json(self, tpname, oid, changes):
         self.apply_all({tpname: {oid: changes}}, True)
@@ -819,12 +933,11 @@ class dataframe(object):
                                                                          v if already_converted else self.__generate_dim(v, fks)) 
                                                                         for k, v in dim_change.items()]))
                     for fk, fk_type, group in fks:
-                        if group in self.known_objects:
-                            fk_event_type = Event.New if fk not in self.known_objects[group] else Event.Modification
-                            fk_dims = None
-                            if fk_event_type == Event.New and group in self.object_map and fk in self.object_map[group]:
-                                fk_dims = self.__convert_to_dim_map(self.object_map[group][fk])
-                            self.record(fk_event_type, fk_type, fk_dims)
+                        fk_event_type = Event.Modification if group in self.known_objects and fk in self.known_objects[group] else Event.New
+                        fk_dims = None
+                        if fk_event_type == Event.New and group in self.object_map and fk in self.object_map[group]:
+                            fk_dims = self.__convert_to_dim_map(self.object_map[group][fk])
+                        self.record(fk_event_type, fk_type, fk, fk_dims)
 
         if tpname in self.tp_to_attached_df:
             for df in self.tp_to_attached_df[tpname]:
@@ -839,7 +952,7 @@ class dataframe(object):
 
     def get_record(self, parameters = None):
         # calculate impure at the last minute
-        if self.mode == DataframeModes.ApplicationCache:
+        if self.mode != DataframeModes.Client:
             for tpname in self.impure:
                 tp = self.name2class[tpname]
                 with self.lock:
@@ -848,7 +961,7 @@ class dataframe(object):
                 self.__record_pcc_changes(objs, known_members)
                 self.apply_records_in_cache()
         
-        return self.current_record
+        return self.__convert_to_proto(self.current_record)
 
     def clear_record(self):
         if self.mode == DataframeModes.ApplicationCache:

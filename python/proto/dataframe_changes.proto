@@ -1,0 +1,133 @@
+package Dataframe;
+
+message Value {
+    // Used for dictionaries, and object state maps.
+    message Pair {
+        // The key.
+        required Record key = 1;
+        // The value.
+        required Record value = 2;
+    }
+
+    // Used to store non-PCC indexed types. EG: Vector3
+    message Object {
+        // The type of the object.
+        // may have only type.name, can look up actual type later
+        // in DataframeChanges.Types
+        optional Type type = 1;
+        // The object state map as a dictionary.
+        repeated Pair object_map = 2;
+    }
+
+    // used to refer to PCC indexed types.
+    message ForeignKey {
+        // The group to
+        required string group_key = 1;
+        optional Type actual_type = 2;
+        required string object_key = 3;
+    }
+    
+    // Using ordinals 1-15 as these are optimized.
+    optional sint64 int_value = 1;
+    optional double float_value = 2;
+    optional string str_value = 3;
+    optional bool bool_value = 4;
+
+    repeated Record collection = 10;
+    repeated Pair map = 11;
+
+    optional Object object = 12;
+    optional ForeignKey foreign_key = 13;
+}
+
+message Record {
+    // Types of Records that we support as of now.
+    enum RecordType {
+        INT = 1;
+        FLOAT = 2;
+        STRING = 3;
+        BOOL = 4;
+        NULL = 5;
+
+        COLLECTION = 10;
+        DICTIONARY = 11;
+
+        OBJECT = 12;
+        FOREIGN_KEY = 13;
+        // Can add more types. Primitives and often used types
+        // should come between 1-15.
+    }
+
+    // Type of the record.
+    required RecordType record_type = 1;
+    // Has corresponding value.
+    optional Value value = 2;
+}
+
+message DimensionChanges {
+    // Name of the dimension in the object.
+    required string dimension_name = 1;
+    // Value that the dimension should hold.
+    optional Record value = 2;
+}
+
+message Type {
+    // fully qualified name of type.
+    required string name = 1;
+    // serialized type object that can be loaded.
+    optional string type_pickled = 2;
+}
+
+message Event {
+     enum EventType {
+        Delete = 0;
+        New = 1;
+        Modification = 2;
+        
+    }
+}
+
+
+message TypeChanges {
+    // The type that is changing
+    required Type type = 1;
+    // The type of change, refer enum.
+    required Event.EventType event = 2;
+}
+
+message ObjectChanges {
+    /*
+    Changes in the object
+    */
+
+    // primary key of the object. Can be pickle serialized object
+    required string object_key = 1;
+    // list of dimension changes, can be empty list
+    repeated DimensionChanges dimension_changes = 2;
+    // list of type membership changes for the object
+    repeated TypeChanges type_changes = 3;
+}
+
+message GroupChanges {
+    /*
+    Changes in the group.
+    */
+
+    // The group key. EG: "Car"
+    required string group_key = 1;
+
+    // List of changes in each object of that group.
+    repeated ObjectChanges object_changes = 2;
+}
+
+message DataframeChanges {
+    /*
+    Serialization object for inter dataframe transfers
+    */
+
+    // A list of changes in each group
+    repeated GroupChanges group_changes = 1;
+
+    // Serializations of types that might be transferred here.
+    repeated Type types = 2;
+}
