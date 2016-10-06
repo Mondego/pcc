@@ -407,6 +407,166 @@ def convert_json_to_proto(update_json):
                 tpc.event = status
     return dfc
 
+def _join_example_data():
+    @pcc_set
+    class Transaction(object):
+        @primarykey(str)
+        def oid(self): return self._id
+
+        @oid.setter
+        def oid(self, value): self._id = value
+
+        @dimension(int)
+        def card(self):
+            return self._card
+
+        @card.setter
+        def card(self, value):
+            self._card = value
+
+        @dimension(int)
+        def amount(self):
+            return self._amount
+
+        @amount.setter
+        def amount(self, value):
+            self._amount = value
+
+        @dimension(bool)
+        def flagged(self):
+            return self._flagged
+
+        @flagged.setter
+        def flagged(self, value):
+            self._flagged = value
+
+        def __init__(self, card, amount):
+            self.card = card
+            self.amount = amount
+            self.flagged = False
+
+        def flag(self):
+            self.flagged = True
+
+    @pcc_set
+    class Card(object):
+        @primarykey(str)
+        def oid(self):
+            return self._id
+
+        @oid.setter
+        def oid(self, value):
+            self._id = value
+        
+        @dimension(bool)
+        def holdstate(self):
+            return self._holdstate
+
+        @holdstate.setter
+        def holdstate(self, value):
+            self._holdstate = value
+
+        @dimension(str)
+        def owner(self):
+            return self._owner
+
+        @owner.setter
+        def owner(self, value):
+            self._owner = value
+        
+        def __init__(self, oid, owner):
+            self.oid = oid
+            self.owner = owner
+            self.holdstate = False
+
+        def hold(self):
+            self.holdstate = True
+
+    @pcc_set
+    class Person(object):
+        @primarykey(str)
+        def oid(self):
+            return self._id
+
+        @oid.setter
+        def oid(self, value):
+            self._id = value
+
+        @dimension(str)
+        def name(self):
+            return self._name
+
+        @name.setter
+        def name(self, value):
+            self._name = value
+
+        def __init__(self, oid, name):
+            self.oid = oid
+            self.name = name
+
+        def notify(self):
+            pass
+
+    @join(Person, Card, Transaction)
+    class RedAlert(object):
+        @primarykey(str)
+        def oid(self): return self._id
+
+        @oid.setter
+        def oid(self, value): self._id = value
+
+        @dimension(Person)
+        def p(self):
+            return self._p
+
+        @p.setter
+        def p(self, value):
+            self._p = value
+
+        @dimension(Card)
+        def c(self):
+            return self._c
+
+        @c.setter
+        def c(self, value):
+            self._c = value
+
+        @dimension(Transaction)
+        def t(self):
+            return self._t
+
+        @t.setter
+        def t(self, value):
+            self._t = value
+
+        def __init__(self, p, c, t):
+            self.p = p
+            self.c = c
+            self.t = t
+
+        @staticmethod
+        def __predicate__(p, c, t):
+            return c.owner == p.oid and t.card == c.oid and t.amount > 2000
+
+        def Protect(self):
+            self.t.flag()
+            self.c.hold()
+            self.p.notify()
+
+    p1 = Person("0", "Vishnu")
+    c1p1 = Card("0", "0")
+    c2p1 = Card("1", "0")
+    p2 = Person("1", "Indira")
+    c1p2 = Card("2", "1")
+    p3 = Person("2", "Bramha")
+    c1p3 = Card("3", "2")
+    t1 = Transaction("1", 100)
+    t2 = Transaction("2", 1000)
+    t3 = Transaction("0", 10000)
+    #Also RedAlert Card but not Vishnu's
+    t4 = Transaction(3, 10000)
+    return Person, Card, Transaction, RedAlert, [p1, p2, p3], [c1p1, c2p1, c1p2, c1p3], [t1, t2, t3, t4]
+
 update_json1 = convert_json_to_proto({
             "Car": {
                 "id1": {
@@ -1378,3 +1538,21 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
             oid = obj_c.object_key
             self.assertTrue(len(obj_c.dimension_changes) == 4)
             self.assertTrue(len(obj_c.type_changes) == 2)
+
+    def test_dataframe_get_join(self):
+        Person, Card, Transaction, RedAlert, people, cards, trans = _join_example_data()
+        df = dataframe()
+        df.add_types([Person, Card, Transaction, RedAlert])
+        df.extend(Person, people)
+        df.extend(Card, cards)
+        df.extend(Transaction, trans)
+        df.start_recording = True
+        df_c = dataframe(mode = DataframeModes.Client)
+        df_c.add_types([Person, Card, Transaction, RedAlert])
+        df_c.extend(Person, people)
+        df_c.extend(Card, cards)
+        df_c.extend(Transaction, trans)
+        df_c.apply_all(df.get_record())
+        self.assertTrue(len(df_c.get(RedAlert)) == 1)
+        
+        

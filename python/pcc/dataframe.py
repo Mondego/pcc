@@ -9,7 +9,6 @@ from create import create, change_type
 from uuid import uuid4
 from parameter import ParameterMode
 from multiprocessing import RLock
-from uuid import uuid4
 
 import dataframe_changes_pb2 as df_proto
 from dataframe_changes_pb2 import Event, Record
@@ -34,7 +33,7 @@ class ObjectType(object):
     Impure = 8
 
 class dataframe(object):
-    def __init__(self, lock = RLock(), mode = DataframeModes.Master, name = uuid4()):
+    def __init__(self, lock = RLock(), mode = DataframeModes.Master, name = str(uuid4())):
         self.mode = mode
         # PCCs to be calculated only if it is in Master Mode.
         self.calculate_pcc = (mode == DataframeModes.Master)
@@ -132,7 +131,7 @@ class dataframe(object):
         # all clear to insert.
 
         if obj.__primarykey__ == None:
-            setattr(obj, tp.__primarykey__._name, uuid4())
+            setattr(obj, tp.__primarykey__._name, str(uuid4()))
 
         oid = obj.__primarykey__
         tpname = tp.__realname__
@@ -221,7 +220,7 @@ class dataframe(object):
                     id_map[othertp].add(new_obj.__primarykey__)
                 except AttributeError:
                     # It's a join, no ID in join. :|
-                    new_obj.__primarykey__ = uuid4() # This should set it to new UUID
+                    new_obj.__primarykey__ = str(uuid4()) # This should set it to new UUID
                 if new_obj.__primarykey__ not in old_memberships[othertp]:
                     # adding this object as a new entry to type othertp
                     if self.start_recording or othertpname in self.tp_to_attached_df:
@@ -384,7 +383,7 @@ class dataframe(object):
                 k, v = p.key, p.value
                 value[self.__process_record(k)] = self.__process_record(v)
             return value
-        if record.record_type == Record.ForeignKey:
+        if record.record_type == Record.FOREIGN_KEY:
             groupname = record.value.foreign_key.group_key
             oid = record.value.foreign_key.object_key
             if groupname not in self.group_to_members:
@@ -394,9 +393,9 @@ class dataframe(object):
                                  if record.value.foreign_key.actual_type.IsInitialized() else
                                 groupname)
             actual_type_name, actual_type = (
-                            actual_type_name, self.__name2class[actual_type_name]
-                              if (actual_type_name in self.__name2class) else
-                            groupname, self.__name2class[groupname])
+                            (actual_type_name, self.name2class[actual_type_name])
+                              if (actual_type_name in self.name2class) else
+                            (groupname, self.name2class[groupname]))
             
             if groupname in self.current_state and oid in self.current_state[groupname]:
             # The object exists in one form or the other.
@@ -933,14 +932,12 @@ class dataframe(object):
                         "dims", RecursiveDictionary()).rec_update(dict([(k if already_converted else k._name, 
                                                                          v if already_converted else self.__generate_dim(v, fks)) 
                                                                         for k, v in dim_change.items()]))
-                    if fks:
-                        print fks
                     for fk, fk_type, group in fks:
                         fk_event_type = Event.Modification if group in self.known_objects and fk in self.known_objects[group] else Event.New
                         fk_dims = None
                         if fk_event_type == Event.New and group in self.object_map and fk in self.object_map[group]:
                             fk_dims = self.__convert_to_dim_map(self.object_map[group][fk])
-                        self.record(fk_event_type, fk_type, fk_dims)
+                        self.record(fk_event_type, fk_type, fk, fk_dims)
 
         if tpname in self.tp_to_attached_df:
             for df in self.tp_to_attached_df[tpname]:
@@ -955,7 +952,7 @@ class dataframe(object):
 
     def get_record(self, parameters = None):
         # calculate impure at the last minute
-        if self.mode == DataframeModes.ApplicationCache:
+        if self.mode != DataframeModes.Client:
             for tpname in self.impure:
                 tp = self.name2class[tpname]
                 with self.lock:
