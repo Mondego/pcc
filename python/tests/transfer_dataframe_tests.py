@@ -8,7 +8,8 @@ from pcc.dataframe import dataframe, DataframeModes
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
 from pcc.projection import projection
-    
+from pcc.dataframe_changes_pb2 import DataframeChanges, Record, Event, Value
+ 
 import unittest, json
 
 def create_cars():
@@ -333,7 +334,80 @@ def CreateProjectionTypesAndObjects():
 
 
 
-update_json1 = {
+def makerecord(dimchange):
+    class DimensionType(object):
+        Literal = 0
+        Object = 1
+        ForeignKey = 2
+        Collection = 3
+        Dictionary = 4
+        Unknown = 5
+
+    r = Record()
+    if dimchange["type"] == DimensionType.Literal:
+        # Have to do weird conversion here :(
+        if dimchange["value"] == None:
+            r.record_type = Record.NULL
+            return r 
+        if bool in set(dimchange["value"].__class__.mro()):
+            r.value.bool_value = bool(dimchange["value"])
+            r.record_type = Record.BOOL
+            return r
+        if float in set(dimchange["value"].__class__.mro()):
+            r.value.float_value = float(dimchange["value"])
+            r.record_type = Record.FLOAT
+            return r
+        if str in set(dimchange["value"].__class__.mro()) or unicode in set(dimchange["value"].__class__.mro()):
+            r.value.str_value = str(dimchange["value"])
+            r.record_type = Record.STRING
+            return r
+        if int in set(dimchange["value"].__class__.mro()) or long in set(dimchange["value"].__class__.mro()):
+            r.value.int_value = long(dimchange["value"])
+            r.record_type = Record.INT
+            return r
+    if dimchange["type"] == DimensionType.Collection:
+        r.value.collection.extend([makerecord(dm) for dm in dimchange["value"]])
+        r.record_type = Record.COLLECTION
+        return r
+    if dimchange["type"] == DimensionType.Dictionary:
+        vs = []
+        for k, v in dimchange["value"].items():
+            one_v = Value.Pair()
+            key_r = Record()
+            key_r.record_type = Record.STRING
+            key_r.value.str_value = k
+            one_v.key.CopyFrom(key_r)
+            one_v.value.CopyFrom(makerecord(v))
+            vs.append(one_v)
+        r.value.map.extend(vs)
+        r.record_type = Record.DICTIONARY
+        return r
+    if dimchange["type"] == DimensionType.Object:
+        r.value.object.object_map.extend(makerecord({"type": DimensionType.Dictionary, "value": dimchange["value"]}).value.map)
+        r.record_type = Record.OBJECT
+        return r
+    
+def convert_json_to_proto(update_json):
+    old_record_map = {}
+    dfc = DataframeChanges()
+    for groupname, groupchanges in update_json.items():
+        gc = dfc.group_changes.add()
+        gc.group_key = groupname
+        for oid, objectchanges in groupchanges.items():
+            oc = gc.object_changes.add()
+            oc.object_key = oid
+            if "dims" in objectchanges:
+                for dim, dimchange in objectchanges["dims"].items():
+                    dc = oc.dimension_changes.add()
+                    dc.dimension_name = dim
+                    dc.value.CopyFrom(makerecord(dimchange))
+            for tp, status in objectchanges["types"].items():
+                tpc = oc.type_changes.add()
+                tpc.type.name = tp
+                tpc.event = status
+    return dfc
+
+update_json1 = convert_json_to_proto({
             "Car": {
                 "id1": {
                     "types": {
@@ -415,8 +489,8 @@ update_json1 = {
                     },
                 }
             }    
-        }
-resp_json1 = {
+        })
+resp_json1 = convert_json_to_proto({
             "Car": {
                 "id3": {
                     "types": {
@@ -458,8 +532,8 @@ resp_json1 = {
                     },
                 }
             }    
-        }
-update_json2 = {
+        })
+update_json2 = convert_json_to_proto({
             "Car": {
                 "id2": {
                     "types": {
@@ -473,8 +547,8 @@ update_json2 = {
                     }
                 }
             }    
-        }
-update_json3 = {
+        })
+update_json3 = convert_json_to_proto({
             "Car": {
                 "id2": {
                     "types": {
@@ -490,8 +564,8 @@ update_json3 = {
                     }
                 }
             }    
-        }
-update_json4 = {
+        })
+update_json4 = convert_json_to_proto({
             "Car": {
                 "id2": {
                     "types": {
@@ -514,8 +588,8 @@ update_json4 = {
                     }
                 }
             }    
-        }
-update_json5 = {
+        })
+update_json5 = convert_json_to_proto({
             "Car": {
                 "id4": {
                     "types": {
@@ -525,8 +599,8 @@ update_json5 = {
                     }
                 }
             }    
-        }
-update_json6 = {
+        })
+update_json6 = convert_json_to_proto({
             "Car": {
                 "id4": {
                     "types": {
@@ -542,8 +616,8 @@ update_json6 = {
                     }
                 }
             }    
-        }
-update_json7 = {
+        })
+update_json7 = convert_json_to_proto({
             "Car": {
                 "id1": {
                     "types": {
@@ -569,8 +643,8 @@ update_json7 = {
                     }
                 }
             }    
-        }
-update_json8 = {
+        })
+update_json8 = convert_json_to_proto({
             "Car": {
                 "id1": {
                     "types": {
@@ -649,8 +723,8 @@ update_json8 = {
                     },
                 }
             }    
-        }
-update_json9 = '''{
+        })
+update_json9 = convert_json_to_proto(json.loads('''{
             "Car": {
                 "0fb70042-cb18-4d4c-8ec0-ddfe609f852a": {
                     "dims": {
@@ -767,8 +841,8 @@ update_json9 = '''{
                     }
                 }
             }
-        }'''
-update_json10 = '''{
+        }'''))
+update_json10 = convert_json_to_proto({
     "Car": {
         "586d5e49-2da7-4318-a09b-795744be9867": {
             "dims": {
@@ -817,9 +891,9 @@ update_json10 = '''{
             }
         }
     }
-}
-'''                      
-resp_json10 = {
+})
+                      
+resp_json10 = convert_json_to_proto({
     "Car": {
         "586d5e49-2da7-4318-a09b-795744be9867": {
             "dims": {
@@ -860,7 +934,7 @@ resp_json10 = {
             }
         }
     }
-}
+})
 
 class Test_dataframe_transfer_tests(unittest.TestCase):
     def test_dataframe_apply_all_new(self):
@@ -961,7 +1035,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         for c in df.get(RedActiveCar):
             c.velocity = 0
         #print json.dumps(df.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
-        self.assertTrue(df.get_record() == {
+        self.assertTrue(df.get_record() == convert_json_to_proto({
             "Car" :{
                 "id4" :{
                     "dims" :{
@@ -990,7 +1064,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                     }
                 }
             }
-        })
+        }))
 
     def test_dataframe_get_changes2(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
@@ -1001,7 +1075,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         for c in df.get(Car):
             c.velocity += 1
         #print json.dumps(df.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
-        self.assertTrue(df.get_record() == {
+        self.assertTrue(df.get_record() == convert_json_to_proto({
             "Car" :{
                 "id1" :{
                     "dims" :{
@@ -1083,7 +1157,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                     }
                 }
             }
-        })
+        }))
 
     def test_dataframe_transfer_changes3(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
@@ -1261,7 +1335,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, InactiveCar, ActiveCar = create_complex_cartypes()
         df = dataframe()
         df.add_types([Car, ActiveCar, InactiveCar])
-        df.apply_all(json.loads(update_json9))
+        df.apply_all(update_json9)
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(InactiveCar)) == 2)
         self.assertTrue(len(df.get(ActiveCar)) == 0)
@@ -1270,7 +1344,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, CarForPedestrian, cars = CreateProjectionTypesAndObjects()
         df = dataframe()
         df.add_types([Car, CarForPedestrian])
-        df.apply_all(json.loads(update_json10))
+        df.apply_all(update_json10)
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(CarForPedestrian)) == 2)
         for c in df.get(CarForPedestrian):
@@ -1285,7 +1359,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df_cache.add_type(CarForPedestrian)
         df_cache.start_recording = True
         df.connect(df_cache)
-        df.apply_all(json.loads(update_json10))
+        df.apply_all(update_json10)
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(CarForPedestrian)) == 2)
         #print json.dumps(df_cache.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
@@ -1297,9 +1371,10 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.add_types([Car, CarForPedestrian])
         df.extend(Car, cars)
         serialized = df.serialize_all()
-        self.assertTrue(len(serialized) == 1)
-        self.assertTrue("Car" in serialized)
-        self.assertTrue(len(serialized["Car"]) == 2)
-        for oid, obj in serialized["Car"].items():
-            self.assertTrue(len(obj["dims"]) == 4)
-            self.assertTrue(len(obj["types"]) == 2)
+        self.assertTrue(len(serialized.group_changes) == 1)
+        self.assertTrue("Car" == serialized.group_changes[0].group_key)
+        self.assertTrue(len(serialized.group_changes[0].object_changes) == 2)
+        for obj_c in serialized.group_changes[0].object_changes:
+            oid = obj_c.object_key
+            self.assertTrue(len(obj_c.dimension_changes) == 4)
+            self.assertTrue(len(obj_c.type_changes) == 2)
