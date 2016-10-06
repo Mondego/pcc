@@ -471,7 +471,7 @@ class dataframe(object):
         return -1
 
     def __make_proto_pair(self, k, v):
-        p = df_proto.Record.Pair()
+        p = df_proto.Value.Pair()
         p.key.CopyFrom(k)
         p.value.CopyFrom(v)
         return p
@@ -501,7 +501,7 @@ class dataframe(object):
         
         if dim_type == Record.DICTIONARY:
             dim.value.map.extend([
-                self.__make_proto_pair(k, self.__generate_dim(v, foreign_keys)) 
+                self.__make_proto_pair(self.__generate_dim(k, foreign_keys), self.__generate_dim(v, foreign_keys)) 
                 for k, v in dim_change.items()])
             return dim
             
@@ -747,9 +747,9 @@ class dataframe(object):
         part_obj_map = dict()
         group_changes_json = RecursiveDictionary()
         relevant_changes = df_proto.DataframeChanges()
+        c = []
         for grp_changes in df_changes.group_changes:
             groupname = grp_changes.group_key
-            c = []
             if groupname in self.group_to_members:
                 c.append(grp_changes)
         relevant_changes.group_changes.extend(c)
