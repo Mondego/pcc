@@ -10,8 +10,8 @@ from uuid import uuid4
 from parameter import ParameterMode
 from multiprocessing import RLock
 
-import dataframe_changes_pb2 as df_proto
-from dataframe_changes_pb2 import Event, Record
+import dataframe_changes_json as df_proto
+from dataframe_changes_json import Event, Record
 
 
 BASE_TYPES = set([])
@@ -353,7 +353,10 @@ class dataframe(object):
         if record.record_type == Record.FLOAT:
             return record.value.float_value
         if record.record_type == Record.STRING:
-            return record.value.str_value
+            try:
+                return record.value.str_value
+            except AttributeError:
+                print record.value
         if record.record_type == Record.BOOL:
             return record.value.bool_value
         if record.record_type == Record.NULL:
@@ -751,7 +754,7 @@ class dataframe(object):
             groupname = grp_changes.group_key
             if groupname in self.group_to_members:
                 c.append(grp_changes)
-        relevant_changes.group_changes.extend(c)
+        relevant_changes.group_changes = c
         relevant_changes.types.extend(df_changes.types)
         deletes, part_obj_map, group_changes_json = self.__create_objs(relevant_changes)
         
@@ -806,23 +809,35 @@ class dataframe(object):
 
     def __convert_to_proto(self, current_record):
         df_changes = df_proto.DataframeChanges()
+        gcs = []
         for groupname in current_record:
-            groupchanges = df_changes.group_changes.add()
+            groupchanges = df_proto.GroupChanges()
             groupchanges.group_key = groupname
+            objsc = []
             for oid, obj_changes_json in current_record[groupname].items():
-                obj_changes = groupchanges.object_changes.add()
+                obj_changes = df_proto.ObjectChanges()
                 # in the future, can pickle object id here.
                 obj_changes.object_key = oid
                 if "dims" in obj_changes_json:
+                    dims = []
                     for d, record in obj_changes_json["dims"].items():
-                        dim_change = obj_changes.dimension_changes.add()
+                        dim_change = df_proto.DimensionChanges()
                         dim_change.dimension_name = d
                         dim_change.value.CopyFrom(record)
+                        dims.append(dim_change)
+                    obj_changes.dimension_changes = dims
                     
+                tpcs = []
                 for t, status in obj_changes_json["types"].items():
-                    tp_change = obj_changes.type_changes.add()
+                    tp_change = df_proto.TypeChanges()
                     tp_change.type.name = t
                     tp_change.event = status
+                    tpcs.append(tp_change)
+                obj_changes.type_changes = tpcs
+                objsc.append(obj_changes)
+            groupchanges.object_changes = objsc
+            gcs.append(groupchanges)
+        df_changes.group_changes = gcs
         return df_changes
 
                         

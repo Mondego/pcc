@@ -50,7 +50,9 @@ class RecursiveDictionary(dict):
         def iter_rec_update(self, iterator):
                 for (key, value) in iterator:
                         if key in self: 
-                            if isinstance(self[key], dict) and isinstance(value, dict):
+                            if isinstance(self[key], RecursiveDictionary) and isinstance(value, RecursiveDictionary):
+                                self[key].rec_update(value)
+                            elif isinstance(self[key], dict) and isinstance(value, dict):
                                 self[key] = RecursiveDictionary(self[key])
                                 self[key].rec_update(value)
                             elif isinstance(self[key], list) and isinstance(value, list):
@@ -67,3 +69,6 @@ class RecursiveDictionary(dict):
         
         def __repr__(self):
                 return super(self.__class__, self).__repr__()
+
+        def CopyFrom(self, other_dict):
+            self.rec_update(other_dict)

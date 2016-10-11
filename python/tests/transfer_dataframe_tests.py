@@ -8,7 +8,7 @@ from pcc.dataframe import dataframe, DataframeModes
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
 from pcc.projection import projection
-from pcc.dataframe_changes_pb2 import DataframeChanges, Record, Event, Value
+from pcc.dataframe_changes_json import DataframeChanges, Record, Event, Value, GroupChanges, ObjectChanges, DimensionChanges, TypeChanges
  
 import unittest, json
 
@@ -390,21 +390,33 @@ def makerecord(dimchange):
 def convert_json_to_proto(update_json):
     old_record_map = {}
     dfc = DataframeChanges()
+    gcs = []
     for groupname, groupchanges in update_json.items():
-        gc = dfc.group_changes.add()
+        gc = GroupChanges()
         gc.group_key = groupname
+        objs = []
         for oid, objectchanges in groupchanges.items():
-            oc = gc.object_changes.add()
+            oc = ObjectChanges()
             oc.object_key = oid
             if "dims" in objectchanges:
+                dcs = []
                 for dim, dimchange in objectchanges["dims"].items():
-                    dc = oc.dimension_changes.add()
+                    dc = DimensionChanges()
                     dc.dimension_name = dim
                     dc.value.CopyFrom(makerecord(dimchange))
+                    dcs.append(dc)
+                oc.dimension_changes = dcs
+            tpcs = []
             for tp, status in objectchanges["types"].items():
-                tpc = oc.type_changes.add()
+                tpc = TypeChanges()
                 tpc.type.name = tp
                 tpc.event = status
+                tpcs.append(tpc)
+            oc.type_changes = tpcs
+            objs.append(oc)
+        gc.object_changes = objs
+        gcs.append(gc)
+    dfc.group_changes = gcs
     return dfc
 
 def _join_example_data():
@@ -1427,8 +1439,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df_m.connect(df_s)
         df_s.start_recording = True
         df_m.apply_all(update_json1)
-        #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
-        self.assertTrue(df_s.get_record() == update_json1)
+        self.assertTrue(df_s.get_record().group_changes == update_json1.group_changes)
         self.assertTrue(df_s.get(Car) == df_m.get(Car))
         self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
         self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
