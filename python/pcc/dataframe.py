@@ -10,8 +10,8 @@ from uuid import uuid4
 from parameter import ParameterMode
 from multiprocessing import RLock
 
-import dataframe_changes_json as df_repr
-from dataframe_changes_json import Event, Record
+import IDataframeChanges as df_repr
+from IDataframeChanges import Event, Record
 
 
 BASE_TYPES = set([])
@@ -797,7 +797,7 @@ class dataframe(object):
         relevant_changes = dict()
         part_obj_map = dict()
         group_changes_json = RecursiveDictionary()
-        relevant_changes = df_repr.DataframeChanges()
+        relevant_changes = df_repr.DataframeChanges_Base()
         relevant_changes["gc"] = RecursiveDictionary()
         for groupname, grp_changes in df_changes["gc"].items():
             # if the groupname is relevant.
@@ -866,7 +866,7 @@ class dataframe(object):
             df.apply_all(df_changes)
 
     def __convert_to_serializable_dict(self, current_record):
-        df_changes = df_repr.DataframeChanges()
+        df_changes = df_repr.DataframeChanges_Base()
         df_changes.ParseFromDict({"gc": self.current_record})
         return df_changes
 
