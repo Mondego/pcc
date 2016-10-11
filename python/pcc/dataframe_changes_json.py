@@ -6,4 +6,4 @@ class DataframeChanges(DataframeChanges_Base):
         self.ParseFromDict(json.loads(str_value))
 
     def SerializeToString(self):
-        return json.dumps(self.SerializeToDict())
+        return json.dumps(self)

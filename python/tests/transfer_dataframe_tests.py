@@ -8,7 +8,7 @@ from pcc.dataframe import dataframe, DataframeModes
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
 from pcc.projection import projection
-from pcc.dataframe_changes_json import DataframeChanges, Record, Event, Value, GroupChanges, ObjectChanges, DimensionChanges, TypeChanges
+from pcc.dataframe_changes_json import DataframeChanges, Record, Event
  
 import unittest, json
 
@@ -334,89 +334,10 @@ def CreateProjectionTypesAndObjects():
 
 
 
-def makerecord(dimchange):
-    class DimensionType(object):
-        Literal = 0
-        Object = 1
-        ForeignKey = 2
-        Collection = 3
-        Dictionary = 4
-        Unknown = 5
-
-    r = Record()
-    if dimchange["type"] == DimensionType.Literal:
-        # Have to do weird conversion here :(
-        if dimchange["value"] == None:
-            r.record_type = Record.NULL
-            return r 
-        if bool in set(dimchange["value"].__class__.mro()):
-            r.value.bool_value = bool(dimchange["value"])
-            r.record_type = Record.BOOL
-            return r
-        if float in set(dimchange["value"].__class__.mro()):
-            r.value.float_value = float(dimchange["value"])
-            r.record_type = Record.FLOAT
-            return r
-        if str in set(dimchange["value"].__class__.mro()) or unicode in set(dimchange["value"].__class__.mro()):
-            r.value.str_value = str(dimchange["value"])
-            r.record_type = Record.STRING
-            return r
-        if int in set(dimchange["value"].__class__.mro()) or long in set(dimchange["value"].__class__.mro()):
-            r.value.int_value = long(dimchange["value"])
-            r.record_type = Record.INT
-            return r
-    if dimchange["type"] == DimensionType.Collection:
-        r.value.collection.extend([makerecord(dm) for dm in dimchange["value"]])
-        r.record_type = Record.COLLECTION
-        return r
-    if dimchange["type"] == DimensionType.Dictionary:
-        vs = []
-        for k, v in dimchange["value"].items():
-            one_v = Value.Pair()
-            key_r = Record()
-            key_r.record_type = Record.STRING
-            key_r.value.str_value = k
-            one_v.key.CopyFrom(key_r)
-            one_v.value.CopyFrom(makerecord(v))
-            vs.append(one_v)
-        r.value.map.extend(vs)
-        r.record_type = Record.DICTIONARY
-        return r
-    if dimchange["type"] == DimensionType.Object:
-        r.value.object.object_map.extend(makerecord({"type": DimensionType.Dictionary, "value": dimchange["value"]}).value.map)
-        r.record_type = Record.OBJECT
-        return r
-    
 def convert_json_to_proto(update_json):
     old_record_map = {}
     dfc = DataframeChanges()
-    gcs = []
-    for groupname, groupchanges in update_json.items():
-        gc = GroupChanges()
-        gc.group_key = groupname
-        objs = []
-        for oid, objectchanges in groupchanges.items():
-            oc = ObjectChanges()
-            oc.object_key = oid
-            if "dims" in objectchanges:
-                dcs = []
-                for dim, dimchange in objectchanges["dims"].items():
-                    dc = DimensionChanges()
-                    dc.dimension_name = dim
-                    dc.value.CopyFrom(makerecord(dimchange))
-                    dcs.append(dc)
-                oc.dimension_changes = dcs
-            tpcs = []
-            for tp, status in objectchanges["types"].items():
-                tpc = TypeChanges()
-                tpc.type.name = tp
-                tpc.event = status
-                tpcs.append(tpc)
-            oc.type_changes = tpcs
-            objs.append(oc)
-        gc.object_changes = objs
-        gcs.append(gc)
-    dfc.group_changes = gcs
+    dfc.ParseFromDict({"gc": update_json})
     return dfc
 
 def _join_example_data():
@@ -587,15 +508,15 @@ update_json1 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id1"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 0
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "BLUE"
                         }
                     }
@@ -606,15 +527,15 @@ update_json1 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id2"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 0
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "RED"
                         }
                     }
@@ -626,15 +547,15 @@ update_json1 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id3"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 1
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "GREEN"
                         }
                     }
@@ -647,15 +568,15 @@ update_json1 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id4"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 2
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "RED"
                         },
                     },
@@ -670,15 +591,15 @@ resp_json1 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id3"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 1
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "GREEN"
                         }
                     }
@@ -690,15 +611,15 @@ resp_json1 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id4"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 2
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "RED"
                         },
                     },
@@ -713,7 +634,7 @@ update_json2 = convert_json_to_proto({
                     },
                     "dims": {
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "GREEN"
                         }
                     }
@@ -730,8 +651,8 @@ update_json3 = convert_json_to_proto({
                     },
                     "dims": {
                         "velocity": {
-                            "type": 0,
-                            "value": "1"
+                            "type": 1,
+                            "value": 1
                         }
                     }
                 }
@@ -746,15 +667,15 @@ update_json4 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id2"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": "1"
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "RED"
                         }
                     }
@@ -782,7 +703,7 @@ update_json6 = convert_json_to_proto({
                     },
                     "dims": {
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 0
                         }
                     }
@@ -797,20 +718,28 @@ update_json7 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id1"
                         },
                         "velocity": {
-                            "type": 1,
+                            "type": 12,
                             "value": {
-                                "x": { "type": 0, "value": 10 },
-                                "y": { "type": 0, "value": 10 },
-                                "z": { "type": 0, "value": 10 },
+                                "omap": [
+                                    {"k": { "type": 3, "value": "x"},
+                                     "v": { "type": 1, "value": 10 }
+                                    },
+                                    {"k": { "type": 3, "value": "y"},
+                                     "v": { "type": 1, "value": 10 }
+                                    },
+                                    {"k": { "type": 3, "value": "z"},
+                                     "v": { "type": 1, "value": 10 }
+                                    }
+                                ]
                             }
                         },
                         "color": {
-                            "type": 3,
-                            "value": [{"type": 0, "value": "BLUE"}]
+                            "type": 10, 
+                            "value": [{"type": 3, "value": "BLUE"}]
                         }
                     }
                 }
@@ -824,15 +753,15 @@ update_json8 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id1"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 0
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "BLUE"
                         }
                     }
@@ -843,15 +772,15 @@ update_json8 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id2"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 0
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "RED"
                         }
                     }
@@ -862,15 +791,15 @@ update_json8 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id3"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 1
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "GREEN"
                         }
                     }
@@ -881,15 +810,15 @@ update_json8 = convert_json_to_proto({
                     },
                     "dims": {
                         "oid": {
-                            "type": 0,
+                            "type": 3,
                             "value": "id4"
                         },
                         "velocity": {
-                            "type": 0,
+                            "type": 1,
                             "value": 2
                         },
                         "color": {
-                            "type": 0,
+                            "type": 3,
                             "value": "RED"
                         },
                     },
@@ -901,53 +830,51 @@ update_json9 = convert_json_to_proto(json.loads('''{
                 "0fb70042-cb18-4d4c-8ec0-ddfe609f852a": {
                     "dims": {
                         "Color": {
-                            "type": 0,
+                            "type": 1,
                             "value": 5
                         },
                         "ID": {
-                            "type": 0,
+                            "type": 3,
                             "value": "0fb70042-cb18-4d4c-8ec0-ddfe609f852a"
                         },
                         "Length": {
-                            "type": 0,
+                            "type": 5,
                             "value": null
                         },
                         "Position": {
-                            "type": 1,
+                            "type": 12,
                             "value": {
-                                    "X": {
-                                        "type": 0,
-                                        "value": 0
+                                "omap": [
+                                    {"k": { "type": 3, "value": "X"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Y": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Y"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Z": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Z"},
+                                     "v": { "type": 1, "value": 0 }
                                     }
-                                }
+                                ]
+                            }
                         },
                         "Velocity": {
-                            "type": 1,
+                            "type": 12,
                             "value": {
-                                    "X": {
-                                        "type": 0,
-                                        "value": 0
+                                "omap": [
+                                    {"k": { "type": 3, "value": "X"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Y": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Y"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Z": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Z"},
+                                     "v": { "type": 1, "value": 0 }
                                     }
+                                ]
                             }
                         },
                         "Width": {
-                            "type": 0,
+                            "type": 5,
                             "value": null
                         }
                     },
@@ -958,53 +885,51 @@ update_json9 = convert_json_to_proto(json.loads('''{
                 "7ff34b19-7f30-4c5d-a246-f1668d3b89b9": {
                     "dims": {
                         "Color": {
-                            "type": 0,
+                            "type": 1,
                             "value": 5
                         },
                         "ID": {
-                            "type": 0,
+                            "type": 3,
                             "value": "7ff34b19-7f30-4c5d-a246-f1668d3b89b9"
                         },
                         "Length": {
-                            "type": 0,
+                            "type": 5,
                             "value": null
                         },
                         "Position": {
-                            "type": 1,
+                            "type": 12,
                             "value": {
-                                    "X": {
-                                        "type": 0,
-                                        "value": 0
+                                "omap": [
+                                    {"k": { "type": 3, "value": "X"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Y": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Y"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Z": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Z"},
+                                     "v": { "type": 1, "value": 0 }
                                     }
-                                }
+                                ]
+                            }
                         },
                         "Velocity": {
-                            "type": 1,
+                            "type": 12,
                             "value": {
-                                    "X": {
-                                        "type": 0,
-                                        "value": 0
+                                "omap": [
+                                    {"k": { "type": 3, "value": "X"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Y": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Y"},
+                                     "v": { "type": 1, "value": 0 }
                                     },
-                                    "Z": {
-                                        "type": 0,
-                                        "value": 0
+                                    {"k": { "type": 3, "value": "Z"},
+                                     "v": { "type": 1, "value": 0 }
                                     }
+                                ]
                             }
                         },
                         "Width": {
-                            "type": 0,
+                            "type": 5,
                             "value": null
                         }
                     },
@@ -1019,19 +944,19 @@ update_json10 = convert_json_to_proto({
         "586d5e49-2da7-4318-a09b-795744be9867": {
             "dims": {
                 "location": {
-                    "type": 0,
+                    "type": 3,
                     "value": "himalaya"
                 },
                 "oid": {
-                    "type": 0,
+                    "type": 3,
                     "value": "586d5e49-2da7-4318-a09b-795744be9867"
                 },
                 "owner": {
-                    "type": 0,
+                    "type": 3,
                     "value": "Shiva"
                 },
                 "velocity": {
-                    "type": 0,
+                    "type": 1,
                     "value": 299792459
                 }
             },
@@ -1042,19 +967,19 @@ update_json10 = convert_json_to_proto({
         "8b2658fb-ab86-4e00-96bc-31952d8eb38f": {
             "dims": {
                 "location": {
-                    "type": 0,
+                    "type": 3,
                     "value": "himalaya"
                 },
                 "oid": {
-                    "type": 0,
+                    "type": 3,
                     "value": "8b2658fb-ab86-4e00-96bc-31952d8eb38f"
                 },
                 "owner": {
-                    "type": 0,
+                    "type": 3,
                     "value": "Murugan"
                 },
                 "velocity": {
-                    "type": 0,
+                    "type": 1,
                     "value": 299792458
                 }
             },
@@ -1070,15 +995,15 @@ resp_json10 = convert_json_to_proto({
         "586d5e49-2da7-4318-a09b-795744be9867": {
             "dims": {
                 "location": {
-                    "type": 0,
+                    "type": 3,
                     "value": "himalaya"
                 },
                 "oid": {
-                    "type": 0,
+                    "type": 3,
                     "value": "586d5e49-2da7-4318-a09b-795744be9867"
                 },
                 "velocity": {
-                    "type": 0,
+                    "type": 1,
                     "value": 299792459
                 }
             },
@@ -1089,15 +1014,15 @@ resp_json10 = convert_json_to_proto({
         "8b2658fb-ab86-4e00-96bc-31952d8eb38f": {
             "dims": {
                 "location": {
-                    "type": 0,
+                    "type": 3,
                     "value": "himalaya"
                 },
                 "oid": {
-                    "type": 0,
+                    "type": 3,
                     "value": "8b2658fb-ab86-4e00-96bc-31952d8eb38f"
                 },
                 "velocity": {
-                    "type": 0,
+                    "type": 1,
                     "value": 299792458
                 }
             },
@@ -1212,7 +1137,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                 "id4" :{
                     "dims" :{
                         "velocity" :{
-                            "type" :0,
+                            "type" :1,
                             "value" :0
                         }
                     },
@@ -1225,7 +1150,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                 "id5" :{
                     "dims" :{
                         "velocity" :{
-                            "type" :0,
+                            "type" :1,
                             "value" :0
                         }
                     },
@@ -1248,84 +1173,84 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
             c.velocity += 1
         #print json.dumps(df.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
         self.assertTrue(df.get_record() == convert_json_to_proto({
-            "Car" :{
-                "id1" :{
-                    "dims" :{
-                        "color" :{
-                            "type" :0,
-                            "value" :"BLUE"
+            "Car": {
+                "id1": {
+                    "dims": {
+                        "color": {
+                            "type": 3,
+                            "value": "BLUE"
                         },
-                        "oid" :{
-                            "type" :0,
-                            "value" :"id1"
+                        "oid": {
+                            "type": 3,
+                            "value": "id1"
                         },
-                        "velocity" :{
-                            "type" :0,
-                            "value" :1
+                        "velocity": {
+                            "type": 1,
+                            "value": 1
                         }
                     },
-                    "types" :{
-                        "ActiveCar" :1,
-                        "Car" :2
+                    "types": {
+                        "ActiveCar": 1,
+                        "Car": 2
                     }
                 },
-                "id2" :{
-                    "dims" :{
-                        "color" :{
-                            "type" :0,
-                            "value" :"RED"
+                "id2": {
+                    "dims": {
+                        "color": {
+                            "type": 3,
+                            "value": "RED"
                         },
-                        "oid" :{
-                            "type" :0,
-                            "value" :"id2"
+                        "oid": {
+                            "type": 3,
+                            "value": "id2"
                         },
-                        "velocity" :{
-                            "type" :0,
-                            "value" :1
+                        "velocity": {
+                            "type": 1,
+                            "value": 1
                         }
                     },
-                    "types" :{
-                        "ActiveCar" :1,
-                        "Car" :2,
-                        "RedActiveCar" :1
+                    "types": {
+                        "ActiveCar": 1,
+                        "Car": 2,
+                        "RedActiveCar": 1
                     }
                 },
-                "id3" :{
-                    "dims" :{
-                        "velocity" :{
-                            "type" :0,
-                            "value" :2
+                "id3": {
+                    "dims": {
+                        "velocity": {
+                            "type": 1,
+                            "value": 2
                         }
                     },
-                    "types" :{
-                        "ActiveCar" :2,
-                        "Car" :2
+                    "types": {
+                        "ActiveCar": 2,
+                        "Car": 2
                     }
                 },
-                "id4" :{
-                    "dims" :{
-                        "velocity" :{
-                            "type" :0,
-                            "value" :2
+                "id4": {
+                    "dims": {
+                        "velocity": {
+                            "type": 1,
+                            "value": 2
                         }
                     },
-                    "types" :{
-                        "ActiveCar" :2,
-                        "Car" :2,
-                        "RedActiveCar" :2
+                    "types": {
+                        "ActiveCar": 2,
+                        "Car": 2,
+                        "RedActiveCar": 2
                     }
                 },
-                "id5" :{
-                    "dims" :{
-                        "velocity" :{
-                            "type" :0,
-                            "value" :3
+                "id5": {
+                    "dims": {
+                        "velocity": {
+                            "type": 1,
+                            "value": 3
                         }
                     },
-                    "types" :{
-                        "ActiveCar" :2,
-                        "Car" :2,
-                        "RedActiveCar" :2
+                    "types": {
+                        "ActiveCar": 2,
+                        "Car": 2,
+                        "RedActiveCar": 2
                     }
                 }
             }
@@ -1439,7 +1364,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df_m.connect(df_s)
         df_s.start_recording = True
         df_m.apply_all(update_json1)
-        self.assertTrue(df_s.get_record().group_changes == update_json1.group_changes)
+        self.assertTrue(df_s.get_record()["gc"] == update_json1["gc"])
         self.assertTrue(df_s.get(Car) == df_m.get(Car))
         self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
         self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
@@ -1542,13 +1467,12 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.add_types([Car, CarForPedestrian])
         df.extend(Car, cars)
         serialized = df.serialize_all()
-        self.assertTrue(len(serialized.group_changes) == 1)
-        self.assertTrue("Car" == serialized.group_changes[0].group_key)
-        self.assertTrue(len(serialized.group_changes[0].object_changes) == 2)
-        for obj_c in serialized.group_changes[0].object_changes:
-            oid = obj_c.object_key
-            self.assertTrue(len(obj_c.dimension_changes) == 4)
-            self.assertTrue(len(obj_c.type_changes) == 2)
+        self.assertTrue(len(serialized["gc"]) == 1)
+        self.assertTrue("Car" in serialized["gc"])
+        self.assertTrue(len(serialized["gc"]["Car"]) == 2)
+        for oid, obj_c in serialized["gc"]["Car"].items():
+            self.assertTrue(len(obj_c["dims"]) == 4)
+            self.assertTrue(len(obj_c["types"]) == 2)
 
     def test_dataframe_get_join(self):
         Person, Card, Transaction, RedAlert, people, cards, trans = _join_example_data()

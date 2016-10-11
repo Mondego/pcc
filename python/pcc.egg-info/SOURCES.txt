@@ -5,7 +5,6 @@ pcc/attributes.py
 pcc/create.py
 pcc/dataframe.py
 pcc/dataframe_changes_json.py
-pcc/dataframe_changes_pb2.py
 pcc/impure.py
 pcc/isa.py
 pcc/join.py
