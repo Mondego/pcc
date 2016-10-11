@@ -4,6 +4,7 @@ pcc/__init__.py
 pcc/attributes.py
 pcc/create.py
 pcc/dataframe.py
+pcc/dataframe_changes_bson.py
 pcc/dataframe_changes_json.py
 pcc/impure.py
 pcc/isa.py
