@@ -1,4 +1,4 @@
-protobuf
+bson
 
 [dev]
 
