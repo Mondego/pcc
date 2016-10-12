@@ -10,8 +10,8 @@ from uuid import uuid4
 from parameter import ParameterMode
 from multiprocessing import RLock
 
-import IDataframeChanges as df_repr
-from IDataframeChanges import Event, Record
+import dataframe_changes.IDataframeChanges as df_repr
+from dataframe_changes.IDataframeChanges import Event, Record
 
 
 BASE_TYPES = set([])

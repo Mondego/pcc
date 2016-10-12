@@ -1,11 +1,8 @@
 setup.py
-pcc/IDataframeChanges.py
 pcc/__init__.py
 pcc/attributes.py
 pcc/create.py
 pcc/dataframe.py
-pcc/dataframe_changes_bson.py
-pcc/dataframe_changes_json.py
 pcc/impure.py
 pcc/isa.py
 pcc/join.py
@@ -20,3 +17,8 @@ pcc.egg-info/SOURCES.txt
 pcc.egg-info/dependency_links.txt
 pcc.egg-info/requires.txt
 pcc.egg-info/top_level.txt
+pcc/dataframe_changes/IDataframeChanges.py
+pcc/dataframe_changes/__init__.py
+pcc/dataframe_changes/dataframe_changes_bson.py
+pcc/dataframe_changes/dataframe_changes_cbor.py
+pcc/dataframe_changes/dataframe_changes_json.py
