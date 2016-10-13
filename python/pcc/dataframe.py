@@ -42,6 +42,10 @@ class dataframe(object):
         # inactivecar, redcar, etc etc.
         self.group_to_members = dict()
         
+        # group key (always string fullanme of type) to members of group that are pure.  For example: car -> activecar,
+        # inactivecar, redcar, etc etc. but not CarAndPedestrian (a join)
+        self.group_to_pure_members = dict()
+        
         # str name to class.
         self.name2class = dict()
 
@@ -122,7 +126,7 @@ class dataframe(object):
             raise TypeError("Object must have a primary key dimension to be used with Dataframes")
 
     def __convert_to_dim_map(self, obj):
-        return dict([(dim, getattr(obj, dim._name)) for dim in obj.__dimensions__ if hasattr(obj, dim._name)])
+        return RecursiveDictionary([(dim, getattr(obj, dim._name)) for dim in obj.__dimensions__ if hasattr(obj, dim._name)])
 
     
     def __append(self, tp, obj):
@@ -252,15 +256,7 @@ class dataframe(object):
     def __adjust_pcc(self, objs, groupname, original_changes = None):
         if not self.calculate_pcc:
             return
-        can_be_created = list()
-        for othertp in self.group_to_members[groupname]:
-            other_cats = self.categories[othertp.__realname__]
-            if ((not self.__is_impure(othertp, other_cats))
-                and len(set([ObjectType.Projection,
-                             ObjectType.Subset,
-                             ObjectType.Union]).intersection(
-                                 other_cats)) > 0):
-                can_be_created.append(othertp)
+        can_be_created = self.group_to_pure_members[groupname]
 
         old_memberships = dict()
         for othertp in can_be_created:
@@ -272,7 +268,7 @@ class dataframe(object):
         obj_map = self.__calculate_pcc(can_be_created, {groupname: objs}, None)  
         new_objs_map = self.__record_pcc_changes(obj_map,
                                                  old_memberships,
-                                                 {groupname: original_changes} if original_changes else None)
+                                                 RecursiveDictionary({groupname: original_changes}) if original_changes else None)
         for othertp, new_objs in new_objs_map.items():
             for new_obj in new_objs:
                 self.object_map.setdefault(
@@ -456,21 +452,20 @@ class dataframe(object):
         try:
             if obj.__class__.__name__ in self.member_to_group:
                 return Record.FOREIGN_KEY
-            if dict in type(obj).mro():
+            if isinstance(obj, dict):
                 return Record.DICTIONARY
             if hasattr(obj, "__iter__"):
                 #print obj
                 return Record.COLLECTION
-            obj_mro = set(type(obj).mro())
-            if int in obj_mro or long in obj_mro:
+            if isinstance(obj, int) or isinstance(obj, long):
                 return Record.INT
-            if float in obj_mro:
+            if isinstance(obj, float):
                 return Record.FLOAT
-            if str in obj_mro or unicode in obj_mro:
+            if isinstance(obj, str) or isinstance(obj, unicode):
                 return Record.STRING
-            if bool in obj_mro:
+            if isinstance(obj, bool):
                 return Record.BOOL
-            if type(None) in obj_mro:
+            if obj == None:
                 return Record.NULL
             if hasattr(obj, "__dict__"):
                 return Record.OBJECT
@@ -502,8 +497,8 @@ class dataframe(object):
             return dim                
         
         if dim_type == Record.DICTIONARY:
-            dim["value"] = [{"k": self.__generate_dim(k, foreign_keys), 
-                             "v": self.__generate_dim(v, foreign_keys)} 
+            dim["value"] = [RecursiveDictionary({"k": self.__generate_dim(k, foreign_keys), 
+                                                 "v": self.__generate_dim(v, foreign_keys)}) 
                             for k, v in dim_change.items()]
             return dim
             
@@ -528,7 +523,7 @@ class dataframe(object):
 
     def __report_dim_modification(self, oid, name, value, groupname):
         if groupname in self.name2class and self.name2class[groupname] in self.group_to_members[groupname]:
-            self.add_to_record_cache(Event.Modification, groupname, oid, {name: value}) 
+            self.add_to_record_cache(Event.Modification, groupname, oid, RecursiveDictionary({name: value})) 
             self.apply_records_in_cache()
 
     def connect(self, new_df):
@@ -585,6 +580,15 @@ class dataframe(object):
     
         # Adding name to the group
         self.group_to_members.setdefault(key, set()).add(tp)
+        self.group_to_pure_members.setdefault(key, set())
+        if (tp != keytp
+            and (not self.__is_impure(tp, categories))
+            and len(set([ObjectType.Projection,
+                            ObjectType.Subset,
+                            ObjectType.Union]).intersection(
+                                categories)) > 0):
+            self.group_to_pure_members[key].add(tp)
+
         self.member_to_group[name] = key
         self.current_state.setdefault(key, RecursiveDictionary())
         self.fake_class_map.setdefault(key, self.__create_fake_class()).add_dims(tp.__dimensions__)
@@ -936,7 +940,7 @@ class dataframe(object):
                                 self.current_record.setdefault(
                                     groupname, RecursiveDictionary()).setdefault(
                                         oid, RecursiveDictionary()).rec_update(
-                                            RecursiveDictionary({"types": finaltpmap, "dims": dims_relevant}))
+                                            RecursiveDictionary({"types": finaltpmap, "dims": RecursiveDictionary(dims_relevant)}))
             return
 
         elif self.mode == DataframeModes.Client:
@@ -984,10 +988,15 @@ class dataframe(object):
                         oid, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({tpname: event_type}))
                 if dim_change:
                     fks = []
-                    self.current_record[groupname][oid].setdefault(
-                        "dims", RecursiveDictionary()).rec_update(dict([(k if already_converted else k._name, 
-                                                                         v if already_converted else self.__generate_dim(v, fks)) 
-                                                                        for k, v in dim_change.items()]))
+                    if already_converted:
+                        self.current_record[groupname][oid].setdefault(
+                            "dims", RecursiveDictionary()).rec_update(dim_change)
+                    else:
+                        dims = self.current_record[groupname][oid].setdefault(
+                                    "dims", RecursiveDictionary())
+                        for k, v in dim_change.items():
+                            dims.rec_update({k._name: self.__generate_dim(v, fks)}) 
+                                                     
                     for fk, fk_type, group in fks:
                         fk_event_type = Event.Modification if group in self.known_objects and fk in self.known_objects[group] else Event.New
                         fk_dims = None
@@ -1076,7 +1085,7 @@ class dataframe(object):
                 self.known_objects[tpname].clear()
 
     def serialize_all(self):
-        new_record = {}
+        new_record = RecursiveDictionary()
         with self.lock:
             old_state = self.start_recording
             old_current_record = self.get_record()
