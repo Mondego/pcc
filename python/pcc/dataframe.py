@@ -473,7 +473,12 @@ class dataframe(object):
             return -1
         return -1
 
-    def __generate_dim(self, dim_change, foreign_keys):
+    def __generate_dim(self, dim_change, foreign_keys, built_objs):
+        try:
+            if dim_change in built_objs:
+                raise RuntimeError("Cyclic reference in the object to be serialized. %s", dim_change)
+        except TypeError:
+            pass
         dim_type = self.__get_obj_type(dim_change)
         dim = RecursiveDictionary()
         dim["type"] = dim_type
@@ -493,19 +498,23 @@ class dataframe(object):
             return dim
             
         if dim_type == Record.COLLECTION:
-            dim["value"] = [self.__generate_dim(v, foreign_keys) for v in dim_change]
+            dim["value"] = [self.__generate_dim(v, foreign_keys, built_objs) for v in dim_change]
             return dim                
         
         if dim_type == Record.DICTIONARY:
-            dim["value"] = [RecursiveDictionary({"k": self.__generate_dim(k, foreign_keys), 
-                                                 "v": self.__generate_dim(v, foreign_keys)}) 
+            dim["value"] = [RecursiveDictionary({"k": self.__generate_dim(k, foreign_keys, built_objs), 
+                                                 "v": self.__generate_dim(v, foreign_keys, built_objs)}) 
                             for k, v in dim_change.items()]
             return dim
             
         if dim_type == Record.OBJECT:
+            try:
+                built_objs.add(dim_change)
+            except TypeError:
+                pass
             dim["value"] = RecursiveDictionary()
             dim["value"]["omap"] = (
-                self.__generate_dim(dim_change.__dict__, foreign_keys)["value"])
+                self.__generate_dim(dim_change.__dict__, foreign_keys, built_objs)["value"])
             # Can also set the type of the object here serialized. Future work. 
             return dim
 
@@ -995,7 +1004,7 @@ class dataframe(object):
                         dims = self.current_record[groupname][oid].setdefault(
                                     "dims", RecursiveDictionary())
                         for k, v in dim_change.items():
-                            dims.rec_update({k._name: self.__generate_dim(v, fks)}) 
+                            dims.rec_update({k._name: self.__generate_dim(v, fks, set())}) 
                                                      
                     for fk, fk_type, group in fks:
                         fk_event_type = Event.Modification if group in self.known_objects and fk in self.known_objects[group] else Event.New

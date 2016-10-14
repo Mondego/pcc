@@ -9,7 +9,7 @@ from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
 from pcc.projection import projection
     
-import unittest
+import unittest, json
 
 def _load_edge_nodes():
     @pcc_set
@@ -482,4 +482,34 @@ class Test_dataframe_object_tests(unittest.TestCase):
             self.assertTrue(hasattr(c, "oid"))
             self.assertFalse(hasattr(c, "owner"))
 
-    
+    def test_cyclic_reference_serialize(self):
+        class B(object):
+            def __init__(self, c):
+                self.c = c
+        class C(object):
+            def __init__(self):
+                self.b = None
+        @pcc_set
+        class A(object):
+            @primarykey(str)
+            def ID(self): return self._id
+            @ID.setter
+            def ID(self, v): self._id = v
+            @dimension(B)
+            def b(self): return self._b
+            @b.setter
+            def b(self, v): self._b = v
+            def __init__(self): self.ID = "hi"
+
+        a = A()
+        c = C()
+        b = B(c)
+        c.b = b
+        a.b = b
+        df = dataframe()
+        df.add_type(A)
+        df.start_recording = True
+        with self.assertRaises(RuntimeError) as assR:
+            df.append(A, a)
+
+        
