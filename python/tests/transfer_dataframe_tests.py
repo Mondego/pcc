@@ -8,7 +8,7 @@ from pcc.dataframe import dataframe, DataframeModes
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
 from pcc.projection import projection
-from pcc.dataframe_changes_json import DataframeChanges, Record, Event
+from pcc.dataframe_changes.dataframe_changes_json import DataframeChanges, Record, Event
  
 import unittest, json
 

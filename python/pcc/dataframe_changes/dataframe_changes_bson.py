@@ -1,4 +1,4 @@
-from pcc.IDataframeChanges import *
+from IDataframeChanges import *
 import bson
 
 class DataframeChanges(DataframeChanges_Base):

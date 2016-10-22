@@ -99,17 +99,78 @@ class dataframe(object):
 
         self.deleted_objs = RecursiveDictionary()
             
-        
-    def __get_depends(self, tp):
+    @staticmethod
+    def __get_depends(tp):
         if hasattr(tp, "__pcc_bases__"):
             return tp.__pcc_bases__
         raise TypeError("Type %s needs to have some bases" % tp.__realname__)
 
-    def __get_group_key(self, tp):
-        if tp.__PCC_BASE_TYPE__ or (hasattr(tp, "__pcc_join__") and tp.__pcc_join__):
+    @staticmethod
+    def __get_group_key(tp):
+        if tp.__PCC_BASE_TYPE__ or (hasattr(tp, "__pcc_join__") and tp.__pcc_join__) or (hasattr(tp, "__pcc_union__") and tp.__pcc_union__):
             return tp.__realname__, tp
         else:
-            return self.__get_group_key(list(tp.__pcc_bases__)[0])
+            return dataframe.__get_group_key(list(tp.__pcc_bases__)[0])
+
+    @staticmethod
+    def __convert_to_dim_map(obj):
+        return RecursiveDictionary([(dim, getattr(obj, dim._name)) for dim in obj.__dimensions__ if hasattr(obj, dim._name)])
+
+    @staticmethod
+    def __create_fake_class():
+        class _container(object):
+            @staticmethod
+            def add_dims(dims):
+                for dim in dims:
+                    setattr(_container, dim._name, dim)
+        return _container
+
+    @staticmethod
+    def __categorize(tp):
+        all_categories = set()
+        if not (hasattr(tp, "__realname__") or hasattr(tp, "__PCC_BASE_TYPE__")):
+            return set([ObjectType.UnknownType])
+        
+        if tp.__PCC_BASE_TYPE__:
+            all_categories.add(ObjectType.PCCBase)
+        if hasattr(tp, "__pcc_subset__") and tp.__pcc_subset__:
+            all_categories.add(ObjectType.Subset)
+        if hasattr(tp, "__pcc_join__") and tp.__pcc_join__:
+            all_categories.add(ObjectType.Join)
+        if hasattr(tp, "__pcc_projection__") and tp.__pcc_projection__:
+            all_categories.add(ObjectType.Projection)
+        if hasattr(tp, "__pcc_union__") and tp.__pcc_union__:
+            all_categories.add(ObjectType.Union)
+        if hasattr(tp, "__pcc_param__") and tp.__pcc_param__:
+            all_categories.add(ObjectType.Param)
+            all_categories.add(ObjectType.Impure)
+        if hasattr(tp, "__pcc_isa__") and tp.__pcc_isa__:
+            all_categories.add(ObjectType.ISA)
+        if hasattr(tp, "__pcc_impure__") and tp.__pcc_impure__:
+            all_categories.add(ObjectType.Impure)
+
+        return all_categories
+
+    @staticmethod
+    def __change_type(obj, totype):
+        class container(totype):
+            __metaclass__ = PCCMeta(totype)
+            __original_class__ = totype
+            def __init__(self):
+                pass
+
+        new_obj = container()
+        new_obj.__dict__ = obj.__dict__
+        return new_obj
+
+    def __is_impure(self, tp, categories):
+        if self.mode == DataframeModes.Client:
+            return False
+        return (len(set([ObjectType.Join,
+                         ObjectType.Impure,
+                         ObjectType.Param,
+                         ObjectType.UnknownType]).intersection(
+                             categories)) > 0)
 
     def __check_validity(self, tp, obj):
         if not hasattr(tp, "__realname__"): 
@@ -124,9 +185,6 @@ class dataframe(object):
             raise TypeError("Object type and type given do not match")
         if not hasattr(obj, "__primarykey__"):
             raise TypeError("Object must have a primary key dimension to be used with Dataframes")
-
-    def __convert_to_dim_map(self, obj):
-        return RecursiveDictionary([(dim, getattr(obj, dim._name)) for dim in obj.__dimensions__ if hasattr(obj, dim._name)])
 
     
     def __append(self, tp, obj):
@@ -153,59 +211,6 @@ class dataframe(object):
            self.add_to_record_cache(Event.New, tpname, oid, self.__convert_to_dim_map(obj))
         return groupname, oid
     
-    def __create_fake_class(self):
-        class _container(object):
-            @staticmethod
-            def add_dims(dims):
-                for dim in dims:
-                    setattr(_container, dim._name, dim)
-        return _container
-
-    def __categorize(self, tp):
-        all_categories = set()
-        if not (hasattr(tp, "__realname__") or hasattr(tp, "__PCC_BASE_TYPE__")):
-            return set([ObjectType.UnknownType])
-        
-        if tp.__PCC_BASE_TYPE__:
-            all_categories.add(ObjectType.PCCBase)
-        if hasattr(tp, "__pcc_subset__") and tp.__pcc_subset__:
-            all_categories.add(ObjectType.Subset)
-        if hasattr(tp, "__pcc_join__") and tp.__pcc_join__:
-            all_categories.add(ObjectType.Join)
-        if hasattr(tp, "__pcc_projection__") and tp.__pcc_projection__:
-            all_categories.add(ObjectType.Projection)
-        if hasattr(tp, "__pcc_union__") and tp.__pcc_union__:
-            all_categories.add(ObjectType.Union)
-        if hasattr(tp, "__pcc_param__") and tp.__pcc_param__:
-            all_categories.add(ObjectType.Param)
-            all_categories.add(ObjectType.Impure)
-        if hasattr(tp, "__pcc_isa__") and tp.__pcc_isa__:
-            all_categories.add(ObjectType.ISA)
-        if hasattr(tp, "__pcc_impure__") and tp.__pcc_impure__:
-            all_categories.add(ObjectType.Impure)
-
-        return all_categories
-
-    def __change_type(obj, totype):
-        class container(totype):
-            __metaclass__ = PCCMeta(totype)
-            __original_class__ = totype
-            def __init__(self):
-                pass
-
-        new_obj = container()
-        new_obj.__dict__ = obj.__dict__
-        return new_obj
-
-    def __is_impure(self, tp, categories):
-        if self.mode == DataframeModes.Client:
-            return False
-        return (len(set([ObjectType.Join,
-                         ObjectType.Impure,
-                         ObjectType.Param,
-                         ObjectType.UnknownType]).intersection(
-                             categories)) > 0)
-
     def __record_pcc_changes(self, new_objs_map, old_memberships, original_changes = None):
         '''
         This function records the changes (modifications, new, deletes) in the objects found 
@@ -649,6 +654,12 @@ class dataframe(object):
         self.__adjust_pcc(objmap, groupname)
         self.apply_records_in_cache()
     
+    def take(self, tp, count):
+        objs = self.get(tp)[:count]
+        for obj in objs:
+            self.delete(tp, obj)
+        return objs
+
     def get(self, tp, parameters=None):
 
         tpname = tp.__realname__
@@ -666,12 +677,36 @@ class dataframe(object):
             # Not calculating pcc if Client/Cache mode
             return list()
         groupkey = self.member_to_group[tpname]
-        objs = list()
+        objs = dict()
         with self.lock:
             objs = self.__calculate_pcc([tp], self.object_map, parameters)
         return_values = self.__record_pcc_changes(objs, dict().fromkeys(objs, list()))[tp]
         self.apply_records_in_cache()
         return return_values
+
+    def get_one(self, tp, oid):
+        tpname = tp.__realname__
+        if tpname not in self.observing_types:
+            raise TypeError("Type %s not registered" % tpname)
+        
+        with self.lock:
+            if not self.__is_impure(tp, self.categories[tp.__realname__]) and tpname in self.object_map and oid in self.object_map[tpname]:
+                return self.object_map[tpname][oid]
+
+        if hasattr(tp, "__PCC_BASE_TYPE__") and tp.__PCC_BASE_TYPE__:
+            return None
+
+        if not self.calculate_pcc:
+            # Not calculating pcc if Client/Cache mode
+            return None
+        groupkey = self.member_to_group[tpname]
+        objs = dict()
+        with self.lock:
+            objs = self.__calculate_pcc([tp], self.object_map, parameters)
+        if tp in objs and oid in objs[tp]:
+            return_value = self.__record_pcc_changes({tp: [objs[tp][oid]]}, dict().fromkeys(objs, list()))[tp][0]
+        self.apply_records_in_cache()
+        return return_value
 
     def delete(self, tp, obj):
         with self.lock:
