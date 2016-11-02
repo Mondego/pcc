@@ -402,7 +402,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         self.assertTrue((OutEdge.__realname__ in df.object_map) == False)
         self.assertTrue((InEdge.__realname__ in df.object_map) == False)
         self.assertTrue(len(df.get(OutEdge, (nodes[0],))) == 3)
-        self.assertTrue(isinstance(df.get(OutEdge, (nodes[0],))[0], OutEdge.Class()))
+        self.assertTrue(isinstance(df.get(OutEdge, (nodes[0],))[0], OutEdge))
         self.assertTrue(len(df.get(InEdge, (nodes[0],))) == 0) 
 
     def test_join_get(self):
@@ -447,13 +447,13 @@ class Test_dataframe_object_tests(unittest.TestCase):
                 self.color = col
 
         @subset(Car)
-        class ActiveCar(Car.Class()):
+        class ActiveCar(Car):
             @staticmethod
             def __predicate__(c):
                 return c.velocity != 0
 
         @subset(ActiveCar)
-        class RedActiveCar(Car.Class()):
+        class RedActiveCar(Car):
             @staticmethod
             def __predicate__(ac):
                 return ac.color == "RED"

@@ -11,4 +11,5 @@ class isa(object):
       actual_class.__isa__.add(of_cls)
       actual_class.__dimensions__.update(set(dimensions))
     actual_class.__pcc_isa__ = True
+    actual_class.__pcc_type__ = "isa"
     return actual_class

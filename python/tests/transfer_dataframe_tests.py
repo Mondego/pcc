@@ -40,13 +40,13 @@ def create_cars():
 
 
     @subset(Car)
-    class ActiveCar(Car.Class()):
+    class ActiveCar(Car):
         @staticmethod
         def __predicate__(c):
             return c.velocity != 0
 
     @subset(ActiveCar)
-    class RedActiveCar(Car.Class()):
+    class RedActiveCar(Car):
         @staticmethod
         def __predicate__(ac):
             return ac.color == "RED"
@@ -220,7 +220,7 @@ def create_complex_cartypes():
             self._Width = value
 
     @subset(Car)
-    class InactiveCar(Car.Class()):
+    class InactiveCar(Car):
         @staticmethod
         def __query__(cars):
             return [c for c in cars if InactiveCar.__predicate__(c)]
@@ -234,7 +234,7 @@ def create_complex_cartypes():
             self.Velocity = Vector3(self.SPEED, 0, 0)
 
     @subset(Car)
-    class ActiveCar(Car.Class()):
+    class ActiveCar(Car):
         @staticmethod
         def __query__(cars):  # @DontTrace
             return [c for c in cars if ActiveCar.__predicate__(c)]

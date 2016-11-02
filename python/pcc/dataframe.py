@@ -181,21 +181,21 @@ class dataframe(object):
         if ObjectType.PCCBase not in self.categories[tp.__realname__]:
             # Person not appending the right type of object
             raise TypeError("Cannot insert/delete type %s" % tp.__realname__)
-        if tp.__realname__ != obj.__class__.__realname__:
+        if tp.__realname__ != obj.__class__.__realname__ and self.member_to_group[obj.__class__.__realname__] != tp.__realname__:
             raise TypeError("Object type and type given do not match")
-        if not hasattr(obj, "__primarykey__"):
-            raise TypeError("Object must have a primary key dimension to be used with Dataframes")
+        if not hasattr(tp, "__primarykey__"):
+            raise TypeError("Type must have a primary key dimension to be used with Dataframes")
 
     
     def __append(self, tp, obj):
         self.__check_validity(tp, obj)
 
         # all clear to insert.
-
-        if obj.__primarykey__ == None:
+        try:
+            oid = obj.__primarykey__
+        except AttributeError:
             setattr(obj, tp.__primarykey__._name, str(uuid4()))
-
-        oid = obj.__primarykey__
+            oid = obj.__primarykey__
         tpname = tp.__realname__
         groupname = self.member_to_group[tpname]
 
@@ -299,7 +299,7 @@ class dataframe(object):
         try:
             pcc_objects = create(pcctype, *universe, params = param_list)
         except TypeError, e:
-            print ("Exception in __make_pcc: " + e.message)
+            print ("Exception in __make_pcc: " + e.message + " type: " + pcctype.__realname__)
             return list()
         return pcc_objects
 
