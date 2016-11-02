@@ -39,10 +39,21 @@ def create(tp, *args, **kwargs):
     return __create_pcc(tp, params, args)
 
 def __create_pcc(actual_class, params, collections):
+    items = []
     if hasattr(actual_class, "__query__"):
-        return [change_type(item, actual_class) for item in actual_class.__query__(*(list(collections) + list(params)))]
+        items = [change_type(item, actual_class) for item in actual_class.__query__(*(list(collections) + list(params)))]
     else:
-        return __generic_query[actual_class.__pcc_type__](actual_class, collections, params)
+        items = __generic_query[actual_class.__pcc_type__](actual_class, collections, params)
+    if hasattr(actual_class, "__orderby__"):
+        items = sorted(items, key = actual_class.__orderby__)
+    if hasattr(actual_class, "__limit__"):
+        items = items[:actual_class.__limit__]
+    if hasattr(actual_class, "__groupby__"):
+        dict_by_prop = {}
+        for item in items:
+            dict_by_prop.setdefault(item.__groupby__, list()).append(item)
+        items = dict_by_prop.values()
+    return items
 
 def change_type(obj, totype):
     class container(object):
