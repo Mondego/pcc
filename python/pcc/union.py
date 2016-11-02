@@ -48,19 +48,4 @@ class union(object):
         actual_class.__pcc_union__ = True
         actual_class.__pcc_type__ = "union"
         actual_class.__real_types__ = self.real_types
-        #    @staticmethod
-        #    def Class():
-        #        # Not sure if this should be exposed,
-        #        # as then people can create objects fromt this
-        #        # useful for inheriting from class directly though.
-        #        return actual_class
-
-        #    @staticmethod
-        #    def __create_pcc__(change_type_fn, *collections, **kwargs):
-        #        return [change_type_fn(item, actual_class) 
-        #                        for collection in collections 
-        #                            for item in collection 
-        #                                if type(item).__original_class__ in self.real_types]
-
-        #return _Union
         return actual_class

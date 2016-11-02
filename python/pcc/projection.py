@@ -28,16 +28,4 @@ class projection(object):
         actual_class.__pcc_projection__ = True
             
         actual_class.__pcc_type__ = "projection"
-            
-            #@staticmethod
-            #def Class():
-            #    # Not sure if this should be exposed, 
-            #    # as then people can create objects fromt this
-            #    # useful for inheriting from class directly though.
-            #    return actual_class
-
-            #@staticmethod
-            #def __create_pcc__(change_type_fn, collection, param = tuple()):
-            #    return [change_type_fn(item, actual_class) for item in collection]
-             
         return actual_class
