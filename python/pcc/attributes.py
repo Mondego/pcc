@@ -85,6 +85,7 @@ class primarykey(object):
 
     def __call__(self, func):
         x = spacetime_property(self.type, func)
+        
         x._primarykey = True
         return x
 

@@ -4,7 +4,7 @@ Create on Feb 27, 2016
 @author: Rohan Achar
 '''
 from attributes import spacetime_property
-from set import PCCMeta
+from _utils import build_required_attrs
 
 class union(object):
     def __init__(self, *types):
@@ -27,41 +27,40 @@ class union(object):
                 self.dimensions.add(dimension)
             
         self.types = types
-        self.real_types = [tp.Class() if hasattr(tp, "Class") else tp for tp in types]
+        self.real_types = [tp.__realname__ for tp in types]
 
     def __call__(self, actual_class):
+        build_required_attrs(actual_class)
         # actual_class the class that is being passed from application.
         actual_class.__dimensions__ = self.dimensions
         actual_class.__dimensions_name__ = self.dimension_names
         # The pcc union class being cooked right here.
-        class _Union(object):
-            __realname__ = actual_class.__name__
-            actual_class.__realname__ = __realname__
         
-            __metaclass__ = PCCMeta(actual_class)
-            __dependent_type__ = True
-            __ENTANGLED_TYPES__ = self.types
-            __PCC_BASE_TYPE__ = False
-            __pcc_bases__ = set(self.types).union(actual_class.__pcc_bases__
-                    if hasattr(actual_class, "__pcc_bases__") else
-                    set())
-            __start_tracking__ = False
-            __dimensions__ = actual_class.__dimensions__ if hasattr(actual_class, "__dimensions__") else set()
-            __dimensions_name__ = actual_class.__dimensions_name__ if hasattr(actual_class, "__dimensions_name__") else set()
-            __pcc_union__ = True
+        actual_class.__dependent_type__ = True
+        actual_class.__ENTANGLED_TYPES__ = self.types
+        actual_class.__PCC_BASE_TYPE__ = False
+        actual_class.__pcc_bases__ = set(self.types).union(actual_class.__pcc_bases__
+                                        if hasattr(actual_class, "__pcc_bases__") else
+                                        set())
+        actual_class.__start_tracking__ = False
+        actual_class.__dimensions__ = actual_class.__dimensions__ if hasattr(actual_class, "__dimensions__") else set()
+        actual_class.__dimensions_name__ = actual_class.__dimensions_name__ if hasattr(actual_class, "__dimensions_name__") else set()
+        actual_class.__pcc_union__ = True
+        actual_class.__pcc_type__ = "union"
+        actual_class.__real_types__ = self.real_types
+        #    @staticmethod
+        #    def Class():
+        #        # Not sure if this should be exposed,
+        #        # as then people can create objects fromt this
+        #        # useful for inheriting from class directly though.
+        #        return actual_class
 
-            @staticmethod
-            def Class():
-                # Not sure if this should be exposed,
-                # as then people can create objects fromt this
-                # useful for inheriting from class directly though.
-                return actual_class
+        #    @staticmethod
+        #    def __create_pcc__(change_type_fn, *collections, **kwargs):
+        #        return [change_type_fn(item, actual_class) 
+        #                        for collection in collections 
+        #                            for item in collection 
+        #                                if type(item).__original_class__ in self.real_types]
 
-            @staticmethod
-            def __create_pcc__(change_type_fn, *collections, **kwargs):
-                return [change_type_fn(item, actual_class) 
-                                for collection in collections 
-                                    for item in collection 
-                                        if type(item).__original_class__ in self.real_types]
-
-        return _Union
+        #return _Union
+        return actual_class
