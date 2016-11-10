@@ -48,10 +48,11 @@ def __create_pcc(actual_class, params, collections):
         items = sorted(items, key = actual_class.__orderby__)
     if hasattr(actual_class, "__limit__"):
         items = items[:actual_class.__limit__]
-    if hasattr(actual_class, "__groupby__"):
+    if hasattr(actual_class, "__distinct__"):
         dict_by_prop = {}
         for item in items:
-            dict_by_prop.setdefault(item.__groupby__, list()).append(item)
+            if item.__distinct__ not in dict_by_prop:
+                dict_by_prop[item.__distinct__] = item
         items = dict_by_prop.values()
     return items
 

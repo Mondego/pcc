@@ -349,8 +349,52 @@ def _CreateProjectionTypesAndObjects():
 
     return Car, CarForPedestrian, [car1, car2] 
 
+def _CreateSubsetWithDistinct():
+    @pcc_set
+    class BaseClass(object):
+        @primarykey(str)
+        def ID(self): return self._id
 
+        @ID.setter
+        def ID(self, v): self._id = v
 
+        @dimension(str)
+        def prop1(self): return self._p1
+
+        @prop1.setter
+        def prop1(self, v): self._p1 = v
+
+        @dimension(str)
+        def prop2(self): return self._p2
+
+        @prop2.setter
+        def prop2(self, v): self._p2 = v
+
+    @subset(BaseClass)
+    class DistinctSubset(object):
+        @staticmethod
+        def __predicate__(bc):
+            return True
+
+        @property
+        def __distinct__(self):
+            return self.prop2
+
+    obj1 = BaseClass()
+    obj2 = BaseClass()
+    obj3 = BaseClass()
+    obj1.ID = "0"
+    obj2.ID = "1"
+    obj3.ID = "2"
+    obj1.prop1 = "a"
+    obj2.prop1 = "b"
+    obj3.prop1 = "a"
+    obj3.prop1 = "c"
+    obj1.prop2 = "a"
+    obj2.prop2 = "b"
+    obj3.prop2 = "a"
+    return BaseClass, DistinctSubset, [obj1, obj2, obj3]
+        
 class Test_dataframe_object_tests(unittest.TestCase):
     def test_base_set_addition(self):
         Node, Edge, nodes, edges = _CreateNodesAndEdges()
@@ -512,4 +556,18 @@ class Test_dataframe_object_tests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as assR:
             df.append(A, a)
 
-        
+    def test_distinct_subset_get(self):
+        BaseClass, DistinctSubset, bc_objs = _CreateSubsetWithDistinct()
+        df = dataframe()
+        df.add_types([BaseClass, DistinctSubset])
+        df.extend(BaseClass, bc_objs)
+        distinct_subs = df.get(DistinctSubset)
+        self.assertTrue(len(distinct_subs) == 2)
+        flag = True
+        seen = set()
+        for d in distinct_subs:
+            if d.prop2 in seen:
+                flag = False
+            else:
+                seen.add(d.prop2)
+        self.assertTrue(flag)

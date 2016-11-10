@@ -98,6 +98,8 @@ class dataframe(object):
         self.__join_types = set()
 
         self.deleted_objs = RecursiveDictionary()
+
+        self.closest_foreign_key_type = {}
             
     @staticmethod
     def __get_depends(tp):
@@ -162,6 +164,13 @@ class dataframe(object):
         new_obj = container()
         new_obj.__dict__ = obj.__dict__
         return new_obj
+
+    @staticmethod
+    def __is_not_saveable(categories):
+        return (ObjectType.Join in categories 
+                or ObjectType.Param in categories 
+                or ObjectType.Subset in categories 
+                or ObjectType.Union in categories)
 
     def __is_impure(self, tp, categories):
         if self.mode == DataframeModes.Client:
@@ -525,12 +534,17 @@ class dataframe(object):
 
         if dim_type == Record.FOREIGN_KEY:
             key, group, fk_type = dim_change.__primarykey__, self.member_to_group[dim_change.__class__.__name__], dim_change.__class__.__name__
-            foreign_keys.append((key, fk_type, group))
+            if fk_type in self.closest_foreign_key_type:
+                convert_type = self.closest_foreign_key_type[fk_type]
+            else:
+                raise TypeError("Cannot use %s as a foreign key type" % fk_type)
+                        
+            foreign_keys.append((key, convert_type, group))
             dim["value"] = RecursiveDictionary()
             dim["value"]["group_key"] = group
             dim["value"]["object_key"] = key
             dim["value"]["actual_type"] = RecursiveDictionary()
-            dim["value"]["actual_type"]["name"] = fk_type
+            dim["value"]["actual_type"]["name"] = convert_type
             return dim
 
         raise TypeError("Don't know how to deal with %s" % dim_change)
@@ -568,6 +582,10 @@ class dataframe(object):
         if not not_member:
             self.observing_types.add(name)
 
+        not_directly_saveable_type = dataframe.__is_not_saveable(categories)
+        if not not_directly_saveable_type:
+            self.closest_foreign_key_type[name] = name
+        cannot_be_saved = ObjectType.Join in categories or ObjectType.Union in categories
         # getting all the dependencies that tp depends on (results are in string form)
         depend_types = self.__get_depends(tp)
         self.depends_map[name] = depend_types
@@ -580,6 +598,11 @@ class dataframe(object):
                 self.__add_type(dtp, except_type = name, not_member=True)
             if ObjectType.Impure in self.categories[dtpname]:
                 categories.add(ObjectType.Impure)
+            if (not cannot_be_saved
+                and not_directly_saveable_type 
+                and dtpname in self.closest_foreign_key_type):
+                self.closest_foreign_key_type[name] = self.closest_foreign_key_type[dtpname]
+                
 
         # add categories to map
         self.categories[name] = categories
