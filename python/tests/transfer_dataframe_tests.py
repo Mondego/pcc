@@ -1295,7 +1295,6 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
-        df.extend(Car, cars)
         df.apply_all(update_json1)
 
         self.assertTrue(len(df.get_new(Car)) == 4)
@@ -1306,6 +1305,23 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get_deleted(ActiveCar)) == 0)  
         self.assertTrue(len(df.get_new(RedActiveCar)) == 1)
         self.assertTrue(len(df.get_mod(RedActiveCar)) == 0)
+        self.assertTrue(len(df.get_deleted(RedActiveCar)) == 0)  
+
+    def test_dataframe_apply_get_new_with_existing_objs(self):
+        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df = dataframe()
+        df.add_types([Car, ActiveCar, RedActiveCar])
+        df.extend(Car, cars)
+        df.apply_all(update_json1)
+
+        self.assertTrue(len(df.get_new(Car)) == 0)
+        self.assertTrue(len(df.get_mod(Car)) == 4)  
+        self.assertTrue(len(df.get_deleted(Car)) == 0)  
+        self.assertTrue(len(df.get_new(ActiveCar)) == 0)
+        self.assertTrue(len(df.get_mod(ActiveCar)) == 2)
+        self.assertTrue(len(df.get_deleted(ActiveCar)) == 0)  
+        self.assertTrue(len(df.get_new(RedActiveCar)) == 0)
+        self.assertTrue(len(df.get_mod(RedActiveCar)) == 1)
         self.assertTrue(len(df.get_deleted(RedActiveCar)) == 0)  
 
     def test_dataframe_apply_get_mod(self):

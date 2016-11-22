@@ -1,4 +1,4 @@
-from pcc.recursive_dictionary import RecursiveDictionary
+from recursive_dictionary import RecursiveDictionary
 
 
 class DataframeChanges_Base(RecursiveDictionary):

@@ -1,6 +1,7 @@
 from attributes import spacetime_property
 
 def build_required_attrs(cooked_cls):
+    cooked_cls.__pcc_type__ = True
     cooked_cls.__start_tracking__ = __start_tracking_prop__
     cooked_cls.__realname__ = __realname__ = cooked_cls.__name__
     cooked_cls.__dimensions__ = set() if not hasattr(cooked_cls, "__dimensions__") else set(cooked_cls.__dimensions__)
