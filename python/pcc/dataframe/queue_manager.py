@@ -2,7 +2,7 @@
 #### Attached Dataframe Stuff ###################
 #################################################
 
-class CacheManager(object):
+class QueueManager(object):
     def __init__(self):
         
         self.df_to_tp = dict()

@@ -178,7 +178,9 @@ class TypeManager(object):
         return True
 
     def get_requested_type(self, tp):
-        tpname = tp.__realname__
+        return self.get_requested_type_from_str(tp.__realname__)
+
+    def get_requested_type_from_str(self, tpname):
         try:
             if tpname in self.observing_types:
                 return self.name2class[tpname]
@@ -186,6 +188,9 @@ class TypeManager(object):
                 raise TypeError("Type % is not registered" % tpname)
         except KeyError:
             raise TypeError("Type % is not registered" % tpname)
+
+    def get_name2type_map(self):
+        return self.name2class
 
     #################################################
     ### Private Methods #############################
@@ -210,6 +215,7 @@ class TypeManager(object):
         
         if not not_member:
             self.observing_types.add(tp_obj)
+        tp_obj.observable = not not_member
         
         not_directly_saveable_type = TypeManager.__is_not_saveable(categories)
         if not not_directly_saveable_type:

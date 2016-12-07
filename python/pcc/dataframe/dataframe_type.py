@@ -41,7 +41,9 @@ class DataframeType(object):
                  group_members = set(),
                  pure_group_members = set(),
                  is_pure = False,
-                 parameter_types = dict()):
+                 parameter_types = dict(),
+                 super_class = None,
+                 observable = True):
         self.type = tp
         self.group_type = grp_tp
         self.categories = categories
@@ -51,6 +53,8 @@ class DataframeType(object):
         self.pure_group_members = pure_group_members
         self.is_pure = is_pure
         self.parameter_types = parameter_types
+        self.super_class = super_class
+        self.observable = observable
 
 
 

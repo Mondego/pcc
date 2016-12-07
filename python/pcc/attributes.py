@@ -59,7 +59,7 @@ class spacetime_property(property):
                 for tp_obj, tr, rc in self._dataframe_data:
                     tr(tp_obj, {obj.__primarykey__: obj})
                     #rc(obj.__primarykey__, self, value, tp_obj)
-                    rc()
+                    rc(tp_obj, obj.__primarykey__, {self._name: value})
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
                 value = str(uuid.uuid4())
