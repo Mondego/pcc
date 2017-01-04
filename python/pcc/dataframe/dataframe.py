@@ -3,17 +3,17 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from attributes import spacetime_property
-from recursive_dictionary import RecursiveDictionary
-from create import create, change_type
-from parameter import ParameterMode
+from pcc.attributes import spacetime_property
+from pcc.recursive_dictionary import RecursiveDictionary
+from pcc.create import create, change_type
+from pcc.parameter import ParameterMode
 from uuid import uuid4
 from threading import Thread
 from Queue import Queue
 from Queue import Empty
 
-import dataframe_changes.IDataframeChanges as df_repr
-from dataframe_changes.IDataframeChanges import Event, Record
+import pcc.dataframe_changes.IDataframeChanges as df_repr
+from pcc.dataframe_changes.IDataframeChanges import Event, Record
 from object_manager import ObjectManager
 from type_manager import TypeManager
 from change_manager import ChangeManager
@@ -48,10 +48,6 @@ class dataframe(object):
         # PCCs to be calculated only if it is in Master Mode.
         self.calculate_pcc = True
 
-        # Flag to see if the dataframe should keep a record of all changes.
-        # Can be used to synchnronize between dataframes.
-        self.start_recording = False
-        
         # Unique ID for this dataframe.
         self.name = name
 
@@ -59,18 +55,24 @@ class dataframe(object):
         self.type_manager = TypeManager()
 
         # The object that deals with object management
-        self.object_manager = ObjectManager()
+        self.object_manager = ObjectManager(self.type_manager)
 
         # The object that deals with record management
         self.change_manager = ChangeManager()
+
+        # Flag to see if the dataframe should keep a record of all changes.
+        # Can be used to synchnronize between dataframes.
+        self.start_recording = False
+        
 
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
         pairs_added = self.type_manager.add_type(
             tp, 
             tracking, 
-            self.object_manager.adjust_pcc, 
-            self.change_manager.report_dim_modification)
+            self.object_manager.adjust_pcc,  
+            self.change_manager.report_dim_modification,
+            self.object_manager.create_records_for_dim_modification)
         self.object_manager.create_tables(pairs_added)
 
     def add_types(self, types, tracking=False):
@@ -78,7 +80,8 @@ class dataframe(object):
             types, 
             tracking, 
             self.object_manager.adjust_pcc, 
-            self.change_manager.report_dim_modification)
+            self.change_manager.report_dim_modification,
+            self.object_manager.create_records_for_dim_modification)
         self.object_manager.create_tables(pairs_added)
 
     def has_type(self, tp):
@@ -116,8 +119,10 @@ class dataframe(object):
 
     def get(self, tp, oid = None, parameters = None):
         # TODO: Add checks for tp
+        if tp.__realname__ not in self.type_manager.observing_types:
+            raise TypeError("%s Type is not registered for observing." % tp.__realname__)
         tp_obj = self.type_manager.get_requested_type(tp)
-        return self.object_manager.get(tp_obj, parameter) if oid == None else self.object_manager.get_one(tp_obj, oid, parameter)
+        return self.object_manager.get(tp_obj, parameters) if oid == None else self.object_manager.get_one(tp_obj, oid, parameters)
 
     def delete(self, tp, obj):
         # TODO: Add checks for tp
@@ -131,27 +136,47 @@ class dataframe(object):
         records = self.object_manager.delete_all(tp_obj)
         self.change_manager.add_records(records)
 
+    def convert_to_records(objmap):
+        pass
+
     #############################################
 
     ####### CHANGE MANAGEMENT METHODS ###########
+
+    @property
+    def start_recording(self): return self.change_manager.startrecording
+
+    @start_recording.setter
+    def start_recording(self, v): self.change_manager.startrecording = v
 
     def apply_changes(self, changes):
         if "gc" not in changes:
             return
 
-        tp_obj_gc = RecursiveDictionary()
-        tp_obj_gc["gc"] = RecursiveDictionary()
-        if "types" in changes:
-            tp_obj_gc["types"] = changes["types"]
-        for tpname in changes["gc"]:
-            try:
-                tp_obj = self.type_manager.get_requested_type_from_str(tpname)
-            except TypeError:
-                continue
-            tp_obj_gc["gc"][tp_obj] = changes["gc"][tpname]
-        records, buffer_changes = self.object_manager.apply_changes(tp_obj_gc, self.type_manager.get_name2type_map())
-        self.change_manager.add_buffer_changes(buffer_changes)
-        self.change_manager.add_changelog(changes)
-        self.change_manager.add_records(records)
+        applied_records, all_records = self.object_manager.apply_changes(changes)
+        self.object_manager.add_buffer_changes(applied_records)
+        self.change_manager.add_records(all_records)
+
+    def get_record(self):
+        return self.change_manager.get_record()
+
+    def connect_app_queue(self, app_queue):
+        return self.type_manager.get_impures_in_types(app_queue.types), self.change_manager.add_app_queue(app_queue)
+
+    def convert_to_record(self, results, deleted_oids):
+        return self.object_manager.convert_to_records(results, deleted_oids)
+
+    def serialize_all(self):
+        return self.change_manager.convert_to_serializable_dict(
+            self.object_manager.convert_whole_object_map())
+
+    def get_new(self, tp):
+        return self.object_manager.get_new(tp)
+
+    def get_mod(self, tp):
+        return self.object_manager.get_mod(tp)
+
+    def get_deleted(self, tp):
+        return self.object_manager.get_deleted(tp)
 
     #############################################

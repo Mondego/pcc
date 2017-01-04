@@ -122,17 +122,18 @@ class TypeManager(object):
     ### API Methods #################################
     #################################################
         
-    def add_type(self, tp, tracking=False, pcc_adjuster = None, dim_modification_reporter = None):
+    def add_type(self, tp, tracking=False, pcc_adjuster = None, dim_modification_reporter = None, records_creator = None):
         pairs_added = set()
         with self.lock:
             self.__add_type(tp, 
                             tracking = tracking, 
                             pairs_added = pairs_added, 
                             pcc_adjuster = pcc_adjuster, 
-                            dim_modification_reporter = dim_modification_reporter)
+                            dim_modification_reporter = dim_modification_reporter,
+                            records_creator = records_creator)
         return pairs_added
 
-    def add_types(self, types, tracking=False, pcc_adjuster = None, dim_modification_reporter = None):
+    def add_types(self, types, tracking=False, pcc_adjuster = None, dim_modification_reporter = None, records_creator = None):
         pairs_added = set()
         with self.lock:
             for tp in types:
@@ -140,7 +141,8 @@ class TypeManager(object):
                                 tracking = tracking, 
                                 pairs_added = pairs_added, 
                                 pcc_adjuster = pcc_adjuster, 
-                                dim_modification_reporter = dim_modification_reporter)
+                                dim_modification_reporter = dim_modification_reporter,
+                                records_creator = records_creator)
         return pairs_added
 
     def has_type(self, tp):
@@ -182,21 +184,32 @@ class TypeManager(object):
 
     def get_requested_type_from_str(self, tpname):
         try:
-            if tpname in self.observing_types:
+            if tpname in self.name2class:
                 return self.name2class[tpname]
             else:
-                raise TypeError("Type % is not registered" % tpname)
+                raise TypeError("Type %s is not registered" % tpname)
         except KeyError:
-            raise TypeError("Type % is not registered" % tpname)
+            raise TypeError("Type %s is not registered" % tpname)
 
     def get_name2type_map(self):
         return self.name2class
+
+    def get_impures_in_types(self, types):
+        result = set()
+        for tp in types:
+            tp_obj = self.get_requested_type(tp)
+            if (ObjectType.Impure in tp_obj.categories
+                or ObjectType.Join in tp_obj.categories
+                or ObjectType.Param in tp_obj.categories
+                or ObjectType.Union in tp_obj.categories):
+                result.add(tp)
+        return result
 
     #################################################
     ### Private Methods #############################
     #################################################
     
-    def __add_type(self, tp, except_type = None, tracking=False, not_member=False, pairs_added = set(), pcc_adjuster = None, dim_modification_reporter = None):
+    def __add_type(self, tp, except_type = None, tracking=False, not_member=False, pairs_added = set(), pcc_adjuster = None, dim_modification_reporter = None, records_creator = None):
         categories = TypeManager.__categorize(tp)
         if ObjectType.UnknownType in categories:
             raise TypeError("Type %s cannot be added" % name)
@@ -245,7 +258,7 @@ class TypeManager(object):
         tp_obj.is_pure = not TypeManager.__is_impure(tp, categories)
         tp_obj.depends = depends
         if hasattr(tp, "__parameter_types__"):
-            for mode, types in self.__parameter_types__.items():
+            for mode, types in tp.__parameter_types__.items():
                 ptype_objs = []
                 for ptp in types:
                     insert_obj = ptp
@@ -254,6 +267,8 @@ class TypeManager(object):
                                       if ptp.__realname__ in self.name2class else 
                                       self.__add_type(ptp, except_type = name, not_member = True))
                     ptype_objs.append(insert_obj)   
+                if tp_obj.parameter_types == dict():
+                    tp_obj.parameter_types = dict()
                 tp_obj.parameter_types[mode] = ptype_objs
             
         # Adding name to the group
@@ -269,7 +284,6 @@ class TypeManager(object):
 
         tp_obj.group_members = self.group_to_members[key]
         tp_obj.pure_group_members = self.group_to_pure_members[key]
-
         pairs_added.add((name, ObjectType.PCCBase in categories))
         self.super_class_map.setdefault(key, self.__create_superset_class()).add_dims(tp.__dimensions__)
         tp_obj.super_class = self.super_class_map[key]
@@ -278,6 +292,6 @@ class TypeManager(object):
             self.join_types.add(tp_obj)
 
         for dim in tp.__dimensions__:
-            dim._dataframe_data.add((tp_obj, pcc_adjuster, dim_modification_reporter))
+            dim._dataframe_data.add((self.get_requested_type, pcc_adjuster, records_creator, dim_modification_reporter))
         return tp_obj
         

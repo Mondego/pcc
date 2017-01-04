@@ -412,7 +412,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue(len(df.object_map[HighValueTransaction.__realname__]) == 1)
+        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__realname__]) == 1)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
@@ -427,7 +427,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue((HighValueTransaction.__realname__ in df.object_map) == False)
+        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__realname__]) == 0)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
@@ -443,11 +443,11 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.add_types([Node, Edge, InEdge, OutEdge])
         df.extend(Node, nodes)
         df.extend(Edge, edges)
-        self.assertTrue((OutEdge.__realname__ in df.object_map) == False)
-        self.assertTrue((InEdge.__realname__ in df.object_map) == False)
-        self.assertTrue(len(df.get(OutEdge, (nodes[0],))) == 3)
-        self.assertTrue(isinstance(df.get(OutEdge, (nodes[0],))[0], OutEdge))
-        self.assertTrue(len(df.get(InEdge, (nodes[0],))) == 0) 
+        self.assertTrue(len(df.object_manager.object_map[OutEdge.__realname__]) == 0)
+        self.assertTrue(len(df.object_manager.object_map[InEdge.__realname__]) == 0)
+        self.assertTrue(len(df.get(OutEdge, parameters = (nodes[0],))) == 3)
+        self.assertTrue(isinstance(df.get(OutEdge, parameters = (nodes[0],))[0], OutEdge))
+        self.assertTrue(len(df.get(InEdge, parameters = (nodes[0],))) == 0) 
 
     def test_join_get(self):
         Person, Card, Transaction, RedAlert, persons, cards, transactions = _join_example_data()
@@ -456,7 +456,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.extend(Person, persons)
         df.extend(Card, cards)
         df.extend(Transaction, transactions)
-        self.assertTrue((RedAlert.__realname__ in df.object_map) == False)
+        self.assertTrue(len(df.object_manager.object_map[RedAlert.__realname__]) == 0)
         self.assertTrue(len(df.get(RedAlert)) == 2)
         for ra in df.get(RedAlert):
             ra.Protect()
@@ -517,7 +517,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, CarForPedestrian])
         df.extend(Car, cars)
-        self.assertTrue(len(df.object_map[CarForPedestrian.__realname__]) == 2)
+        self.assertTrue(len(df.object_manager.object_map[CarForPedestrian.__realname__]) == 2)
         cars_p = df.get(CarForPedestrian)
         self.assertTrue(len(cars_p) == 2)
         for c in cars_p:

@@ -1,8 +1,11 @@
 #################################################
 #### Record keeping (Atomic Needed) #############
 #################################################
-from recursive_dictionary import RecursiveDictionary
-from multiprocessing import Queue
+from pcc.recursive_dictionary import RecursiveDictionary
+from Queue import Queue
+from queue_manager import QueueManager
+from pcc.dataframe_changes.IDataframeChanges import Event
+import pcc.dataframe_changes.IDataframeChanges as df_repr
 
 class ChangeManager(object):
     def __init__(self):
@@ -16,29 +19,79 @@ class ChangeManager(object):
 
         self.deleted_objs = RecursiveDictionary()
 
-        self.temp_record = Queue()
+        self.queue_manager = QueueManager()
+
+        self.startrecording = False
         
     #################################################
     ### Static Methods ##############################
     #################################################
     
-    def add_records(self, records):
-        print "record:", records
-
-    def add_changelog(self, changes):
-        pass
-
-    def add_buffer_changes(self, buffer_changes):
-        pass
-    
     #################################################
     ### API Methods #################################
     #################################################
-    def report_dim_modification(self, tp_obj, oid, value_change):
-        print "dim mod", tp_obj.name, oid, value_change
+    def report_dim_modification(self, records):
+        for record in records:
+            self.__record(record.event, record.tpname, record.groupname, record.oid, record.dim_change, record.full_obj)
+
+    def add_records(self, records):
+        for rec in records:
+            event, tpname, groupname, oid, dim_change, full_dim_map  = (
+                rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj)
+            self.__record(event, tpname, groupname, oid, dim_change, full_dim_map)
+        self.__send_to_queues(records)
+        
+    def add_changelog(self, changes):
+        pass
+
+    def get_record(self):
+        return self.convert_to_serializable_dict(self.current_record)
+    
+    def add_app_queue(self, app_queue):
+        return self.queue_manager.add_app_queue(app_queue)
+
+    def build_change_map(self, records):
+        the_dict = RecursiveDictionary()
+        
+    def convert_to_serializable_dict(self, current_record):
+        df_changes = df_repr.DataframeChanges_Base()
+        df_changes.ParseFromDict({"gc": current_record})
+        return df_changes
 
     #################################################
     ### Private Methods #############################
     #################################################
-    
-    
+    def __record_objs_to_dict(self, the_dict, tpname, groupname, oid, full_obj_map):
+        objmap = the_dict.setdefault(groupname, RecursiveDictionary()).setdefault(oid, RecursiveDictionary())
+        objmap.setdefault("types", RecursiveDictionary())[tpname] = Event.New
+        objmap.setdefaykt("dims", RecursiveDictionary()).rec_update(full_obj_map)
+
+    def __record(self, event_type, tpname, groupname, oid, dim_change, full_dim_map):
+        if not self.startrecording:
+            return
+        #for e event_type, tpname, oid, dim_changes in records:
+        if event_type == Event.Delete and tpname == groupname:
+            # it is its own key. Which means the obj is being deleted for good.
+            # Purge all changes.
+            if groupname in self.current_record and oid in self.current_record[groupname]:
+                if "dims" in self.current_record[groupname][oid]:
+                    del self.current_record[groupname][oid]["dims"]
+                for tp in self.current_record[groupname][oid]["types"]:
+                    self.current_record[groupname][oid]["types"][tp] = Event.Delete
+            self.deleted_objs.setdefault(groupname, set()).add(oid)
+
+                
+        if event_type != Event.Delete and tpname in self.deleted_objs and oid in self.deleted_objs[tpname]:
+            # This object is flagged for deletion. Throw this change away.
+            return
+        self.current_record.setdefault(
+            groupname, RecursiveDictionary()).setdefault(
+                oid, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({tpname: event_type}))
+        if dim_change:
+            fks = []
+            dims = self.current_record[groupname][oid].setdefault(
+                        "dims", RecursiveDictionary())
+            dims.rec_update(dim_change) 
+            
+    def __send_to_queues(self, records):
+        self.queue_manager.add_records(records)

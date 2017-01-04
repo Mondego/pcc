@@ -56,10 +56,13 @@ class spacetime_property(property):
             return
         if self._dataframe_data and hasattr(obj, "__primarykey__") and obj.__primarykey__:
             if obj.__start_tracking__:
-                for tp_obj, tr, rc in self._dataframe_data:
-                    tr(tp_obj, {obj.__primarykey__: obj})
+                for tp_getter, tr, gr, rr in self._dataframe_data:
+                    tp_obj = tp_getter(obj.__class__)
                     #rc(obj.__primarykey__, self, value, tp_obj)
-                    rc(tp_obj, obj.__primarykey__, {self._name: value})
+                    records = (gr(tp_obj, obj.__primarykey__, {self: value}))
+                    records.extend(tr(tp_obj, {obj.__primarykey__: obj}))
+                    rr(records)
+                    
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
                 value = str(uuid.uuid4())

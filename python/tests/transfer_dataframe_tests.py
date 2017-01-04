@@ -4,12 +4,14 @@ from pcc.attributes import dimension, primarykey
 from pcc.set import pcc_set
 from pcc.subset import subset
 from pcc.impure import impure
-from pcc.dataframe import dataframe, DataframeModes
+from pcc.dataframe import dataframe
+from pcc.dataframe.dataframe_client import dataframe_client
 from pcc.parameter import parameter, ParameterMode
 from pcc.join import join
 from pcc.projection import projection
 from pcc.dataframe_changes.dataframe_changes_json import DataframeChanges, Record, Event
- 
+from pcc.dataframe.application_queue import ApplicationQueue
+
 import unittest, json
 
 def create_cars():
@@ -1038,7 +1040,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
-        df.apply_all(update_json1)
+        df.apply_changes(update_json1)
         self.assertTrue(len(df.get(Car)) == 4)
         self.assertTrue(len(df.get(ActiveCar)) == 2)
         self.assertTrue(len(df.get(RedActiveCar)) == 1)
@@ -1049,9 +1051,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
         
-        df.apply_all(update_json2)
+        df.apply_changes(update_json2)
         self.assertTrue(len(df.get(Car)) == 5)
-        self.assertTrue(df.object_map["Car"]["id2"].color == "GREEN")  
+        self.assertTrue(df.object_manager.object_map["Car"]["id2"].color == "GREEN")  
 
     def test_dataframe_apply_mod2(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
@@ -1061,7 +1063,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get(Car)) == 5)
         self.assertTrue(len(df.get(ActiveCar)) == 3)
         self.assertTrue(len(df.get(RedActiveCar)) == 2)
-        df.apply_all(update_json3)
+        df.apply_changes(update_json3)
         self.assertTrue(len(df.get(Car)) == 5)
         self.assertTrue(len(df.get(ActiveCar)) == 4)
         self.assertTrue(len(df.get(RedActiveCar)) == 3)
@@ -1070,7 +1072,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
         df.add_types([ActiveCar, RedActiveCar])
-        df.apply_all(update_json4)
+        df.apply_changes(update_json4)
         self.assertTrue(len(df.get(ActiveCar)) == 1)
         self.assertTrue(len(df.get(RedActiveCar)) == 1)
         rac = df.get(RedActiveCar)[0]
@@ -1093,7 +1095,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get(RedActiveCar)) == 2)
         self.assertTrue(len(df.get(Car)) == 5)
         
-        df.apply_all(update_json5)
+        df.apply_changes(update_json5)
         self.assertTrue(len(df.get(ActiveCar)) == 2)
         self.assertTrue(len(df.get(RedActiveCar)) == 1)
         self.assertTrue(len(df.get(Car)) == 4)
@@ -1108,7 +1110,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get(RedActiveCar)) == 2)
         self.assertTrue(len(df.get(Car)) == 5)
         
-        df.apply_all(update_json6)
+        df.apply_changes(update_json6)
         self.assertTrue(len(df.get(ActiveCar)) == 2)
         self.assertTrue(len(df.get(RedActiveCar)) == 1)
         self.assertTrue(len(df.get(Car)) == 5)
@@ -1117,7 +1119,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car = create_cars_withobjects()
         df = dataframe()
         df.add_types([Car])
-        df.apply_all(update_json7)
+        df.apply_changes(update_json7)
         self.assertTrue(len(df.get(Car)) == 1)
         c = df.get(Car)[0]
         self.assertTrue(c.velocity.x == 10 and c.velocity.y == 10 and c.velocity.z == 10)
@@ -1272,7 +1274,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
             c.velocity += 1
         self.assertFalse(len(df1.get(ActiveCar)) == len(df2.get(ActiveCar)))
         #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
-        df2.apply_all(df1.get_record())
+        x = df1.get_record()
+        df2.apply_changes(x)
         #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
         self.assertTrue(len(df1.get(ActiveCar)) == len(df2.get(ActiveCar)))
 
@@ -1295,7 +1298,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
-        df.apply_all(update_json1)
+        df.apply_changes(update_json1)
 
         self.assertTrue(len(df.get_new(Car)) == 4)
         self.assertTrue(len(df.get_mod(Car)) == 0)  
@@ -1312,7 +1315,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
-        df.apply_all(update_json1)
+        df.apply_changes(update_json1)
 
         self.assertTrue(len(df.get_new(Car)) == 0)
         self.assertTrue(len(df.get_mod(Car)) == 4)  
@@ -1329,7 +1332,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
-        df.apply_all(update_json2)
+        df.apply_changes(update_json2)
         self.assertTrue(len(df.get_new(Car)) == 0)
         self.assertTrue(len(df.get_mod(Car)) == 1)  
         self.assertTrue(len(df.get_deleted(Car)) == 0)  
@@ -1343,7 +1346,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
-        df.apply_all(update_json3)
+        df.apply_changes(update_json3)
         self.assertTrue(len(df.get_new(Car)) == 0)
         self.assertTrue(len(df.get_mod(Car)) == 1)  
         self.assertTrue(len(df.get_deleted(Car)) == 0)  
@@ -1359,7 +1362,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
-        df.apply_all(update_json6)
+        df.apply_changes(update_json6)
 
         self.assertTrue(len(df.get_new(Car)) == 0)
         self.assertTrue(len(df.get_mod(Car)) == 1)  
@@ -1374,71 +1377,45 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
     def test_dataframe_apply_between_master_slaves1(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df_m = dataframe()
-        df_s = dataframe(mode = DataframeModes.ApplicationCache)
         df_m.add_types([Car, ActiveCar, RedActiveCar])
-        df_s.add_types([Car, ActiveCar, RedActiveCar])
-        df_m.connect(df_s)
-        df_s.start_recording = True
-        df_m.apply_all(update_json1)
+        df_s = ApplicationQueue("df_s", [Car, ActiveCar, RedActiveCar], df_m)
+        df_m.apply_changes(update_json1)
         self.assertTrue(df_s.get_record()["gc"] == update_json1["gc"])
-        self.assertTrue(df_s.get(Car) == df_m.get(Car))
-        self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
-        self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
 
     def test_dataframe_apply_between_master_slaves2(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df_m = dataframe()
-        df_s = dataframe(mode = DataframeModes.ApplicationCache)
         df_m.add_types([Car, ActiveCar, RedActiveCar])
-        df_s.add_types([ActiveCar, RedActiveCar])
-        df_m.connect(df_s)
-        df_s.start_recording = True
-        df_m.apply_all(update_json1)
+        df_s = ApplicationQueue("df_s", [ActiveCar, RedActiveCar], df_m)
+        df_m.apply_changes(update_json1)
         #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
         self.assertTrue(df_s.get_record() == resp_json1)
-        try:
-            df_s.get(Car)
-            self.fail("Didn't catch exception at previous line")
-        except TypeError:
-            self.assertTrue(True)
         self.assertTrue(len(df_m.get(Car)) == 4)
-        self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
-        self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
     
     def test_dataframe_apply_between_master_slaves3(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df_m = dataframe()
-        df_s = dataframe(mode = DataframeModes.ApplicationCache)
         df_m.add_types([Car, ActiveCar, RedActiveCar])
-        df_s.add_types([ActiveCar, RedActiveCar])
-        df_m.connect(df_s)
-        df_s.start_recording = True
-        df_m.apply_all(update_json8)
+        df_s = ApplicationQueue("df_s", [ActiveCar, RedActiveCar], df_m)
+        df_m.apply_changes(update_json8)
         #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
         self.assertTrue(df_s.get_record() == resp_json1)
-        try:
-            df_s.get(Car)
-            self.fail("Didn't catch exception at previous line")
-        except TypeError:
-            self.assertTrue(True)
         self.assertTrue(len(df_m.get(Car)) == 4)
-        self.assertTrue(df_s.get(ActiveCar) == df_m.get(ActiveCar))
-        self.assertTrue(df_s.get(RedActiveCar) == df_m.get(RedActiveCar))
         
     def test_dataframe_apply_to_client1(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
-        df = dataframe(mode = DataframeModes.Client)
+        df = dataframe_client()
         df.add_types([Car, ActiveCar, RedActiveCar])
-        df.apply_all(update_json8)
+        df.apply_changes(update_json8)
         self.assertTrue(len(df.get(Car)) == 4)
         self.assertTrue(len(df.get(ActiveCar)) == 0)
         self.assertTrue(len(df.get(RedActiveCar)) == 0)
 
     def test_dataframe_apply_to_client2(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
-        df = dataframe(mode = DataframeModes.Client)
+        df = dataframe_client()
         df.add_types([Car, ActiveCar, RedActiveCar])
-        df.apply_all(update_json1)
+        df.apply_changes(update_json1)
         self.assertTrue(len(df.get(Car)) == 4)
         self.assertTrue(len(df.get(ActiveCar)) == 2)
         self.assertTrue(len(df.get(RedActiveCar)) == 1)
@@ -1447,7 +1424,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, InactiveCar, ActiveCar = create_complex_cartypes()
         df = dataframe()
         df.add_types([Car, ActiveCar, InactiveCar])
-        df.apply_all(update_json9)
+        df.apply_changes(update_json9)
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(InactiveCar)) == 2)
         self.assertTrue(len(df.get(ActiveCar)) == 0)
@@ -1456,7 +1433,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, CarForPedestrian, cars = CreateProjectionTypesAndObjects()
         df = dataframe()
         df.add_types([Car, CarForPedestrian])
-        df.apply_all(update_json10)
+        df.apply_changes(update_json10)
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(CarForPedestrian)) == 2)
         for c in df.get(CarForPedestrian):
@@ -1467,15 +1444,13 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         Car, CarForPedestrian, cars = CreateProjectionTypesAndObjects()
         df = dataframe()
         df.add_types([Car, CarForPedestrian])
-        df_cache = dataframe(mode = DataframeModes.ApplicationCache)
-        df_cache.add_type(CarForPedestrian)
-        df_cache.start_recording = True
-        df.connect(df_cache)
-        df.apply_all(update_json10)
+        df_cache = ApplicationQueue("cache", [CarForPedestrian], df)
+        df.apply_changes(update_json10)
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(CarForPedestrian)) == 2)
-        #print json.dumps(df_cache.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
-        self.assertTrue(df_cache.get_record() == resp_json10)
+        record = df_cache.get_record()
+        #print json.dumps(record, sort_keys = True, separators = (',', ': '), indent = 4) 
+        self.assertTrue(record == resp_json10)
     
     def test_dataframe_apply_serialize_all(self):
         Car, CarForPedestrian, cars = CreateProjectionTypesAndObjects()
@@ -1498,12 +1473,12 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.extend(Card, cards)
         df.extend(Transaction, trans)
         df.start_recording = True
-        df_c = dataframe(mode = DataframeModes.Client)
+        df_c = dataframe_client()
         df_c.add_types([Person, Card, Transaction, RedAlert])
         df_c.extend(Person, people)
         df_c.extend(Card, cards)
         df_c.extend(Transaction, trans)
-        df_c.apply_all(df.get_record())
+        df_c.apply_changes(df.get_record())
         self.assertTrue(len(df_c.get(RedAlert)) == 1)
         
         

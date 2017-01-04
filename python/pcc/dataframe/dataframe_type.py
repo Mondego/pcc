@@ -12,7 +12,7 @@ class DataframeType(object):
         return hash(self.name)
 
     def __eq__(self, obj):
-        if type(obj) == str:
+        if type(obj) == str or type(obj) == unicode:
             return self.name == obj
         return self.name == obj.name
 
@@ -31,6 +31,10 @@ class DataframeType(object):
     @property
     def has_params(self):
         return len(self.parameter_types) != 0
+
+    @property
+    def is_base_type(self):
+        return self.name == self.group_key
 
     def __init__(self, 
                  tp, 
