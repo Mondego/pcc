@@ -1,5 +1,5 @@
-from multiprocessing import Manager, RLock
-from multiprocessing.queues import Empty
+from multiprocessing import RLock
+from Queue import Empty, Queue
 
 #################################################
 #### Attached Dataframe Stuff ###################
@@ -14,11 +14,10 @@ class QueueManager(object):
 
         self.tp_to_attached_df = dict()
 
-        self.manager = Manager()
-        
-        self.new_queue = self.manager.Queue()
         self.queues = dict()
+        
         self.type_map = dict()
+        
         self.add_lock = RLock()
 
     #################################################
@@ -47,7 +46,7 @@ class QueueManager(object):
             self.queues[app].put(application_to_record[app])
 
     def add_app_queue(self, app_queue):
-        q = self.manager.Queue()
+        q = Queue()
         with self.add_lock:
             for t in app_queue.types:
                 self.type_map.setdefault(t.__realname__, list()).append(app_queue.app_name)

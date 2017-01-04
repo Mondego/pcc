@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<ProfilingTarget xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <ProjectTarget>
+    <TargetProject>ddbc7ccb-bd44-41e4-bb92-54e143ba9d05</TargetProject>
+    <FriendlyName>python</FriendlyName>
+  </ProjectTarget>
+</ProfilingTarget>
