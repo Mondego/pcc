@@ -27,7 +27,7 @@ class ApplicationQueue(object):
                 is_known = tpname in self.known_objects and oid in self.known_objects[tpname]
                 if event == Event.New:
                     type_changes[tpname] = event
-                    obj_changes.setdefault("dims", RecursiveDictionary()).rec_update(dim_change)
+                    obj_changes.setdefault("dims", RecursiveDictionary()).rec_update(full_obj)
                 elif event == Event.Modification:
                     type_changes[tpname] = event if is_known else Event.New
                     obj_changes.setdefault("dims", RecursiveDictionary()).rec_update(dim_change if is_known else full_obj)
@@ -46,6 +46,9 @@ class ApplicationQueue(object):
         return ApplicationQueue.__convert_to_serializable_dict(
             self.set_known_objects(
                 self.merge_impure_record(self.current_record, objmap)))
+
+    def clear_record(self):
+        self.current_record = RecursiveDictionary()
 
     def fetch_impure_types(self):
         objmap = RecursiveDictionary()

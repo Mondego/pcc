@@ -34,12 +34,13 @@ class ChangeManager(object):
         for record in records:
             self.__record(record.event, record.tpname, record.groupname, record.oid, record.dim_change, record.full_obj)
 
-    def add_records(self, records):
+    def add_records(self, applied_records, pcc_change_records = None, except_app = None):
+        records = (applied_records + pcc_change_records) if pcc_change_records else applied_records
         for rec in records:
             event, tpname, groupname, oid, dim_change, full_dim_map  = (
                 rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj)
             self.__record(event, tpname, groupname, oid, dim_change, full_dim_map)
-        self.__send_to_queues(records)
+        self.__send_to_queues(applied_records, pcc_change_records, except_app)
         
     def add_changelog(self, changes):
         pass
@@ -57,6 +58,9 @@ class ChangeManager(object):
         df_changes = df_repr.DataframeChanges_Base()
         df_changes.ParseFromDict({"gc": current_record})
         return df_changes
+
+    def clear_record(self):
+        self.current_record = RecursiveDictionary()
 
     #################################################
     ### Private Methods #############################
@@ -93,5 +97,5 @@ class ChangeManager(object):
                         "dims", RecursiveDictionary())
             dims.rec_update(dim_change) 
             
-    def __send_to_queues(self, records):
-        self.queue_manager.add_records(records)
+    def __send_to_queues(self, applied_records, pcc_change_records, except_app = None):
+        self.queue_manager.add_records(applied_records, pcc_change_records, except_app)

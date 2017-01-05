@@ -3,7 +3,7 @@ pcc/__init__.py
 pcc/_utils.py
 pcc/attributes.py
 pcc/create.py
-pcc/dataframe.py
+pcc/dataframe_old.py
 pcc/impure.py
 pcc/isa.py
 pcc/join.py
@@ -18,6 +18,18 @@ pcc.egg-info/SOURCES.txt
 pcc.egg-info/dependency_links.txt
 pcc.egg-info/requires.txt
 pcc.egg-info/top_level.txt
+pcc/dataframe/__init__.py
+pcc/dataframe/application_queue.py
+pcc/dataframe/change_manager.py
+pcc/dataframe/dataframe.py
+pcc/dataframe/dataframe_client.py
+pcc/dataframe/dataframe_request.py
+pcc/dataframe/dataframe_threading.py
+pcc/dataframe/dataframe_type.py
+pcc/dataframe/enums.py
+pcc/dataframe/object_manager.py
+pcc/dataframe/queue_manager.py
+pcc/dataframe/type_manager.py
 pcc/dataframe_changes/IDataframeChanges.py
 pcc/dataframe_changes/__init__.py
 pcc/dataframe_changes/dataframe_changes_bson.py

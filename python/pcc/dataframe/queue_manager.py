@@ -29,19 +29,16 @@ class QueueManager(object):
     #################################################
     ### API Methods #################################
     #################################################
-        
-    def add_records(self, records):
+    def add_records(self, applied_records, pcc_change_records, except_app = None):
         application_to_record = dict()
+
         with self.add_lock:
-            for rec in records:
-                event, tpname, groupname, oid, dim_change, full_obj, fk_for_tp = (
-                    rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj, rec.fk_type)
-                if tpname in self.type_map:
-                    for app in self.type_map[tpname]:
-                        application_to_record.setdefault(app, list()).append(rec)
-                elif fk_for_tp and fk_for_tp in self.type_map:
-                    for app in self.type_map[fk_for_tp]:
-                        application_to_record.setdefault(app, list()).append(rec)
+            for rec in applied_records:
+                self._add_tp_app_record(rec, application_to_record, except_app)
+            if pcc_change_records:
+                for rec in pcc_change_records:
+                    self._add_tp_app_record(rec, application_to_record)
+
         for app in application_to_record:
             self.queues[app].put(application_to_record[app])
 
@@ -57,4 +54,14 @@ class QueueManager(object):
     ### Private Methods #############################
     #################################################
     
-    
+    def _add_tp_app_record(self, rec, application_to_record, except_app = None):
+        event, tpname, groupname, oid, dim_change, full_obj, fk_for_tp = (
+            rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj, rec.fk_type)
+        if tpname in self.type_map:
+            for app in self.type_map[tpname]:
+                if not except_app and app != except_app:
+                    application_to_record.setdefault(app, list()).append(rec)
+        elif fk_for_tp and fk_for_tp in self.type_map:
+            for app in self.type_map[fk_for_tp]:
+                if not except_app and app != except_app:
+                    application_to_record.setdefault(app, list()).append(rec)

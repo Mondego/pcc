@@ -1292,7 +1292,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df2.start_recording = True
         for c in df1.get(Car):
             c.velocity += 1
-        self.assertTrue(df1.get_record() == df2.get_record())
+        self.assertTrue(df1.get_record() != df2.get_record())
 
     def test_dataframe_apply_get_new(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()

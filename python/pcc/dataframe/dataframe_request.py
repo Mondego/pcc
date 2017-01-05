@@ -86,3 +86,16 @@ class ApplyChangesDFRequest(object):
         
     @df_changes.setter
     def df_changes(self, v): self._df_changes = v
+
+    @property
+    def except_app(self):
+        try:
+            return self._except_app
+        except AttributeError:
+            self._except_app = None
+            return self._except_app
+        
+    @except_app.setter
+    def except_app(self, v): self._except_app = v
+
+    

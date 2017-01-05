@@ -48,7 +48,9 @@ class TypeManager(object):
         self.join_types = set()
 
         # The closest premamnent storable type for a registered type.
-        self.closest_foreign_key_type = {}
+        self.closest_foreign_key_type = dict()
+
+        self.tp_to_dataframe_payload = dict()
 
     #################################################
     ### Static Methods ##############################
@@ -220,7 +222,7 @@ class TypeManager(object):
         if key in self.name2class:
             key_obj = self.name2class[key]
         elif key != name:
-            key_obj = self.__add_type(keytp, except_type = tp, not_member = True)
+            key_obj = self.__add_type(keytp, except_type = tp, not_member = True, pcc_adjuster = pcc_adjuster, dim_modification_reporter = dim_modification_reporter, records_creator = records_creator)
             self.name2class[key] = key_obj
         else:
             key_obj = tp_obj
@@ -244,7 +246,7 @@ class TypeManager(object):
             if dtpname == except_type:
                 raise TypeError("Cyclic reference detected in definition of %s" % name)
             if dtpname not in self.name2class:
-                dtp_obj =  self.__add_type(dtp, except_type = name, not_member=True)
+                dtp_obj =  self.__add_type(dtp, except_type = name, not_member=True, pcc_adjuster = pcc_adjuster, dim_modification_reporter = dim_modification_reporter, records_creator = records_creator)
             else:
                 dtp_obj = self.name2class[dtpname]
             if ObjectType.Impure in dtp_obj.categories:
@@ -265,7 +267,7 @@ class TypeManager(object):
                     if hasattr(ptp, "__pcc_type__"):
                         insert_obj = (self.name2class[ptp.__realname__] 
                                       if ptp.__realname__ in self.name2class else 
-                                      self.__add_type(ptp, except_type = name, not_member = True))
+                                      self.__add_type(ptp, except_type = name, not_member = True, pcc_adjuster = pcc_adjuster, dim_modification_reporter = dim_modification_reporter, records_creator = records_creator))
                     ptype_objs.append(insert_obj)   
                 if tp_obj.parameter_types == dict():
                     tp_obj.parameter_types = dict()
@@ -291,7 +293,6 @@ class TypeManager(object):
         if ObjectType.Join in categories:
             self.join_types.add(tp_obj)
 
-        for dim in tp.__dimensions__:
-            dim._dataframe_data.add((self.get_requested_type, pcc_adjuster, records_creator, dim_modification_reporter))
+        self.tp_to_dataframe_payload[tp_obj] = (self.get_requested_type, pcc_adjuster, records_creator, dim_modification_reporter)
         return tp_obj
         

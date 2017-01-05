@@ -146,16 +146,19 @@ class dataframe(object):
     @start_recording.setter
     def start_recording(self, v): self.change_manager.startrecording = v
 
-    def apply_changes(self, changes):
+    def apply_changes(self, changes, except_app = None):
         if "gc" not in changes:
             return
 
-        applied_records, all_records = self.object_manager.apply_changes(changes)
+        applied_records, pcc_change_records = self.object_manager.apply_changes(changes)
         self.object_manager.add_buffer_changes(applied_records)
-        self.change_manager.add_records(all_records)
+        self.change_manager.add_records(applied_records, pcc_change_records, except_app)
 
     def get_record(self):
         return self.change_manager.get_record()
+
+    def clear_record(self):
+        return self.change_manager.clear_record()
 
     def connect_app_queue(self, app_queue):
         return self.type_manager.get_impures_in_types(app_queue.types), self.change_manager.add_app_queue(app_queue)
@@ -175,5 +178,11 @@ class dataframe(object):
 
     def get_deleted(self, tp):
         return self.object_manager.get_deleted(tp)
+
+    def clear_all(self):
+        return self.object_manager.clear_all()
+
+    def clear_buffer(self):
+        return self.object_manager.clear_buffer()
 
     #############################################

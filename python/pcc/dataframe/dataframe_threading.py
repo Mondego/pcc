@@ -80,7 +80,7 @@ class dataframe_wrapper(Thread):
             deleteall_req.type_object)
 
     def process_apply_req(self, apply_req):
-        self.dataframe.apply_changes(apply_req.df_changes)
+        self.dataframe.apply_changes(apply_req.df_changes, except_app = apply_req.except_app)
 
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
@@ -152,13 +152,17 @@ class dataframe_wrapper(Thread):
     @property
     def object_manager(self): return self.dataframe.object_manager
 
-    def apply_changes(self, changes):
+    def apply_changes(self, changes, except_app = None):
         req = ApplyChangesDFRequest()
         req.df_changes = changes
+        req.except_app = except_app
         self.put_queue.put(req)
 
     def get_record(self):
-        return self.dataframe.change_manager.get_record()
+        return self.dataframe.get_record()
+
+    def clear_record(self):
+        return self.dataframe.clear_record()
 
     def connect_app_queue(self, app_queue):
         return self.dataframe.connect_app_queue(app_queue)
