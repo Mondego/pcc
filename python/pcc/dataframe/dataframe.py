@@ -136,9 +136,6 @@ class dataframe(object):
         records = self.object_manager.delete_all(tp_obj)
         self.change_manager.add_records(records)
 
-    def convert_to_records(objmap):
-        pass
-
     #############################################
 
     ####### CHANGE MANAGEMENT METHODS ###########

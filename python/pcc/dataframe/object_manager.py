@@ -1,4 +1,4 @@
-from multiprocessing import RLock, Process
+from multiprocessing import RLock
 from uuid import uuid4
 from pcc.recursive_dictionary import RecursiveDictionary
 from pcc.parameter import ParameterMode

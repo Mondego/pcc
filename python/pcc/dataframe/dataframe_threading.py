@@ -29,7 +29,6 @@ class dataframe_wrapper(Thread):
         self.shutdown = False
         self.start()
 
-
     def run(self):
         while not self.shutdown:
             try:
@@ -81,7 +80,7 @@ class dataframe_wrapper(Thread):
             deleteall_req.type_object)
 
     def process_apply_req(self, apply_req):
-        pass
+        self.dataframe.apply_changes(apply_req.df_changes)
 
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
@@ -123,8 +122,11 @@ class dataframe_wrapper(Thread):
         req.param = parameters
         req.token = uuid4()
         self.get_token_dict[req.token] = Queue()
-        self.put_queue.put(req)
-        return self.get_token_dict[req.token].get()
+        self.get_queue.put(req)
+        try:
+            return self.get_token_dict[req.token].get(timeout = 5)
+        except Empty:
+            return list()
 
     def delete(self, tp, obj):
         req = DeleteDFRequest()
@@ -139,3 +141,33 @@ class dataframe_wrapper(Thread):
 
     #############################################
     
+    ####### CHANGE MANAGEMENT METHODS ###########
+
+    @property
+    def start_recording(self): return self.dataframe.startrecording
+
+    @start_recording.setter
+    def start_recording(self, v): self.dataframe.startrecording = v
+
+    @property
+    def object_manager(self): return self.dataframe.object_manager
+
+    def apply_changes(self, changes):
+        req = ApplyChangesDFRequest()
+        req.df_changes = changes
+        self.put_queue.put(req)
+
+    def get_record(self):
+        return self.dataframe.change_manager.get_record()
+
+    def connect_app_queue(self, app_queue):
+        return self.dataframe.connect_app_queue(app_queue)
+
+    def convert_to_record(self, results, deleted_oids):
+        return self.dataframe.convert_to_record(results, deleted_oids)
+
+    def serialize_all(self):
+        # have to put it through the queue
+        return self.dataframe.serialize_all()
+
+    #############################################
