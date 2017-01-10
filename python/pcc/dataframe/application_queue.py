@@ -82,12 +82,13 @@ class ApplicationQueue(object):
 
                 for tpname, event in obj_changes["types"].items():
                     if tpname in current_record[group_name][oid]["types"]:
-                        existing_event = current_record[group_name][oid]["types"][tpname]
+                        existing_event = current_record[group_name][oid]["types"][tpnames]
                     else:
-                        existing_event = Event.New
+                        existing_event = event
                     if existing_event == Event.Delete or existing_event == Event.Modification:
                         continue
                     current_record[group_name][oid].setdefault("dims", RecursiveDictionary()).rec_update(obj_changes["dims"])
+                    current_record[group_name][oid]["types"][tpname] = existing_event
         return current_record
 
     def set_known_objects(self, current_record):

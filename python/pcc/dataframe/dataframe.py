@@ -150,8 +150,8 @@ class dataframe(object):
         if "gc" not in changes:
             return
 
-        applied_records, pcc_change_records = self.object_manager.apply_changes(changes)
-        self.object_manager.add_buffer_changes(applied_records)
+        applied_records, pcc_change_records, deletes = self.object_manager.apply_changes(changes)
+        self.object_manager.add_buffer_changes(changes, deletes)
         self.change_manager.add_records(applied_records, pcc_change_records, except_app)
 
     def get_record(self):

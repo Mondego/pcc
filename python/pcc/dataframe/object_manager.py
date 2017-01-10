@@ -57,6 +57,18 @@ class ObjectManager(object):
     def track_pcc_change_events(self, v):
         self._tpce = v
 
+    @property
+    def propagate_changes(self): 
+        try:
+            return self._pc
+        except AttributeError:
+            self._pc = True
+            return self._pc
+
+    @propagate_changes.setter
+    def propagate_changes(self, v):
+        self._pc = v
+
     @staticmethod
     def __convert_to_dim_map(obj):
         return RecursiveDictionary([(dim, getattr(obj, dim._name)) for dim in obj.__dimensions__ if hasattr(obj, dim._name)])
@@ -72,7 +84,7 @@ class ObjectManager(object):
         # Why? Random, couldnt think of a better way
 
         if hasCollection:
-            for tp in pcctype_obj.parameter_types[ParameterMode.Collection]:
+            for tp in pcctype.__parameter_types__[ParameterMode.Collection]:
                 param_list.append(param_map[tp])
         if hasSingleton:
             param_list.extend(params)
@@ -144,10 +156,10 @@ class ObjectManager(object):
         return pccs
 
     @staticmethod
-    def __get_obj_type(obj, member_to_group):
+    def __get_obj_type(obj, name2class):
         # both iteratable/dictionary + object type is messed up. Won't work.
         try:
-            if obj.__class__.__name__ in member_to_group:
+            if obj.__class__.__name__ in name2class:
                 return Record.FOREIGN_KEY
             if isinstance(obj, dict):
                 return Record.DICTIONARY
@@ -279,9 +291,9 @@ class ObjectManager(object):
         records, touched_objs = list(), dict()
         self.__add_new(objs_new, records, touched_objs)
         self.__change_modified(objs_mod, records, touched_objs)
-        self.__delete_marked_objs(objs_deleted, records)
+        deletes = self.__delete_marked_objs(objs_deleted, records)
         pcc_adjusted_records = self.__adjust_pcc_touched(touched_objs)
-        return records, pcc_adjusted_records
+        return records, pcc_adjusted_records, deletes
     
     def create_records_for_dim_modification(self, tp, oid, dim_change):
         records = self.__create_records(Event.Modification, self.type_manager.get_requested_type(tp.group_type), oid, dim_change, None)
@@ -323,14 +335,16 @@ class ObjectManager(object):
                 for tpname, objmap in self.object_map.items())
             ), RecursiveDictionary())
 
-    def add_buffer_changes(self, records):
-        for rec in records:
-            event, tpname, groupname, oid, dim_change, full_dim_map  = (
-                rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj)
-            self.changelog.setdefault(event, RecursiveDictionary()).setdefault(tpname, RecursiveDictionary())[oid] = (
-                self.object_map[tpname][oid]
-                if event != Event.Delete else
-                rec.deleted_obj)
+    def add_buffer_changes(self, changes, deletes):
+        if "gc" not in changes:
+            return
+        for groupname, group_changes in changes["gc"].items():
+            for oid, obj_changes in group_changes.items():
+                for tpname, event in obj_changes["types"].items():
+                    self.changelog.setdefault(event, RecursiveDictionary()).setdefault(tpname, RecursiveDictionary())[oid] = (
+                        self.object_map[tpname][oid]
+                        if event != Event.Delete else
+                        deletes[tpname][oid])
 
     def get_new(self, tp):
         tpname = tp.__realname__
@@ -387,6 +401,7 @@ class ObjectManager(object):
         # Delete base type object, and delete pccs being calculated from that
         # For Eg: If Car is deleted, ActiveCar obj should also be deleted.
         completed_tp = set()
+        deletes = RecursiveDictionary()
         for tp_obj in (tp_o 
                        for tp_o in objs_deleted 
                        if (tp_o.group_type == tp_o.type
@@ -397,25 +412,29 @@ class ObjectManager(object):
                     self.deleted_objs[tp_obj].add(oid)
                     if oid in self.object_map[tp_obj.group_key]:
                         self.object_map[tp_obj][oid].__start_tracking__ = False
-                        records.append(ChangeRecord(
-                            Event.Delete, 
-                            self.type_manager.get_requested_type(tp_obj.group_type), 
-                            oid, 
-                            None, 
-                            None,
-                            deleted_obj = self.object_map[tp_obj.group_key][oid]))
+                        if self.propagate_changes:
+                            records.append(ChangeRecord(
+                                Event.Delete, 
+                                self.type_manager.get_requested_type(tp_obj.group_type), 
+                                oid, 
+                                None, 
+                                None,
+                                deleted_obj = self.object_map[tp_obj.group_key][oid]))
+                        deletes.setdefault(tp_obj.name, RecursiveDictionary())[oid] = self.object_map[tp_obj.group_key][oid]
                         del self.object_map[tp_obj.group_key][oid]
 
                     for pure_related_pccs_tp in tp_obj.pure_group_members:
                         if oid in self.object_map[pure_related_pccs_tp.name]:
                             self.object_map[pure_related_pccs_tp.name][oid].__start_tracking__ = False
-                            records.append(ChangeRecord(
-                                Event.Delete, 
-                                pure_related_pccs_tp, 
-                                oid,
-                                None, 
-                                None,
-                                deleted_obj = self.object_map[pure_related_pccs_tp.name][oid]))
+                            if self.propagate_changes:
+                                    records.append(ChangeRecord(
+                                    Event.Delete, 
+                                    pure_related_pccs_tp, 
+                                    oid,
+                                    None, 
+                                    None,
+                                    deleted_obj = self.object_map[pure_related_pccs_tp.name][oid]))
+                            deletes.setdefault(tp_obj.name, RecursiveDictionary())[oid] = self.object_map[pure_related_pccs_tp.group_key][oid]
                             del self.object_map[pure_related_pccs_tp.name][oid]
                             
                     del self.current_state[tp_obj.group_key][oid]
@@ -426,17 +445,20 @@ class ObjectManager(object):
                     self.deleted_objs[tp_obj].add(oid)
                     if oid in self.object_map[tp_obj.name]:
                         self.object_map[tp_obj][oid].start_tracking = False
-                        records.append(ChangeRecord(
-                            Event.Delete, 
-                            tp_obj, 
-                            oid, 
-                            None, 
-                            None,
+                        if self.propagate_changes:
+                            records.append(ChangeRecord(
+                                Event.Delete, 
+                                tp_obj, 
+                                oid, 
+                                None, 
+                                None,
                             deleted_obj = self.object_map[tp_obj.name][oid]))
+                        deletes.setdefault(tp_obj.name, RecursiveDictionary())[oid] = self.object_map[tp_obj.name][oid]
                         del self.object_map[tp_obj.name][oid]
                         if len([othertp for othertp in tp_obj.group_members if othertp.name in self.object_map and oid in self.object_map[othertp.name]]) == 0:
                             del self.current_state[tp_obj.group_key][oid]
                             # delete the original object as well
+        return deletes
 
     def __change_modified(self, objs_mod, records, touched_objs):
         for tp_obj in objs_mod:
@@ -451,8 +473,9 @@ class ObjectManager(object):
                 elif obj != None:
                     self.object_map[tp_obj.name][oid].__dict__.rec_update(obj.__dict__)
                 touched_objs.setdefault(tp_obj, RecursiveDictionary())[oid] = (self.object_map[tp_obj.name][oid], change)
-                records.extend(
-                    self.__create_records(Event.Modification, tp_obj, oid, change, None, True))
+                if self.propagate_changes:
+                    records.extend(
+                        self.__create_records(Event.Modification, tp_obj, oid, change, None, True))
 
     def __add_new(self, objs_new, records, touched_objs):
         for tp_obj in objs_new:
@@ -468,8 +491,9 @@ class ObjectManager(object):
                 
                 self.object_map.setdefault(tp_obj.name, RecursiveDictionary())[oid] = obj
                 touched_objs.setdefault(tp_obj, RecursiveDictionary())[oid] = (self.object_map[tp_obj.name][oid], change)
-                records.extend(
-                    self.__create_records(Event.New, tp_obj, oid, change, change, True))
+                if self.propagate_changes:
+                    records.extend(
+                        self.__create_records(Event.New, tp_obj, oid, change, change, True))
 
 
     def __parse_changes(self, df_changes):
@@ -537,12 +561,12 @@ class ObjectManager(object):
                     if (status == Event.New or status == Event.Modification):
                         if member not in self.object_map or oid not in self.object_map[member]:
                             actual_obj = change_type(new_obj, self.type_manager.get_requested_type_from_str(member).type)
-                            objs_new.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = actual_obj, obj_changes["dims"]
+                            objs_new.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = actual_obj, obj_changes.setdefault("dims", RecursiveDictionary())
                         # If this dataframe knows this object
                         else:
                             # Markin this object as a modified object for get_mod dataframe call.
                             # Changes to the base object would have already been applied, or will be applied goin forward.
-                            objs_mod.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = new_obj, obj_changes["dims"]
+                            objs_mod.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = new_obj, obj_changes.setdefault("dims", RecursiveDictionary())
                             # Should get updated through current_state update when current_state changed.
                         # If the object is being deleted.
                     elif status == Event.Delete:
@@ -607,8 +631,8 @@ class ObjectManager(object):
                         fk = v["value"]["object_key"]
                         fk_event = Event.Modification if v["value"]["group_key"] in self.object_map and fk in self.object_map[v["value"]["group_key"]] else Event.New
                         fk_type_obj = self.type_manager.get_requested_type_from_str(v["value"]["actual_type"]["name"])
-                        fk_full_obj = self.__convert_to_dim_map(self.object_map[group][fk])
-                        if fk_event == Event.New and group in self.object_map and fk in self.object_map[group]:
+                        fk_full_obj = self.__convert_to_dim_map(self.object_map[fk_type_obj.group_key][fk])
+                        if fk_event == Event.New and fk_type_obj.group_key in self.object_map and fk in self.object_map[fk_type_obj.group_key]:
                             fk_dims = fk_full_obj          
                         records.extend(self.__create_records(fk_event, fk_type_obj, fk, fk_dims, fk_full_obj, fk_type_to = tp_obj))
             if full_obj_map:
@@ -617,8 +641,8 @@ class ObjectManager(object):
                         fk = v["value"]["object_key"]
                         fk_event = Event.Modification if v["value"]["group_key"] in self.object_map and fk in self.object_map[v["value"]["group_key"]] else Event.New
                         fk_type_obj = self.type_manager.get_requested_type_from_str(v["value"]["actual_type"]["name"])
-                        fk_full_obj = self.__convert_to_dim_map(self.object_map[group][fk])
-                        if fk_event == Event.New and group in self.object_map and fk in self.object_map[group]:
+                        fk_full_obj = self.__convert_to_dim_map(self.object_map[fk_type_obj.group_key][fk])
+                        if fk_event == Event.New and fk_type_obj.group_key in self.object_map and fk in self.object_map[fk_type_obj.group_key]:
                             fk_dims = fk_full_obj          
                         records.extend(self.__create_records(fk_event, fk_type_obj, fk, fk_dims, fk_full_obj, fk_type_to = tp_obj))
             return records
@@ -635,11 +659,11 @@ class ObjectManager(object):
             else:
                 for k, v in full_obj_map.items():
                     new_full_obj_map[k._name] = self.__generate_dim(v, fks, set())
-        for fk, fk_type_obj in fks: 
+        for fk, fk_type_obj, fk_obj in fks: 
             group = fk_type_obj.group_key
             fk_event_type = Event.Modification if group in self.object_map and fk in self.object_map[group] else Event.New
             fk_dims = None
-            fk_full_obj = self.__convert_to_dim_map(self.object_map[group][fk])
+            fk_full_obj = self.__convert_to_dim_map(fk_obj)
             if fk_event_type == Event.New and group in self.object_map and fk in self.object_map[group]:
                 fk_dims = fk_full_obj
             records.extend(self.__create_records(fk_event_type, fk_type_obj, fk, fk_dims, fk_full_obj, fk_type_to = tp_obj))
@@ -757,7 +781,7 @@ class ObjectManager(object):
                 raise RuntimeError("Cyclic reference in the object to be serialized. %s", dim_change)
         except TypeError:
             pass
-        dim_type = ObjectManager.__get_obj_type(dim_change, self.type_manager.member_to_group)
+        dim_type = ObjectManager.__get_obj_type(dim_change, self.type_manager.name2class)
         dim = RecursiveDictionary()
         dim["type"] = dim_type
         if dim_type == Record.INT:
@@ -803,7 +827,7 @@ class ObjectManager(object):
             else:
                 raise TypeError("Cannot use %s as a foreign key type" % fk_type)
                         
-            foreign_keys.append((key, convert_type))
+            foreign_keys.append((key, convert_type, dim_change))
             dim["value"] = RecursiveDictionary()
             dim["value"]["group_key"] = convert_type.group_key
             dim["value"]["object_key"] = key
@@ -822,10 +846,10 @@ class ObjectManager(object):
         if len(fks) == 0:
             return
 
-        fk, fk_type_obj = fks.pop()
+        fk, fk_type_obj, fk_obj = fks.pop()
         group = fk_type_obj.group_key
         fk_event_type = Event.New
-        new_fks, fk_full_obj = self.__convert_obj_to_change_record(self.object_map[group][fk])
+        new_fks, fk_full_obj = self.__convert_obj_to_change_record(fk_obj)
         fks.extend(new_fks)
         fk_obj_record = final_record.setdefault(fk_type_obj.group_key, RecursiveDictionary()).setdefault(fk, RecursiveDictionary())
         fk_obj_record.setdefault("dims", RecursiveDictionary()).rec_update(fk_full_obj)
