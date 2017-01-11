@@ -54,6 +54,9 @@ def __create_pcc(actual_class, params, collections):
             if item.__distinct__ not in dict_by_prop:
                 dict_by_prop[item.__distinct__] = item
         items = dict_by_prop.values()
+
+    if hasattr(actual_class, "__post_process__"):
+        items = [actual_class.__post_process__(item) for item in items]
     return items
 
 def change_type(obj, totype):

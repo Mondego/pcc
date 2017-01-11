@@ -58,6 +58,18 @@ class ObjectManager(object):
         self._tpce = v
 
     @property
+    def impures_pre_calculated(self): 
+        try:
+            return self._ipc
+        except AttributeError:
+            self._ipc = False
+            return self._ipc
+
+    @impures_pre_calculated.setter
+    def impures_pre_calculated(self, v):
+        self._ipc = v
+
+    @property
     def propagate_changes(self): 
         try:
             return self._pc
@@ -564,6 +576,8 @@ class ObjectManager(object):
                             objs_new.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = actual_obj, obj_changes.setdefault("dims", RecursiveDictionary())
                         # If this dataframe knows this object
                         else:
+                            if status == Event.New:
+                                continue
                             # Markin this object as a modified object for get_mod dataframe call.
                             # Changes to the base object would have already been applied, or will be applied goin forward.
                             objs_mod.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = new_obj, obj_changes.setdefault("dims", RecursiveDictionary())
@@ -613,7 +627,7 @@ class ObjectManager(object):
         tp = tp_obj.type
         tpname = tp_obj.name
         with self.lock:
-            if tp_obj.is_pure:
+            if tp_obj.is_pure or self.impures_pre_calculated:
                 return self.object_map[tpname] if tpname in self.object_map else dict()
             obj_map = ObjectManager.build_pccs([tp_obj], self.object_map, parameter)
             return obj_map[tp] if tp in obj_map else dict()
@@ -747,7 +761,7 @@ class ObjectManager(object):
             groupname = record["value"]["group_key"]
             oid = record["value"]["object_key"]
             name2type = self.type_manager.get_name2type_map()
-            if groupname not in name2type or name2type[groupname].type != name2type[groupname].group_key:
+            if groupname not in name2type:
                 # This type cannot be created, it is not registered with the DataframeModes
                 return None
             actual_type_name = (record["value"]["actual_type"]["name"]

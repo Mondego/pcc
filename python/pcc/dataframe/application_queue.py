@@ -56,10 +56,7 @@ class ApplicationQueue(object):
             objmap[tp] = self.dataframe.get(tp)
         return objmap
 
-    def merge_impure_record(self, current_record, objmap):
-        results = RecursiveDictionary()
-        for tp in self.registered_impures:
-            results[tp] = self.dataframe.get(tp)
+    def merge_impure_record(self, current_record, results):
         deleted = RecursiveDictionary()
 
         for tp in self.registered_impures:
