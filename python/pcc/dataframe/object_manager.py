@@ -561,7 +561,8 @@ class ObjectManager(object):
                 if "dims" in obj_changes and len(obj_changes["dims"]) > 0:
                     new_obj, dim_map = self.__build_dimension_obj(
                         obj_changes["dims"], 
-                        group_type)
+                        group_type,
+                        df_changes["gc"])
 
                 # For all type and status changes for that ob ject
                 for member, status in obj_changes["types"].items():
@@ -684,7 +685,7 @@ class ObjectManager(object):
         records.append(ChangeRecord(event, tp_obj, oid, new_obj_changes, new_full_obj_map, fk_type_to))
         return records
 
-    def __build_dimension_obj(self, dim_received, group_obj):
+    def __build_dimension_obj(self, dim_received, group_obj, full_record):
         groupname = group_obj.name
         dim_map = RecursiveDictionary()
         super_class = group_obj.super_class
@@ -698,20 +699,20 @@ class ObjectManager(object):
                 new_record = RecursiveDictionary()
                 new_record["type"] = Record.DICTIONARY
                 new_record["value"] = record["value"]["omap"]
-                dict_value = self.__process_record(new_record)
+                dict_value = self.__process_record(new_record, full_record)
                 value = self.__create_fake_class()()
                 value.__dict__ = dict_value
                 value.__class__ = getattr(super_class, dim)._type
             elif (record["type"] == Record.COLLECTION 
                 or record["type"] == Record.DICTIONARY):
-                collect = self.__process_record(record)
+                collect = self.__process_record(record, full_record)
                 value = getattr(super_class, dim)._type(collect)
             else:    
-                value = self.__process_record(record)
+                value = self.__process_record(record, full_record)
             setattr(obj, dim, value)
         return obj, dim_map
 
-    def __process_record(self, record):
+    def __process_record(self, record, full_record):
         if record["type"] == Record.INT:
             # the value will be in record["value"]
             return long(record["value"])
@@ -739,7 +740,7 @@ class ObjectManager(object):
             new_record["type"] = Record.DICTIONARY
             new_record["value"] = record["value"]["omap"]
                 
-            dict_value = self.__process_record(new_record)
+            dict_value = self.__process_record(new_record, full_record)
             value = self.__create_fake_class()()
             # Set type of object from record.value.object.type. Future work.
             value.__dict__ = dict_value
@@ -747,12 +748,12 @@ class ObjectManager(object):
         if record["type"] == Record.COLLECTION:
             # Assume it is list, as again, don't know this type
             # value is just list of records
-            return [self.__process_record(rec) for rec in record["value"]]
+            return [self.__process_record(rec, full_record) for rec in record["value"]]
         if record["type"] == Record.DICTIONARY:
             # Assume it is dictionary, as again, don't know this type
             # value-> [{"k": key_record, "v": val_record}] Has to be a list because key's may not be string
             return RecursiveDictionary([
-                    (self.__process_record(p["k"]), self.__process_record(p["v"])) 
+                    (self.__process_record(p["k"], full_record), self.__process_record(p["v"], full_record)) 
                     for p in record["value"]])
         if record["type"] == Record.FOREIGN_KEY:
             # value -> {"group_key": group key, 
@@ -780,12 +781,17 @@ class ObjectManager(object):
                 # The group object exists, but not in the actual_type obj.
             # The object does not exist, create a dummy one and the actual object will get updated 
             # in some other group change in this iteration.
-            obj_state =  self.current_state.setdefault(groupname, RecursiveDictionary()).setdefault(oid, RecursiveDictionary())
-            obj = self.__create_fake_class()()
-            obj.__dict__ = obj_state
-            obj.__class__ = actual_type
-            self.object_map.setdefault(actual_type_name, RecursiveDictionary())[oid] = obj
-            return obj 
+            if groupname in full_record and oid in full_record[groupname] and actual_type_name in full_record[groupname][oid]["types"] and full_record[groupname][oid]["types"][actual_type_name] == Event.New:
+                # Object is in the incoming record. Can build that. Duplicates will not be built anyway.
+                obj, _ = self.__build_dimension_obj(full_record[groupname][oid]["dims"], 
+                                                 self.type_manager.get_requested_type_from_str(groupname),
+                                                 full_record)
+                obj_state =  self.current_state.setdefault(groupname, RecursiveDictionary()).setdefault(oid, RecursiveDictionary())
+                obj_state.rec_update(obj.__dict__)
+                obj.__dict__ = obj_state
+                obj.__class__ = actual_type
+                self.object_map.setdefault(actual_type_name, RecursiveDictionary())[oid] = obj
+                return obj 
             
         raise TypeError("Do not know dimension type %s", record["type"])
 
