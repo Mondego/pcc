@@ -32,13 +32,13 @@ class ChangeManager(object):
     #################################################
     def report_dim_modification(self, records):
         for record in records:
-            self.__record(record.event, record.tpname, record.groupname, record.oid, record.dim_change, record.full_obj)
+            self.__record(record.event, record.tpname, record.groupname, record.oid, record.dim_change, record.full_obj, record.is_projection)
 
     def add_records(self, applied_records, pcc_change_records = None, except_app = None):
         records = (applied_records + pcc_change_records) if pcc_change_records else applied_records
         for rec in records:
-            event, tpname, groupname, oid, dim_change, full_dim_map  = (
-                rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj)
+            event, tpname, groupname, oid, dim_change, full_dim_map, is_projection  = (
+                rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj, rec.is_projection)
             self.__record(event, tpname, groupname, oid, dim_change, full_dim_map)
         self.__send_to_queues(applied_records, pcc_change_records, except_app)
         
@@ -70,7 +70,7 @@ class ChangeManager(object):
         objmap.setdefault("types", RecursiveDictionary())[tpname] = Event.New
         objmap.setdefaykt("dims", RecursiveDictionary()).rec_update(full_obj_map)
 
-    def __record(self, event_type, tpname, groupname, oid, dim_change, full_dim_map):
+    def __record(self, event_type, tpname, groupname, oid, dim_change, full_dim_map, is_projection = False):
         if not self.startrecording:
             return
         #for e event_type, tpname, oid, dim_changes in records:
@@ -90,7 +90,7 @@ class ChangeManager(object):
             return
         self.current_record.setdefault(
             groupname, RecursiveDictionary()).setdefault(
-                oid, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({tpname: event_type}))
+                oid, RecursiveDictionary({"types": RecursiveDictionary()}))["types"].rec_update(RecursiveDictionary({(groupname if event_type == Event.New and is_projection else tpname): event_type}))
         if dim_change:
             fks = []
             dims = self.current_record[groupname][oid].setdefault(

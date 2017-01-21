@@ -19,6 +19,7 @@ class ChangeRecord(object):
         self.full_obj = full_obj
         self.fk_type = fk_type.name if fk_type else None
         self.deleted_obj = deleted_obj
+        self.is_projection = tp_obj.is_projection
 
 #################################################
 #### Object Management Stuff (Atomic Needed) ####
@@ -570,6 +571,9 @@ class ObjectManager(object):
                     name2type = self.type_manager.get_name2type_map()
                     if not (member in name2type and name2type[member].group_key == groupname and name2type[member].observable):
                         continue
+                    # if it is a projection, switch it with the actual type so that all calculations can be based of that.
+                    if self.type_manager.get_requested_type_from_str(member).is_projection:
+                        member = self.type_manager.get_requested_type_from_str(member).group_key
                     # If the object is New, or New for this dataframe.
                     if (status == Event.New or status == Event.Modification):
                         if member not in self.object_map or oid not in self.object_map[member]:
@@ -580,7 +584,8 @@ class ObjectManager(object):
                             if status == Event.New:
                                 continue
                             # Markin this object as a modified object for get_mod dataframe call.
-                            # Changes to the base object would have already been applied, or will be applied goin forward.
+                            # Changes to the base object would have already been applied, or will be applied goin forward. 
+                            #print new_obj.__dict__, member
                             objs_mod.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = new_obj, obj_changes.setdefault("dims", RecursiveDictionary())
                             # Should get updated through current_state update when current_state changed.
                         # If the object is being deleted.
@@ -612,7 +617,7 @@ class ObjectManager(object):
         
 
         # Store the state in records
-        self.current_state[groupname][oid] = RecursiveDictionary(obj.__dict__)
+        self.current_state.setdefault(groupname, RecursiveDictionary())[oid] = RecursiveDictionary(obj.__dict__)
 
         # Set the object state by reference to the original object's symbol table
         obj.__dict__ = self.current_state[groupname][oid]

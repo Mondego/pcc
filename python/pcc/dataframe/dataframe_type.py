@@ -1,3 +1,4 @@
+from pcc.dataframe.type_manager import ObjectType
 class DataframeType(object):
     # Name -> str, 
     # Type -> type, 
@@ -35,6 +36,10 @@ class DataframeType(object):
     @property
     def is_base_type(self):
         return self.name == self.group_key
+
+    @property
+    def is_projection(self):
+        return ObjectType.Projection in self.categories
 
     def __init__(self, 
                  tp, 

@@ -168,7 +168,7 @@ class TypeManager(object):
         tp_obj = self.name2class[tp.__realname__]
         if not tp_obj in self.observing_types:
             raise TypeError("Type %s cannot be inserted/deleted into Dataframe, register it first." % tp.__realname__) 
-        if ObjectType.PCCBase not in tp_obj.categories:
+        if ObjectType.PCCBase not in tp_obj.categories and ObjectType.Projection not in tp_obj.categories:
             # Person not appending the right type of object
             raise TypeError("Cannot insert/delete type %s" % tp.__realname__)
         if not hasattr(tp, "__primarykey__"):
@@ -228,9 +228,9 @@ class TypeManager(object):
             key_obj = tp_obj
         self.name2class[name] = tp_obj
         
-        if not not_member:
-            self.observing_types.add(tp_obj)
-        tp_obj.observable = not not_member
+        #if not not_member:
+        self.observing_types.add(tp_obj)
+        #tp_obj.observable = not not_member
         
         not_directly_saveable_type = TypeManager.__is_not_saveable(categories)
         if not not_directly_saveable_type:
