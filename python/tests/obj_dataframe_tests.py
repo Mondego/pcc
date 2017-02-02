@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from pcc.attributes import dimension, primarykey
+from pcc.attributes import dimension, primarykey, count
 from pcc.set import pcc_set
 from pcc.subset import subset
 from pcc.impure import impure
@@ -571,3 +571,54 @@ class Test_dataframe_object_tests(unittest.TestCase):
             else:
                 seen.add(d.prop2)
         self.assertTrue(flag)
+
+    def test_aggregate_dimension(self):
+        @pcc_set
+        class Car(object):
+            @primarykey(str)
+            def oid(self): return self._id
+
+            @oid.setter
+            def oid(self, value): self._id = value
+
+            @dimension(int)
+            def velocity(self): return self._velocity
+
+            @velocity.setter
+            def velocity(self, value): self._velocity = value
+
+            @dimension(str)
+            def color(self): return self._color
+
+            @color.setter
+            def color(self, value): self._color = value
+
+            def __init__(self, vel, col):
+                self.velocity = vel
+                self.color = col
+
+        @subset(Car)
+        class ActiveCarCountByColor(object):
+            __group_by__ = Car.color
+
+            @count(Car.oid)
+            def total_count(self): return self._tc
+
+            @total_count.setter
+            def total_count(self, v): self._tc = v
+
+            @staticmethod
+            def __predicate__(c):
+                return c.velocity != 0
+
+        cars = [Car(0, "RED"), Car(1, "RED"), Car(2, "RED"), Car(2, "BLUE"), Car(0, "BLUE")]
+        df = dataframe()
+        df.add_types([Car, ActiveCarCountByColor])
+        df.extend(Car, cars)
+        car_by_count = df.get(ActiveCarCountByColor)
+        self.assertTrue(len(car_by_count) == 2)
+        for c in car_by_count:
+            if c.__group_by__ == "RED":
+                self.assertTrue(c.total_count == 2)
+            if c.__group_by__ == "BLUE":
+                self.assertTrue(c.total_count == 1)

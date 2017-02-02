@@ -215,7 +215,8 @@ class TypeManager(object):
         categories = TypeManager.__categorize(tp)
         if ObjectType.UnknownType in categories:
             raise TypeError("Type %s cannot be added" % name)
-        
+        if hasattr(tp, "__grouped_pcc__") and tp.__grouped_pcc__:
+            categories.add(ObjectType.Impure)
         name = tp.__realname__
         key, keytp = TypeManager.__get_group_key(tp)
         tp_obj = DataframeType(tp, keytp, categories)
@@ -293,6 +294,8 @@ class TypeManager(object):
         if ObjectType.Join in categories:
             self.join_types.add(tp_obj)
 
-        self.tp_to_dataframe_payload[tp_obj] = (self.get_requested_type, pcc_adjuster, records_creator, dim_modification_reporter)
+        self.tp_to_dataframe_payload[tp_obj] = ((self.get_requested_type, pcc_adjuster, records_creator, dim_modification_reporter) 
+                                                if not (hasattr(tp, "__grouped_pcc__") and tp.__grouped_pcc__) else
+                                                None)
         return tp_obj
         

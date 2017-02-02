@@ -3,7 +3,6 @@ pcc/__init__.py
 pcc/_utils.py
 pcc/attributes.py
 pcc/create.py
-pcc/dataframe_old.py
 pcc/impure.py
 pcc/isa.py
 pcc/join.py
