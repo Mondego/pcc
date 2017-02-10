@@ -25,7 +25,7 @@ class dataframe_wrapper(Thread):
 
         # Results for get requests
         self.get_token_dict = dict()
-        self.isdaemon = True
+        self.isDaemon = True
         self.shutdown = False
         self.start()
 

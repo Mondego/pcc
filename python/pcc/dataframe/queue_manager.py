@@ -59,9 +59,9 @@ class QueueManager(object):
             rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj, rec.fk_type)
         if tpname in self.type_map:
             for app in self.type_map[tpname]:
-                if not except_app and app != except_app:
+                if app != except_app:
                     application_to_record.setdefault(app, list()).append(rec)
         elif fk_for_tp and fk_for_tp in self.type_map:
             for app in self.type_map[fk_for_tp]:
-                if not except_app and app != except_app:
+                if app != except_app:
                     application_to_record.setdefault(app, list()).append(rec)

@@ -91,7 +91,7 @@ class ObjectManager(object):
         universe = list()
         param_list = list()
         for tp in pcctype.__ENTANGLED_TYPES__:
-            universe.append(relevant_objs[tp])
+            universe.append(relevant_objs.setdefault(tp, list()))
 
         # Creating random rule for parameters, all Collections first, then singleton objects
         # Why? Random, couldnt think of a better way
@@ -349,15 +349,21 @@ class ObjectManager(object):
             ), RecursiveDictionary())
 
     def add_buffer_changes(self, changes, deletes):
-        if "gc" not in changes:
+        try:
+            if "gc" not in changes:
+                return
+            for groupname, group_changes in changes["gc"].items():
+                for oid, obj_changes in group_changes.items():
+                    for tpname, event in obj_changes["types"].items():
+                        try:
+                            self.changelog.setdefault(event, RecursiveDictionary()).setdefault(tpname, RecursiveDictionary())[oid] = (
+                                self.object_map[tpname][oid]
+                                if event != Event.Delete else
+                                deletes[tpname][oid])
+                        except Exception:
+                            raise
+        except Exception:
             return
-        for groupname, group_changes in changes["gc"].items():
-            for oid, obj_changes in group_changes.items():
-                for tpname, event in obj_changes["types"].items():
-                    self.changelog.setdefault(event, RecursiveDictionary()).setdefault(tpname, RecursiveDictionary())[oid] = (
-                        self.object_map[tpname][oid]
-                        if event != Event.Delete else
-                        deletes[tpname][oid])
 
     def get_new(self, tp):
         tpname = tp.__realname__

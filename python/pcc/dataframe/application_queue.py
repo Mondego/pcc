@@ -16,6 +16,7 @@ class ApplicationQueue(object):
         self.lock = RLock()
         
     def merge_records(self, records):
+        #new_records_this_cycle = RecursiveDictionary()
         with self.lock:
             for rec in records:
                 event, tpname, groupname, oid, dim_change, full_obj = (
@@ -28,10 +29,13 @@ class ApplicationQueue(object):
                 if event == Event.New:
                     type_changes[tpname] = event
                     obj_changes.setdefault("dims", RecursiveDictionary()).rec_update(full_obj)
+                    #new_records_this_cycle.setdefault(groupname, RecursiveDictionary()).setdefault(tpname, set()).add(oid)
                 elif event == Event.Modification:
                     type_changes[tpname] = event if is_known else Event.New
                     obj_changes.setdefault("dims", RecursiveDictionary()).rec_update(dim_change if is_known else full_obj)
                 elif event == Event.Delete:
+                    #if groupname in new_records_this_cycle and tpname in new_records_this_cycle[groupname] and oid in new_records_this_cycle[groupname][tpname]:
+                    #    del type_changes[tpname]
                     type_changes[tpname] = event
             
     def get_record(self):
