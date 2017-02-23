@@ -14,6 +14,7 @@ class ApplicationQueue(object):
         self.dataframe = dataframe
         self.registered_impures, self.queue = self.dataframe.connect_app_queue(self)
         self.lock = RLock()
+        self.first_run = True
         
     def merge_records(self, records):
         #new_records_this_cycle = RecursiveDictionary()
@@ -56,16 +57,17 @@ class ApplicationQueue(object):
 
     def fetch_impure_types(self):
         objmap = RecursiveDictionary()
-        for tp in self.registered_impures:
+        for tp in (self.registered_impures if not self.first_run else self.types):
             objmap[tp] = self.dataframe.get(tp)
+        self.first_run = False
         return objmap
 
     def merge_impure_record(self, current_record, results):
         deleted = RecursiveDictionary()
 
-        for tp in self.registered_impures:
+        for tp in self.types:
             tpname = tp.__realname__
-            if tpname in self.known_objects:
+            if tpname in results:
                 obj_oids = self.known_objects[tpname]
                 next_oids = set([obj.__primarykey__ for obj in results[tp]])
                 deleted_oids = obj_oids.difference(next_oids)
@@ -83,7 +85,7 @@ class ApplicationQueue(object):
 
                 for tpname, event in obj_changes["types"].items():
                     if tpname in current_record[group_name][oid]["types"]:
-                        existing_event = current_record[group_name][oid]["types"][tpnames]
+                        existing_event = current_record[group_name][oid]["types"][tpname]
                     else:
                         existing_event = event
                     if existing_event == Event.Delete or existing_event == Event.Modification:

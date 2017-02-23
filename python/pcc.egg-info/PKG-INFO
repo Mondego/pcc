@@ -6,7 +6,7 @@ Home-page: https://github.com/Mondego/pcc
 Author: Rohan Achar
 Author-email: ra.rohan@gmail.com
 License: MIT
-Description: $ pip install dist/pcc-0.0.xxx-py2-none-any.whl
+Description: $ pip install dist/pcc-0.0.xxx-py2-none-any.whl
         
 Keywords: predicate collection classes,design patterns
 Platform: UNKNOWN
