@@ -136,6 +136,9 @@ class dataframe(object):
         records = self.object_manager.delete_all(tp_obj)
         self.change_manager.add_records(records)
 
+    def clear_joins(self):
+        for tp_obj in self.type_manager.get_join_types():
+            _ = self.object_manager.delete_all(tp_obj)
     #############################################
 
     ####### CHANGE MANAGEMENT METHODS ###########

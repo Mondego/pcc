@@ -33,7 +33,9 @@ class ApplicationQueue(object):
                     #new_records_this_cycle.setdefault(groupname, RecursiveDictionary()).setdefault(tpname, set()).add(oid)
                 elif event == Event.Modification:
                     type_changes[tpname] = event if is_known else Event.New
-                    obj_changes.setdefault("dims", RecursiveDictionary()).rec_update(dim_change if is_known else full_obj)
+                    change = dim_change if is_known else full_obj
+                    if change:
+                        obj_changes.setdefault("dims", RecursiveDictionary()).rec_update(change)
                 elif event == Event.Delete:
                     #if groupname in new_records_this_cycle and tpname in new_records_this_cycle[groupname] and oid in new_records_this_cycle[groupname][tpname]:
                     #    del type_changes[tpname]

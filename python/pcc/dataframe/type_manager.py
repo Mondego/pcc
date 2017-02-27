@@ -207,6 +207,10 @@ class TypeManager(object):
                 result.add(tp)
         return result
 
+    def get_join_types(self):
+        return self.join_types
+
+
     #################################################
     ### Private Methods #############################
     #################################################

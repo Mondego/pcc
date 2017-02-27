@@ -43,6 +43,8 @@ class ObjectManager(object):
 
         self.changelog = RecursiveDictionary()
 
+        self.record_obj = RecursiveDictionary()
+
     #################################################
     ### Static Methods ##############################
     #################################################
@@ -290,9 +292,9 @@ class ObjectManager(object):
 
     def delete_all(self, tp_obj):
         records = []
-        if tp_obj.name in self.object_map and oid in self.object_map[tp_obj.name]:
-            for oid in self.object_map[tp_obj.name]:
-                records.extend(self.delete(tp_obj, oid))
+        if tp_obj.name in self.object_map:
+            for obj in self.object_map[tp_obj.name].values():
+                records.extend(self.delete(tp_obj, obj))
         return records
 
     def apply_changes(self, df_changes, except_df = None):
@@ -572,35 +574,39 @@ class ObjectManager(object):
                         df_changes["gc"])
 
                 # For all type and status changes for that ob ject
-                for member, status in obj_changes["types"].items():
+                for found_member, status in obj_changes["types"].items():
+                    types_to_go_through = list()
+                    types_to_go_through.append(found_member)
                     # If member is not tracked by the dataframe
                     name2type = self.type_manager.get_name2type_map()
-                    if not (member in name2type and name2type[member].group_key == groupname and name2type[member].observable):
+                    if not (found_member in name2type and name2type[found_member].group_key == groupname and name2type[found_member].observable):
                         continue
                     # if it is a projection, switch it with the actual type so that all calculations can be based of that.
-                    if self.type_manager.get_requested_type_from_str(member).is_projection:
-                        member = self.type_manager.get_requested_type_from_str(member).group_key
-                    # If the object is New, or New for this dataframe.
-                    if (status == Event.New or status == Event.Modification):
-                        if member not in self.object_map or oid not in self.object_map[member]:
-                            actual_obj = change_type(new_obj, self.type_manager.get_requested_type_from_str(member).type)
-                            objs_new.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = actual_obj, obj_changes.setdefault("dims", RecursiveDictionary())
-                        # If this dataframe knows this object
+                    if self.type_manager.get_requested_type_from_str(found_member).is_projection:
+                        types_to_go_through.append(self.type_manager.get_requested_type_from_str(found_member).group_key)
+                        
+                    for member in types_to_go_through:
+                        # If the object is New, or New for this dataframe.
+                        if (status == Event.New or status == Event.Modification):
+                            if member not in self.object_map or oid not in self.object_map[member]:
+                                actual_obj = change_type(new_obj, self.type_manager.get_requested_type_from_str(member).type)
+                                objs_new.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = actual_obj, obj_changes.setdefault("dims", RecursiveDictionary())
+                            # If this dataframe knows this object
+                            else:
+                                if status == Event.New:
+                                    continue
+                                # Markin this object as a modified object for get_mod dataframe call.
+                                # Changes to the base object would have already been applied, or will be applied goin forward. 
+                                #print new_obj.__dict__, member
+                                objs_mod.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = new_obj, obj_changes.setdefault("dims", RecursiveDictionary())
+                                # Should get updated through current_state update when current_state changed.
+                            # If the object is being deleted.
+                        elif status == Event.Delete:
+                            if member in self.object_map and oid in self.object_map[member]:
+                                # Maintaining a list of deletes for seein membership changes later.
+                                objs_deleted.setdefault(self.type_manager.get_requested_type_from_str(member), set()).add(oid)
                         else:
-                            if status == Event.New:
-                                continue
-                            # Markin this object as a modified object for get_mod dataframe call.
-                            # Changes to the base object would have already been applied, or will be applied goin forward. 
-                            #print new_obj.__dict__, member
-                            objs_mod.setdefault(self.type_manager.get_requested_type_from_str(member), RecursiveDictionary())[oid] = new_obj, obj_changes.setdefault("dims", RecursiveDictionary())
-                            # Should get updated through current_state update when current_state changed.
-                        # If the object is being deleted.
-                    elif status == Event.Delete:
-                        if member in self.object_map and oid in self.object_map[member]:
-                            # Maintaining a list of deletes for seein membership changes later.
-                            objs_deleted.setdefault(self.type_manager.get_requested_type_from_str(member), set()).add(oid)
-                    else:
-                        raise Exception("Object change Status %s unknown" % status)
+                            raise Exception("Object change Status %s unknown" % status)
         return objs_new, objs_mod, objs_deleted
             
     def __create_table(self, tpname, basetype):
@@ -645,6 +651,19 @@ class ObjectManager(object):
             return obj_map[tp] if tp in obj_map else dict()
 
     def __create_records(self, event, tp_obj, oid, obj_changes, full_obj_map, converted = False, fk_type_to = None):
+        if event == Event.Delete:
+            if tp_obj in self.record_obj and oid in self.record_obj[tp_obj]:
+                del self.record_obj[tp_obj][oid]
+        elif event == Event.New:
+            self.record_obj.setdefault(tp_obj, RecursiveDictionary()).setdefault(oid, RecursiveDictionary()).rec_update(full_obj_map)
+        elif event == Event.Modification:
+            if tp_obj in self.record_obj and oid in self.record_obj[tp_obj]:
+                self.record_obj[tp_obj][oid].rec_update(obj_changes)
+            else:
+                raise RuntimeError("Trying to modify an object that was not added. %s %s" % (tp_obj.name, oid))
+
+        if not full_obj_map and event != Event.Delete:
+            full_obj_map = self.record_obj[tp_obj][oid]
         records = list()
         fks = list()
         new_obj_changes = RecursiveDictionary()
@@ -876,16 +895,16 @@ class ObjectManager(object):
     def __build_fk_into_objmap(self, fks, final_record):
         if len(fks) == 0:
             return
-
-        fk, fk_type_obj, fk_obj = fks.pop()
-        group = fk_type_obj.group_key
-        fk_event_type = Event.New
-        new_fks, fk_full_obj = self.__convert_obj_to_change_record(fk_obj)
-        fks.extend(new_fks)
-        fk_obj_record = final_record.setdefault(fk_type_obj.group_key, RecursiveDictionary()).setdefault(fk, RecursiveDictionary())
-        fk_obj_record.setdefault("dims", RecursiveDictionary()).rec_update(fk_full_obj)
-        fk_obj_record.setdefault("types", RecursiveDictionary())[fk_type_obj.name] = Event.New
-        self.__build_fk_into_objmap(fks, final_record)
+        more_fks = list()
+        for fk, fk_type_obj, fk_obj in fks:
+            group = fk_type_obj.group_key
+            fk_event_type = Event.New
+            new_fks, fk_full_obj = self.__convert_obj_to_change_record(fk_obj)
+            more_fks.extend(new_fks)
+            fk_obj_record = final_record.setdefault(fk_type_obj.group_key, RecursiveDictionary()).setdefault(fk, RecursiveDictionary())
+            fk_obj_record.setdefault("dims", RecursiveDictionary()).rec_update(fk_full_obj)
+            fk_obj_record.setdefault("types", RecursiveDictionary())[fk_type_obj.name] = Event.New
+        self.__build_fk_into_objmap(more_fks, final_record)
 
     def __build_fks_to_records(self, fks, tp_obj):
         if len(fks) == 0:
