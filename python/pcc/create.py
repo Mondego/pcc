@@ -1,6 +1,10 @@
 from copy import deepcopy
 from itertools import product
+class container(object):
+    def __init__(self):
+        pass
 
+    
 def __subset_generic_query(actual_class, collection, param):
     if len(collection) > 1:
         raise TypeError("Cannot create subset %s from more that one collection. Use params = (<params>,...) to use parameters" % actual_class.__realname__)
@@ -70,10 +74,6 @@ def __create_pcc(actual_class, params, collections):
     return items
 
 def change_type(obj, totype):
-    class container(object):
-        def __init__(self):
-            pass
-
     new_obj = container()
     new_obj.__dict__ = obj.__dict__
     new_obj.__class__ = totype

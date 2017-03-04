@@ -67,13 +67,13 @@ class ApplicationQueue(object):
     def merge_impure_record(self, current_record, results):
         deleted = RecursiveDictionary()
 
-        for tp in self.types:
+        for tp in self.registered_impures:
             tpname = tp.__realname__
-            if tpname in results:
-                obj_oids = self.known_objects[tpname]
-                next_oids = set([obj.__primarykey__ for obj in results[tp]])
-                deleted_oids = obj_oids.difference(next_oids)
-                deleted[tpname] = deleted_oids
+            obj_oids = self.known_objects[tpname] if tpname in self.known_objects else set()
+            next_oids = set([obj.__primarykey__ for obj in results[tp]]) if tp in results else set()
+            deleted_oids = obj_oids.difference(next_oids)
+            deleted[tpname] = deleted_oids
+            
 
         impure_results = self.dataframe.convert_to_record(results, deleted)
         for group_name, grpchanges in impure_results.items():

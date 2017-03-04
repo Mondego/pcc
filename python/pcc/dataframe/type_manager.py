@@ -1,17 +1,13 @@
 #################################################
 ### Type Management Stuff (Atomic via pause) ####
 #################################################
-
-from multiprocessing import RLock
 from enums import ObjectType
-from dataframe_type import DataframeType
+from dataframe_type import type_lock, DataframeType
+import os
 
 class TypeManager(object):
 
     def __init__(self):
-
-        # The lock required to make types consistent for each call.
-        self.lock = RLock()
 
         # group key (always string fullanme of type) to members of group.  For example: car -> activecar,
         # inactivecar, redcar, etc etc.
@@ -126,7 +122,7 @@ class TypeManager(object):
         
     def add_type(self, tp, tracking=False, pcc_adjuster = None, dim_modification_reporter = None, records_creator = None):
         pairs_added = set()
-        with self.lock:
+        with type_lock:
             self.__add_type(tp, 
                             tracking = tracking, 
                             pairs_added = pairs_added, 
@@ -137,7 +133,7 @@ class TypeManager(object):
 
     def add_types(self, types, tracking=False, pcc_adjuster = None, dim_modification_reporter = None, records_creator = None):
         pairs_added = set()
-        with self.lock:
+        with type_lock:
             for tp in types:
                 self.__add_type(tp, 
                                 tracking = tracking, 
@@ -233,8 +229,8 @@ class TypeManager(object):
             key_obj = tp_obj
         self.name2class[name] = tp_obj
         
-        #if not not_member:
-        self.observing_types.add(tp_obj)
+        if not not_member:
+            self.observing_types.add(tp_obj)
         #tp_obj.observable = not not_member
         
         not_directly_saveable_type = TypeManager.__is_not_saveable(categories)
@@ -302,4 +298,4 @@ class TypeManager(object):
                                                 if not (hasattr(tp, "__grouped_pcc__") and tp.__grouped_pcc__) else
                                                 None)
         return tp_obj
-        
+

@@ -64,7 +64,6 @@ class dataframe(object):
         # Can be used to synchnronize between dataframes.
         self.start_recording = False
         
-
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
         pairs_added = self.type_manager.add_type(
@@ -149,13 +148,14 @@ class dataframe(object):
     @start_recording.setter
     def start_recording(self, v): self.change_manager.startrecording = v
 
-    def apply_changes(self, changes, except_app = None):
+    def apply_changes(self, changes, except_app = None, track = True):
         if "gc" not in changes:
             return
 
         applied_records, pcc_change_records, deletes = self.object_manager.apply_changes(changes)
         self.object_manager.add_buffer_changes(changes, deletes)
-        self.change_manager.add_records(applied_records, pcc_change_records, except_app)
+        if track:
+            self.change_manager.add_records(applied_records, pcc_change_records, except_app)
 
     def get_record(self):
         return self.change_manager.get_record()

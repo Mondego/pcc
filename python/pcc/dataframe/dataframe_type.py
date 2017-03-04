@@ -1,4 +1,8 @@
-from pcc.dataframe.type_manager import ObjectType
+from enums import ObjectType
+from multiprocessing import RLock
+
+type_lock = RLock()
+object_lock = RLock()
 class DataframeType(object):
     # Name -> str, 
     # Type -> type, 
@@ -17,29 +21,29 @@ class DataframeType(object):
             return self.name == obj
         return self.name == obj.name
 
-    @property
-    def name(self): 
-        return self.type.__realname__
+    #@property
+    #def name(self): 
+    #    return self.type.__realname__
 
-    @property
-    def group_key(self): 
-        return self.group_type.__realname__
+    #@property
+    #def group_key(self): 
+    #    return self.group_type.__realname__
 
-    @property
-    def can_be_persistent(self): 
-        return self.saveable_parent != None
+    #@property
+    #def can_be_persistent(self): 
+    #    return self.saveable_parent != None
 
-    @property
-    def has_params(self):
-        return len(self.parameter_types) != 0
+    #@property
+    #def has_params(self):
+    #    return len(self.parameter_types) != 0
 
-    @property
-    def is_base_type(self):
-        return self.name == self.group_key
+    #@property
+    #def is_base_type(self):
+    #    return self.name == self.group_key
 
-    @property
-    def is_projection(self):
-        return ObjectType.Projection in self.categories
+    #@property
+    #def is_projection(self):
+    #    return ObjectType.Projection in self.categories
 
     def __init__(self, 
                  tp, 
@@ -64,6 +68,10 @@ class DataframeType(object):
         self.parameter_types = parameter_types
         self.super_class = super_class
         self.observable = observable
-
-
+        self.name = tp.__realname__
+        self.group_key = self.group_type.__realname__
+        self.can_be_persistent = self.saveable_parent != None
+        self.has_params = len(self.parameter_types) != 0
+        self.is_base_type = self.name == self.group_key
+        self.is_projection = ObjectType.Projection in self.categories
 
