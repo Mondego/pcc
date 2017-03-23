@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from pcc.attributes import dimension, primarykey
+from pcc.attributes import dimension, primarykey, count
 from pcc.set import pcc_set
 from pcc.subset import subset
 from pcc.impure import impure
@@ -412,7 +412,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue(len(df.object_map[HighValueTransaction.__realname__]) == 1)
+        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__realname__]) == 1)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
@@ -427,7 +427,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue((HighValueTransaction.__realname__ in df.object_map) == False)
+        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__realname__]) == 0)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
@@ -443,11 +443,11 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.add_types([Node, Edge, InEdge, OutEdge])
         df.extend(Node, nodes)
         df.extend(Edge, edges)
-        self.assertTrue((OutEdge.__realname__ in df.object_map) == False)
-        self.assertTrue((InEdge.__realname__ in df.object_map) == False)
-        self.assertTrue(len(df.get(OutEdge, (nodes[0],))) == 3)
-        self.assertTrue(isinstance(df.get(OutEdge, (nodes[0],))[0], OutEdge))
-        self.assertTrue(len(df.get(InEdge, (nodes[0],))) == 0) 
+        self.assertTrue(len(df.object_manager.object_map[OutEdge.__realname__]) == 0)
+        self.assertTrue(len(df.object_manager.object_map[InEdge.__realname__]) == 0)
+        self.assertTrue(len(df.get(OutEdge, parameters = (nodes[0],))) == 3)
+        self.assertTrue(isinstance(df.get(OutEdge, parameters = (nodes[0],))[0], OutEdge))
+        self.assertTrue(len(df.get(InEdge, parameters = (nodes[0],))) == 0) 
 
     def test_join_get(self):
         Person, Card, Transaction, RedAlert, persons, cards, transactions = _join_example_data()
@@ -456,7 +456,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.extend(Person, persons)
         df.extend(Card, cards)
         df.extend(Transaction, transactions)
-        self.assertTrue((RedAlert.__realname__ in df.object_map) == False)
+        self.assertTrue(len(df.object_manager.object_map[RedAlert.__realname__]) == 0)
         self.assertTrue(len(df.get(RedAlert)) == 2)
         for ra in df.get(RedAlert):
             ra.Protect()
@@ -517,7 +517,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, CarForPedestrian])
         df.extend(Car, cars)
-        self.assertTrue(len(df.object_map[CarForPedestrian.__realname__]) == 2)
+        self.assertTrue(len(df.object_manager.object_map[CarForPedestrian.__realname__]) == 2)
         cars_p = df.get(CarForPedestrian)
         self.assertTrue(len(cars_p) == 2)
         for c in cars_p:
@@ -571,3 +571,54 @@ class Test_dataframe_object_tests(unittest.TestCase):
             else:
                 seen.add(d.prop2)
         self.assertTrue(flag)
+
+    def test_aggregate_dimension(self):
+        @pcc_set
+        class Car(object):
+            @primarykey(str)
+            def oid(self): return self._id
+
+            @oid.setter
+            def oid(self, value): self._id = value
+
+            @dimension(int)
+            def velocity(self): return self._velocity
+
+            @velocity.setter
+            def velocity(self, value): self._velocity = value
+
+            @dimension(str)
+            def color(self): return self._color
+
+            @color.setter
+            def color(self, value): self._color = value
+
+            def __init__(self, vel, col):
+                self.velocity = vel
+                self.color = col
+
+        @subset(Car)
+        class ActiveCarCountByColor(object):
+            __group_by__ = Car.color
+
+            @count(Car.oid)
+            def total_count(self): return self._tc
+
+            @total_count.setter
+            def total_count(self, v): self._tc = v
+
+            @staticmethod
+            def __predicate__(c):
+                return c.velocity != 0
+
+        cars = [Car(0, "RED"), Car(1, "RED"), Car(2, "RED"), Car(2, "BLUE"), Car(0, "BLUE")]
+        df = dataframe()
+        df.add_types([Car, ActiveCarCountByColor])
+        df.extend(Car, cars)
+        car_by_count = df.get(ActiveCarCountByColor)
+        self.assertTrue(len(car_by_count) == 2)
+        for c in car_by_count:
+            if c.__group_by__ == "RED":
+                self.assertTrue(c.total_count == 2)
+            if c.__group_by__ == "BLUE":
+                self.assertTrue(c.total_count == 1)
