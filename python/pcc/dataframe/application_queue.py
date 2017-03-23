@@ -42,11 +42,13 @@ class ApplicationQueue(object):
                     type_changes[tpname] = event
             
     def get_record(self):
+        records = list()
         while True:
             try:
-                records = self.queue.get_nowait()
-                self.merge_records(records)
+                records.extend(self.queue.get_nowait())
             except Empty:
+                self.merge_records(records)
+                records = list()
                 break
         objmap = self.fetch_impure_types()
 

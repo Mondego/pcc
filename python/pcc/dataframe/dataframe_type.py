@@ -29,13 +29,13 @@ class DataframeType(object):
     #def group_key(self): 
     #    return self.group_type.__realname__
 
-    #@property
-    #def can_be_persistent(self): 
-    #    return self.saveable_parent != None
+    @property
+    def can_be_persistent(self): 
+        return self.saveable_parent != None
 
-    #@property
-    #def has_params(self):
-    #    return len(self.parameter_types) != 0
+    @property
+    def has_params(self):
+        return len(self.parameter_types) != 0
 
     #@property
     #def is_base_type(self):
@@ -70,8 +70,6 @@ class DataframeType(object):
         self.observable = observable
         self.name = tp.__realname__
         self.group_key = self.group_type.__realname__
-        self.can_be_persistent = self.saveable_parent != None
-        self.has_params = len(self.parameter_types) != 0
         self.is_base_type = self.name == self.group_key
         self.is_projection = ObjectType.Projection in self.categories
 
