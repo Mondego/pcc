@@ -47,7 +47,10 @@ setup(
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
-        'Topic :: Software Development :: Design Patterns',
+        'Intended Audience :: Education',
+        'Intended Audience :: Science/Research',
+
+        'Topic :: Software Development :: Libraries',
 
         # Pick your license as you wish (should match "license" above)
         'License :: OSI Approved :: MIT License',
@@ -60,7 +63,7 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='predicate collection classes, design patterns',
+    keywords='predicate collection classes, design patterns, dataframe, object databases',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
@@ -74,7 +77,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['bson', 'cbor'],
+    install_requires=['cbor'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
@@ -83,6 +86,7 @@ setup(
     extras_require={
         'dev': [],
         'test': [],
+        'bson': ['bson']
     },
 
     # If there are data files included in your packages that need to be

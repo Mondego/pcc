@@ -8,11 +8,13 @@ Author-email: ra.rohan@gmail.com
 License: MIT
 Description: $ pip install dist/pcc-0.0.xxx-py2-none-any.whl
         
-Keywords: predicate collection classes,design patterns
+Keywords: predicate collection classes,design patterns,dataframe,object databases
 Platform: UNKNOWN
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
-Classifier: Topic :: Software Development :: Design Patterns
+Classifier: Intended Audience :: Education
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Software Development :: Libraries
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Programming Language :: Python :: 2
 Classifier: Programming Language :: Python :: 2.6

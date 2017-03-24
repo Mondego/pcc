@@ -1,5 +1,7 @@
-bson
 cbor
+
+[bson]
+bson
 
 [dev]
 
