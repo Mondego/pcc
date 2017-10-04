@@ -5,7 +5,7 @@ Create on Feb 27, 2016
 '''
 import uuid
 from threading import currentThread
-from recursive_dictionary import RecursiveDictionary
+from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from abc import ABCMeta, abstractmethod
 
 def get_type(obj):

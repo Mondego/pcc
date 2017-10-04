@@ -1,4 +1,4 @@
-from attributes import spacetime_property, aggregate_property
+from rtypes.pcc.attributes import spacetime_property, aggregate_property
 
 def build_required_attrs(cooked_cls):
     cooked_cls.__pcc_type__ = True

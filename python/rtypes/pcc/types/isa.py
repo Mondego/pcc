@@ -1,4 +1,4 @@
-from set import pcc_set
+from rtypes.pcc.types.set import pcc_set
 
 class isa(object):
   def __init__(of_cls, *dimensions):

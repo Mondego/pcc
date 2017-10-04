@@ -1,6 +1,6 @@
 from threading import Thread
 from Queue import Queue, Empty
-from dataframe import dataframe
+from rtypes.dataframe import dataframe
 from uuid import uuid4
 
 from dataframe_request import GetDFRequest, \

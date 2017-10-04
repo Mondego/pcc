@@ -1,11 +1,11 @@
 #################################################
 #### Record keeping (Atomic Needed) #############
 #################################################
-from pcc.recursive_dictionary import RecursiveDictionary
+from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from Queue import Queue
 from queue_manager import QueueManager
-from pcc.dataframe_changes.IDataframeChanges import Event
-import pcc.dataframe_changes.IDataframeChanges as df_repr
+from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event
+from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 
 class ChangeManager(object):
     def __init__(self):

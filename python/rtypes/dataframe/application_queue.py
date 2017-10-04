@@ -1,8 +1,8 @@
-from pcc.recursive_dictionary import RecursiveDictionary
-from pcc.dataframe_changes.IDataframeChanges import Event
+from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
+from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event
 from threading import Thread, RLock
 from Queue import Empty
-import pcc.dataframe_changes.IDataframeChanges as df_repr
+from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 
 
 class ApplicationQueue(object):

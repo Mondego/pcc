@@ -3,20 +3,21 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from pcc.attributes import spacetime_property
-from pcc.recursive_dictionary import RecursiveDictionary
-from pcc.create import create, change_type
-from pcc.parameter import ParameterMode
+from __future__ import absolute_import
+from rtypes.pcc.attributes import spacetime_property
+from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
+from rtypes.pcc.create import create, change_type
+from rtypes.pcc.types.parameter import ParameterMode
 from uuid import uuid4
 from threading import Thread
 from Queue import Queue
 from Queue import Empty
 
-import pcc.dataframe_changes.IDataframeChanges as df_repr
-from pcc.dataframe_changes.IDataframeChanges import Event, Record
-from object_manager import ObjectManager
-from type_manager import TypeManager
-from change_manager import ChangeManager
+from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
+from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event, Record
+from rtypes.dataframe.object_manager import ObjectManager
+from rtypes.dataframe.type_manager import TypeManager
+from rtypes.dataframe.change_manager import ChangeManager
 
 BASE_TYPES = set([])
 

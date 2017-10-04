@@ -4,7 +4,7 @@ Create on Feb 27, 2016
 @author: Rohan Achar
 '''
 from set import pcc_set
-from _utils import build_required_attrs
+from rtypes.pcc.utils._utils import build_required_attrs
 
 class projection(object):
     def __init__(self, of_class, *dimensions):

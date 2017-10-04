@@ -1,4 +1,4 @@
-from dataframe import dataframe
+from rtypes.dataframe import dataframe
 from uuid import uuid4
 
 class dataframe_client(dataframe):

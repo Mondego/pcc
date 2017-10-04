@@ -1,4 +1,4 @@
-from IDataframeChanges import *
+from rtypes.dataframe.dataframe_changes.IDataframeChanges import *
 import json
 
 class DataframeChanges(DataframeChanges_Base):

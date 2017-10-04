@@ -1,11 +1,11 @@
 from uuid import uuid4
-from pcc.recursive_dictionary import RecursiveDictionary
-from pcc.parameter import ParameterMode
+from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
+from rtypes.pcc.types.parameter import ParameterMode
 
-import pcc.dataframe_changes.IDataframeChanges as df_repr
-from pcc.dataframe_changes.IDataframeChanges import Event, Record
-from pcc.dataframe.dataframe_type import object_lock
-from pcc.create import create, change_type
+from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
+from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event, Record
+from rtypes.dataframe.dataframe_type import object_lock
+from rtypes.pcc.create import create, change_type
 
 class ChangeRecord(object):
     def __init__(self, event, tp_obj, oid, dim_change, full_obj, fk_type = None, deleted_obj = None):

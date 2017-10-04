@@ -2,7 +2,7 @@
 ### Type Management Stuff (Atomic via pause) ####
 #################################################
 from enums import ObjectType
-from dataframe_type import type_lock, DataframeType
+from rtypes.dataframe.dataframe_type import type_lock, DataframeType
 import os
 
 class TypeManager(object):

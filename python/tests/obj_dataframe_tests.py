@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 
-from pcc.attributes import dimension, primarykey, count
-from pcc.set import pcc_set
-from pcc.subset import subset
-from pcc.impure import impure
-from pcc.dataframe import dataframe
-from pcc.parameter import parameter, ParameterMode
-from pcc.join import join
-from pcc.projection import projection
+from rtypes.pcc.attributes import dimension, primarykey, count
+from rtypes.pcc.types.set import pcc_set
+from rtypes.pcc.types.subset import subset
+from rtypes.pcc.types.impure import impure
+from rtypes.dataframe.dataframe import dataframe
+from rtypes.pcc.types.parameter import parameter, ParameterMode
+from rtypes.pcc.types.join import join
+from rtypes.pcc.types.projection import projection
     
 import unittest, json
 

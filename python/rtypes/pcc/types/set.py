@@ -3,10 +3,10 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from attributes import primarykey, dimension, spacetime_property
+from rtypes.pcc.attributes import primarykey, dimension, spacetime_property
 from types import FunctionType
 from copy import deepcopy
-from _utils import build_required_attrs
+from rtypes.pcc.utils._utils import build_required_attrs
 
 def pcc_set(actual_class):
     build_required_attrs(actual_class)

@@ -3,8 +3,8 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from attributes import spacetime_property
-from _utils import build_required_attrs
+from rtypes.pcc.attributes import spacetime_property
+from rtypes.pcc.utils._utils import build_required_attrs
 
 class union(object):
     def __init__(self, *types):
