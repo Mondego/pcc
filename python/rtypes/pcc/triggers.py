@@ -9,27 +9,37 @@ class Trigger(object):
         self.priority = priority
 
     def __call__(self, procedure):
-
         class TriggerProcedure(object):
 
             def __init__(self, procedure):
                 self.procedure = procedure
 
-            def __call__(self):
-                return self.procedure
+            def __call__(self, *args, **kwargs):
+                return self.procedure(*args, **kwargs)
 
-        self.TP = TriggerProcedure(procedure)
-
-        return self.TP.__call__()
-
-    
-class Customer():
-    pass
+        return TriggerProcedure(procedure)
 
 
-@Trigger(Customer, 'before', 'insert')
-def insert_trigger(dataframe, new, old, current):
-    print("now we can have some fun :)")
+class TriggerTime(object):
+    before = 1
+    after = 2
 
 
-insert_trigger('test_dataframe', 'test_new', 'test_old', 'test_current')
+class TriggerAction(object):
+    insert = 1
+    read = 2
+    update = 3
+    delete = 4
+
+
+if __name__ == "__main__":
+
+    class Customer():
+        pass
+
+    @Trigger(Customer, "before", "insert")
+    def insert_trigger(dataframe, new, old, current):
+        print("now we can have some fun :)")
+
+
+    insert_trigger('test_dataframe', 'test_new', 'test_old', 'test_current')
