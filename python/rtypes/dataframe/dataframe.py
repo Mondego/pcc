@@ -18,6 +18,7 @@ from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event, Record
 from rtypes.dataframe.object_manager import ObjectManager
 from rtypes.dataframe.type_manager import TypeManager
 from rtypes.dataframe.change_manager import ChangeManager
+from rtypes.dataframe.trigger_manager import TriggerManager
 
 BASE_TYPES = set([])
 
@@ -44,6 +45,8 @@ class dataframe(object):
     ##.3c Allow object serialization to records.
     ##.3d Record buffers (new, mod, and deleted).
     ##.3e clear buffers
+
+    #.4 Trigger Management
     
     def __init__(self, name = str(uuid4())):
         # PCCs to be calculated only if it is in Master Mode.
@@ -190,3 +193,38 @@ class dataframe(object):
         return self.object_manager.clear_buffer()
 
     #############################################
+
+    ######## Trigger MANAGEMENT METHODS #########
+
+    def add_trigger(self, trigger_obj):
+        # can add a Trigger class into the trigger_manager into the dataframe
+        pass
+
+    def remove_trigger(self, trigger_obj):
+        # can remove a Trigger class from the trigger_manager into the dataframe
+        pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

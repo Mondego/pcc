@@ -16,4 +16,6 @@ if __name__ == "__main__":
         print("now we can have some fun :)")
 
 
-    insert_trigger('test_dataframe', 'test_new', 'test_old', 'test_current')
+    test = insert_trigger('test_dataframe', 'test_new', 'test_old', 'test_current')
+
+    print(type(insert_trigger))
