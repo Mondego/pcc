@@ -18,7 +18,8 @@ def get_type(obj):
         if hasattr(obj, "__iter__"):
             print obj
             return "collection"
-        if len(set([float, int, str, unicode, type(None)]).intersection(set(type(obj).mro()))) > 0:
+        if len(set([float, int, str, unicode, type(None)]).intersection(
+            set(type(obj).mro()))) > 0:
             return "primitive"
         if hasattr(obj, "__dict__"):
             return "object"
@@ -26,9 +27,13 @@ def get_type(obj):
         return "unknown"
     return "unknown"
 
-class spacetime_property(property):
+class rtype_property(property):
     change_tracker = RecursiveDictionary()
     GLOBAL_TRACKER = False
+    
+    def __repr__(self):
+        return self._name
+
     def __init__(self, tp, fget, fset = None, fdel = None, doc = None):
         setattr(self, "_type", tp)
         setattr(self, "_dimension", True)
@@ -41,7 +46,7 @@ class spacetime_property(property):
         property.__init__(self, fget, fset, fdel, doc)
 
     def setter(self, fset):
-        prop = spacetime_property(self._type, self.fget, fset)
+        prop = rtype_property(self._type, self.fget, fset)
         for a in self.__dict__:
             setattr(prop, a, self.__dict__[a])
         return prop
@@ -70,7 +75,7 @@ class spacetime_property(property):
                 obj._primarykey = self
             property.__set__(self, obj, value)
             return
-        if not self._primarykey and "_primarykey" != self._name and spacetime_property.GLOBAL_TRACKER:
+        if not self._primarykey and "_primarykey" != self._name and rtype_property.GLOBAL_TRACKER:
             type_name = get_type(value)
             store_value = value
             if type_name == "dependent":
@@ -78,7 +83,7 @@ class spacetime_property(property):
             elif type_name == "object":
                 store_value = dict(value.__dict__)
 
-            spacetime_property.change_tracker.setdefault(
+            rtype_property.change_tracker.setdefault(
                 currentThread().getName(), RecursiveDictionary()).setdefault(
                     obj.__class__, RecursiveDictionary()).setdefault(
                         obj.__primarykey__, dict())[self._name] = store_value
@@ -89,7 +94,7 @@ class primarykey(object):
         self.default = default
 
     def __call__(self, func):
-        x = spacetime_property(self.type, func)
+        x = rtype_property(self.type, func)
         
         x._primarykey = True
         return x
@@ -99,7 +104,7 @@ class dimension(object):
         self.type = tp if tp else "primitive"
 
     def __call__(self, func):
-        x = spacetime_property(self.type, func)
+        x = rtype_property(self.type, func)
         return x
     
 class aggregate_property(property):
@@ -121,7 +126,7 @@ class aggregate(object):
     __metaclass__ = ABCMeta
     def __init__(self, prop):
         setattr(self, "prop", prop)
-        if not isinstance(prop, spacetime_property):
+        if not isinstance(prop, rtype_property):
             raise TypeError("Cannot create aggregate type with given property")
 
     def __call__(self, func):
@@ -150,3 +155,22 @@ class maximum(aggregate):
 class minimum(aggregate):
     def on_call(self, list_of_target_prop):
         return min(list_of_target_prop)
+
+class namespace_property(property):
+    def __init__(self, tp, fget, fset = None, fdel = None, doc = None):
+        self._type = tp
+        property.__init__(self, fget, fset, fdel, doc)
+
+    def setter(self, fset):
+        prop = namespace_property(self._type, self.fget, fset)
+        for a in self.__dict__:
+            setattr(prop, a, self.__dict__[a])
+        return prop
+
+
+class namespace(object):
+    def __init__(self, cls):
+        self.type = cls
+    
+    def __call__(self, func):
+        return namespace_property(self.type, func)
