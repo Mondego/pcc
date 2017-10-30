@@ -19,6 +19,7 @@ from rtypes.dataframe.object_manager import ObjectManager
 from rtypes.dataframe.type_manager import TypeManager
 from rtypes.dataframe.change_manager import ChangeManager
 from rtypes.dataframe.trigger_manager import TriggerManager
+from rtypes.pcc.triggers import TriggerAction, TriggerTime
 
 BASE_TYPES = set([])
 
@@ -64,6 +65,9 @@ class dataframe(object):
         # The object that deals with record management
         self.change_manager = ChangeManager()
 
+        # The object that deals with trigger management
+        self.trigger_manager = TriggerManager()
+
         # Flag to see if the dataframe should keep a record of all changes.
         # Can be used to synchnronize between dataframes.
         self.start_recording = False
@@ -108,8 +112,14 @@ class dataframe(object):
         if (self.type_manager.check_for_new_insert(tp)
             and self.type_manager.check_obj_type_for_insert(tp, obj)):
             tp_obj = self.type_manager.get_requested_type(tp)
+            self.trigger_manager.execute_trigger(
+                tp_obj, TriggerTime.before, TriggerAction.create,
+                "dataframe", "new", "old", "current")
             records = self.object_manager.append(tp_obj, obj)
             self.change_manager.add_records(records)
+            self.trigger_manager.execute_trigger(
+                tp_obj, TriggerTime.after, TriggerAction.create,
+                "dataframe", "new", "old", "current")
 
     def extend(self, tp, objs):
         if (self.type_manager.check_for_new_insert(tp)):
@@ -117,26 +127,51 @@ class dataframe(object):
             for obj in objs:
                 # One pass through objects to see if the types match.
                self.type_manager.check_obj_type_for_insert(tp, obj)
+            # Do I use tp, tp_obj, or objs ?????????????????????????????????????/
+            self.trigger_manager.execute_trigger(
+                tp_obj, TriggerTime.before, TriggerAction.create,
+                "dataframe", "new", "old", "current")
             records = self.object_manager.extend(tp_obj, objs)
             self.change_manager.add_records(records)
+            self.trigger_manager.execute_trigger(
+                tp_obj, TriggerTime.after, TriggerAction.create,
+                "dataframe", "new", "old", "current")
 
     def get(self, tp, oid = None, parameters = None):
         # TODO: Add checks for tp
         if tp.__realname__ not in self.type_manager.observing_types:
             raise TypeError("%s Type is not registered for observing." % tp.__realname__)
         tp_obj = self.type_manager.get_requested_type(tp)
+        self.trigger_manager.execute_trigger(
+            tp_obj, TriggerTime.before, TriggerAction.read,
+            "dataframe", "new", "old", "current")
+        self.trigger_manager.execute_trigger(
+            tp_obj, TriggerTime.after, TriggerAction.read,
+            "dataframe", "new", "old", "current")
         return self.object_manager.get(tp_obj, parameters) if oid == None else self.object_manager.get_one(tp_obj, oid, parameters)
 
     def delete(self, tp, obj):
         # TODO: Add checks for tp
         tp_obj = self.type_manager.get_requested_type(tp)
+        self.trigger_manager.execute_trigger(
+            tp_obj, TriggerTime.before, TriggerAction.delete,
+            "dataframe", "new", "old", "current")
         records = self.object_manager.delete(tp_obj, obj)
+        self.trigger_manager.execute_trigger(
+            tp_obj, TriggerTime.after, TriggerAction.delete,
+            "dataframe", "new", "old", "current")
         self.change_manager.add_records(records)
 
     def delete_all(self, tp):
         # TODO: Add checks for tp
         tp_obj = self.type_manager.get_requested_type(tp)
+        self.trigger_manager.execute_trigger(
+            tp_obj, TriggerTime.before, TriggerAction.delete,
+            "dataframe", "new", "old", "current")
         records = self.object_manager.delete_all(tp_obj)
+        self.trigger_manager.execute_trigger(
+            tp_obj, TriggerTime.after, TriggerAction.delete,
+            "dataframe", "new", "old", "current")
         self.change_manager.add_records(records)
 
     def clear_joins(self):
