@@ -1,18 +1,24 @@
 class DFRequest(object):
     @property
-    def type_object(self): return self._tp_obj
+    def type_object(self):
+        return self._tp_obj
+
     @type_object.setter
-    def type_object(self, v): self._tp_obj = v
+    def type_object(self, v):
+        self._tp_obj = v
 
 class PutDFRequest(DFRequest):
     pass
 
 class GetDFRequest(DFRequest):
     @property
-    def token(self): return self._token
+    def token(self):
+        return self._token
+
     @token.setter
-    def token(self, v): self._token = v
-    
+    def token(self, v):
+        self._token = v
+
     @property
     def oid(self):
         try:
@@ -20,9 +26,10 @@ class GetDFRequest(DFRequest):
         except AttributeError:
             self._oid = None
             return self._oid
-        
+
     @oid.setter
-    def oid(self, v): self._oid = v
+    def oid(self, v):
+        self._oid = v
 
     @property
     def param(self):
@@ -33,7 +40,8 @@ class GetDFRequest(DFRequest):
             return self._param
         
     @param.setter
-    def param(self, v): self._param = v
+    def param(self, v):
+        self._param = v
 
 class AppendDFRequest(PutDFRequest):
     @property
@@ -45,8 +53,9 @@ class AppendDFRequest(PutDFRequest):
             return self._obj
         
     @obj.setter
-    def obj(self, v): self._obj = v
-        
+    def obj(self, v):
+        self._obj = v
+
 
 class ExtendDFRequest(PutDFRequest):
     @property
@@ -56,10 +65,11 @@ class ExtendDFRequest(PutDFRequest):
         except AttributeError:
             self._objs = list()
             return self._objs
-        
+
     @objs.setter
-    def objs(self, v): self._objs = v
-        
+    def objs(self, v):
+        self._objs = v
+
 class DeleteDFRequest(PutDFRequest):
     @property
     def obj(self):
@@ -68,9 +78,10 @@ class DeleteDFRequest(PutDFRequest):
         except AttributeError:
             self._obj = None
             return self._obj
-        
+
     @obj.setter
-    def obj(self, v): self._obj = v
+    def obj(self, v):
+        self._obj = v
 
 class DeleteAllDFRequest(PutDFRequest):
     pass
@@ -83,9 +94,10 @@ class ApplyChangesDFRequest(object):
         except AttributeError:
             self._df_changes = None
             return self._df_changes
-        
+
     @df_changes.setter
-    def df_changes(self, v): self._df_changes = v
+    def df_changes(self, v):
+        self._df_changes = v
 
     @property
     def except_app(self):
@@ -94,8 +106,7 @@ class ApplyChangesDFRequest(object):
         except AttributeError:
             self._except_app = None
             return self._except_app
-        
-    @except_app.setter
-    def except_app(self, v): self._except_app = v
 
-    
+    @except_app.setter
+    def except_app(self, v):
+        self._except_app = v

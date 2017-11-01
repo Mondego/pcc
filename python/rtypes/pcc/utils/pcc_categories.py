@@ -7,3 +7,4 @@ class PCCCategories(object):
     intersection = 6
     parameter = 7
     impure = 8
+    unknown_type = 9

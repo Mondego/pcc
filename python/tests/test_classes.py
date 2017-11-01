@@ -7,6 +7,7 @@ from rtypes.pcc.types.impure import impure
 from rtypes.pcc.types.parameter import parameter, ParameterMode
 from rtypes.pcc.types.join import join
 from rtypes.pcc.types.projection import projection
+from rtypes.pcc import this
 
 class NonPCC(object):
     pass
@@ -97,17 +98,37 @@ class ProjectLargeBase(object):
 class JoinSmallAndLargeBase(object):
     @primarykey(str)
     def oid(self):
-        return self._oid
-    @oid.setter
-    def oid(self, v):
-        self._oid = v
+        return self.sb.oid
     @namespace(SmallBase)
     def sb(self):
         return self._sb
     @sb.setter
     def sb(self, v):
         self._sb = v
+    @namespace(LargeBase)
+    def lb(self):
+        return self._lb
+    @lb.setter
+    def lb(self, v):
+        self._lb = v
+    
+    @staticmethod
+    def __predicate__(sb, lb):
+        return sb.oid == lb.oid and sb.sprop1 == lb.prop1
+
+@projection(this, this.oid, this.sb.oid, this.lb.prop1)
+@join(SmallBase, LargeBase)
+class ProjectedJoinSmallAndLargeBase(object):
+    @primarykey(str)
+    def oid(self):
+        return self.sb.oid
     @namespace(SmallBase)
+    def sb(self):
+        return self._sb
+    @sb.setter
+    def sb(self, v):
+        self._sb = v
+    @namespace(LargeBase)
     def lb(self):
         return self._lb
     @lb.setter

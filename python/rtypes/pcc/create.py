@@ -24,8 +24,27 @@ def __subset_generic_query(actual_class, collection, param):
             if actual_class.__predicate__(
                 *([item] if param == tuple() else [item] + list(param)))]
 
+def setup_join_obj(cls, objs):
+    final_obj = change_type(container(), cls)
+    used_namspaces = set()
+    for obj in objs:
+        found = False
+        for ns_obj in cls.__rtypes_metadata__.namespace_dimensions:
+            if isinstance(obj, ns_obj._type) and ns_obj._name not in used_namspaces:
+                used_namspaces.add(ns_obj._name)
+                setattr(final_obj, ns_obj._name, obj)
+                found = True
+                break
+        if not found:
+            TypeError(
+                "Could not find the namespace with the type {0} "
+                "to put obj of {1}".format(
+                    type(obj), obj))
+    return final_obj
+
+
 def __join_generic_query(actual_class, collections, param):
-    return [actual_class(*(list(one_cross) + list(param)))
+    return [setup_join_obj(actual_class, one_cross)
             for one_cross in product(*collections)
             if actual_class.__predicate__(*(list(one_cross) + list(param)))]
 
@@ -116,10 +135,11 @@ def __convert_to_grp(actual_class, list_of_objs):
     final_result = list()
     for obj in list_of_objs:
         agg_dict.setdefault(
-            getattr(obj, metadata.primarykey._name), list()).append(obj)
+            getattr(obj, metadata.group_by._name), list()).append(obj)
     for groupkey, objs_for_grp in agg_dict.items():
         obj = change_type(container(), actual_class)
         obj.__primarykey__ = groupkey
+        obj.__group_by__ = groupkey
         for dim in metadata.group_dimensions:
             setattr(
                 obj, dim._name, dim.on_call_func(

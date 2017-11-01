@@ -8,5 +8,5 @@ from rtypes.pcc.utils.pcc_categories import PCCCategories
 
 
 def pcc_set(actual_class):
-    build_required_attrs(actual_class, PCCCategories.pcc_set, set())
+    build_required_attrs(actual_class, PCCCategories.pcc_set, list())
     return actual_class

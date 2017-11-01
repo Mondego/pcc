@@ -503,10 +503,10 @@ def _join_example_data():
     return Person, Card, Transaction, RedAlert, [p1, p2, p3], [c1p1, c2p1, c1p2, c1p3], [t1, t2, t3, t4]
 
 update_json1 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id1": {
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     },
                     "dims": {
                         "oid": {
@@ -525,7 +525,7 @@ update_json1 = convert_json_to_proto({
                 },
                 "id2": {
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     },
                     "dims": {
                         "oid": {
@@ -544,8 +544,8 @@ update_json1 = convert_json_to_proto({
                 },
                 "id3": {
                     "types": {
-                        "Car": 1,
-                        "ActiveCar": 1
+                        "tests.transfer_dataframe_tests.Car": 1,
+                        "tests.transfer_dataframe_tests.ActiveCar": 1
                     },
                     "dims": {
                         "oid": {
@@ -564,9 +564,9 @@ update_json1 = convert_json_to_proto({
                 },
                 "id4": {
                     "types": {
-                        "Car": 1,
-                        "ActiveCar": 1,
-                        "RedActiveCar": 1
+                        "tests.transfer_dataframe_tests.Car": 1,
+                        "tests.transfer_dataframe_tests.ActiveCar": 1,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 1
                     },
                     "dims": {
                         "oid": {
@@ -586,10 +586,10 @@ update_json1 = convert_json_to_proto({
             }    
         })
 resp_json1 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id3": {
                     "types": {
-                        "ActiveCar": 1
+                        "tests.transfer_dataframe_tests.ActiveCar": 1
                     },
                     "dims": {
                         "oid": {
@@ -608,8 +608,8 @@ resp_json1 = convert_json_to_proto({
                 },
                 "id4": {
                     "types": {
-                        "ActiveCar": 1,
-                        "RedActiveCar": 1
+                        "tests.transfer_dataframe_tests.ActiveCar": 1,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 1
                     },
                     "dims": {
                         "oid": {
@@ -629,10 +629,10 @@ resp_json1 = convert_json_to_proto({
             }    
         })
 update_json2 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id2": {
                     "types": {
-                        "Car": 2
+                        "tests.transfer_dataframe_tests.Car": 2
                     },
                     "dims": {
                         "color": {
@@ -644,12 +644,12 @@ update_json2 = convert_json_to_proto({
             }    
         })
 update_json3 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id2": {
                     "types": {
-                        "Car": 2,
-                        "ActiveCar": 1,
-                        "RedActiveCar": 1
+                        "tests.transfer_dataframe_tests.Car": 2,
+                        "tests.transfer_dataframe_tests.ActiveCar": 1,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 1
                     },
                     "dims": {
                         "velocity": {
@@ -661,11 +661,11 @@ update_json3 = convert_json_to_proto({
             }    
         })
 update_json4 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id2": {
                     "types": {
-                        "ActiveCar": 1,
-                        "RedActiveCar": 1
+                        "tests.transfer_dataframe_tests.ActiveCar": 1,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 1
                     },
                     "dims": {
                         "oid": {
@@ -685,23 +685,23 @@ update_json4 = convert_json_to_proto({
             }    
         })
 update_json5 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id4": {
                     "types": {
-                        "Car": 0,
-                        "ActiveCar": 0,
-                        "RedActiveCar": 0
+                        "tests.transfer_dataframe_tests.Car": 0,
+                        "tests.transfer_dataframe_tests.ActiveCar": 0,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 0
                     }
                 }
             }    
         })
 update_json6 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id4": {
                     "types": {
-                        "Car": 2,
-                        "ActiveCar": 0,
-                        "RedActiveCar": 0
+                        "tests.transfer_dataframe_tests.Car": 2,
+                        "tests.transfer_dataframe_tests.ActiveCar": 0,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 0
                     },
                     "dims": {
                         "velocity": {
@@ -713,10 +713,10 @@ update_json6 = convert_json_to_proto({
             }    
         })
 update_json7 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id1": {
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     },
                     "dims": {
                         "oid": {
@@ -748,10 +748,10 @@ update_json7 = convert_json_to_proto({
             }    
         })
 update_json8 = convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id1": {
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     },
                     "dims": {
                         "oid": {
@@ -770,7 +770,7 @@ update_json8 = convert_json_to_proto({
                 },
                 "id2": {
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     },
                     "dims": {
                         "oid": {
@@ -789,7 +789,7 @@ update_json8 = convert_json_to_proto({
                 },
                 "id3": {
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     },
                     "dims": {
                         "oid": {
@@ -808,7 +808,7 @@ update_json8 = convert_json_to_proto({
                 },
                 "id4": {
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     },
                     "dims": {
                         "oid": {
@@ -828,7 +828,7 @@ update_json8 = convert_json_to_proto({
             }    
         })
 update_json9 = convert_json_to_proto(json.loads('''{
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "0fb70042-cb18-4d4c-8ec0-ddfe609f852a": {
                     "dims": {
                         "Color": {
@@ -881,7 +881,7 @@ update_json9 = convert_json_to_proto(json.loads('''{
                         }
                     },
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     }
                 },
                 "7ff34b19-7f30-4c5d-a246-f1668d3b89b9": {
@@ -936,13 +936,13 @@ update_json9 = convert_json_to_proto(json.loads('''{
                         }
                     },
                     "types": {
-                        "Car": 1
+                        "tests.transfer_dataframe_tests.Car": 1
                     }
                 }
             }
         }'''))
 update_json10 = convert_json_to_proto({
-    "Car": {
+    "tests.transfer_dataframe_tests.Car": {
         "586d5e49-2da7-4318-a09b-795744be9867": {
             "dims": {
                 "location": {
@@ -963,7 +963,7 @@ update_json10 = convert_json_to_proto({
                 }
             },
             "types": {
-                "Car": 1
+                "tests.transfer_dataframe_tests.Car": 1
             }
         },
         "8b2658fb-ab86-4e00-96bc-31952d8eb38f": {
@@ -986,14 +986,14 @@ update_json10 = convert_json_to_proto({
                 }
             },
             "types": {
-                "Car": 1
+                "tests.transfer_dataframe_tests.Car": 1
             }
         }
     }
 })
                       
 resp_json10 = convert_json_to_proto({
-    "Car": {
+    "tests.transfer_dataframe_tests.Car": {
         "586d5e49-2da7-4318-a09b-795744be9867": {
             "dims": {
                 "location": {
@@ -1010,7 +1010,7 @@ resp_json10 = convert_json_to_proto({
                 }
             },
             "types": {
-                "CarForPedestrian": 1
+                "tests.transfer_dataframe_tests.CarForPedestrian": 1
             }
         },
         "8b2658fb-ab86-4e00-96bc-31952d8eb38f": {
@@ -1029,7 +1029,7 @@ resp_json10 = convert_json_to_proto({
                 }
             },
             "types": {
-                "CarForPedestrian": 1
+                "tests.transfer_dataframe_tests.CarForPedestrian": 1
             }
         }
     }
@@ -1041,9 +1041,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.apply_changes(update_json1)
-        self.assertTrue(len(df.get(Car)) == 4)
-        self.assertTrue(len(df.get(ActiveCar)) == 2)
-        self.assertTrue(len(df.get(RedActiveCar)) == 1)
+        self.assertEqual(len(df.get(Car)), 4)
+        self.assertEqual(len(df.get(ActiveCar)), 2)
+        self.assertEqual(len(df.get(RedActiveCar)), 1)
 
     def test_dataframe_apply_mod1(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
@@ -1053,7 +1053,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         
         df.apply_changes(update_json2)
         self.assertTrue(len(df.get(Car)) == 5)
-        self.assertTrue(df.object_manager.object_map["Car"]["id2"].color == "GREEN")  
+        self.assertTrue(
+            df.object_manager.object_map[
+                "tests.transfer_dataframe_tests.Car"]["id2"].color == "GREEN")  
 
     def test_dataframe_apply_mod2(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
@@ -1135,7 +1137,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
             c.velocity = 0
         #print json.dumps(df.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
         self.assertTrue(df.get_record() == convert_json_to_proto({
-            "Car" :{
+            "tests.transfer_dataframe_tests.Car" :{
                 "id4" :{
                     "dims" :{
                         "velocity" :{
@@ -1144,9 +1146,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types" :{
-                        "ActiveCar" :0,
-                        "Car" :2,
-                        "RedActiveCar" :0
+                        "tests.transfer_dataframe_tests.ActiveCar" :0,
+                        "tests.transfer_dataframe_tests.Car" :2,
+                        "tests.transfer_dataframe_tests.RedActiveCar" :0
                     }
                 },
                 "id5" :{
@@ -1157,9 +1159,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types" :{
-                        "ActiveCar" :0,
-                        "Car" :2,
-                        "RedActiveCar" :0
+                        "tests.transfer_dataframe_tests.ActiveCar" :0,
+                        "tests.transfer_dataframe_tests.Car" :2,
+                        "tests.transfer_dataframe_tests.RedActiveCar" :0
                     }
                 }
             }
@@ -1175,7 +1177,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
             c.velocity += 1
         #print json.dumps(df.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
         self.assertTrue(df.get_record() == convert_json_to_proto({
-            "Car": {
+            "tests.transfer_dataframe_tests.Car": {
                 "id1": {
                     "dims": {
                         "color": {
@@ -1192,8 +1194,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types": {
-                        "ActiveCar": 1,
-                        "Car": 2
+                        "tests.transfer_dataframe_tests.ActiveCar": 1,
+                        "tests.transfer_dataframe_tests.Car": 2
                     }
                 },
                 "id2": {
@@ -1212,9 +1214,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types": {
-                        "ActiveCar": 1,
-                        "Car": 2,
-                        "RedActiveCar": 1
+                        "tests.transfer_dataframe_tests.ActiveCar": 1,
+                        "tests.transfer_dataframe_tests.Car": 2,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 1
                     }
                 },
                 "id3": {
@@ -1225,8 +1227,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types": {
-                        "ActiveCar": 2,
-                        "Car": 2
+                        "tests.transfer_dataframe_tests.ActiveCar": 2,
+                        "tests.transfer_dataframe_tests.Car": 2
                     }
                 },
                 "id4": {
@@ -1237,9 +1239,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types": {
-                        "ActiveCar": 2,
-                        "Car": 2,
-                        "RedActiveCar": 2
+                        "tests.transfer_dataframe_tests.ActiveCar": 2,
+                        "tests.transfer_dataframe_tests.Car": 2,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 2
                     }
                 },
                 "id5": {
@@ -1250,9 +1252,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
                         }
                     },
                     "types": {
-                        "ActiveCar": 2,
-                        "Car": 2,
-                        "RedActiveCar": 2
+                        "tests.transfer_dataframe_tests.ActiveCar": 2,
+                        "tests.transfer_dataframe_tests.Car": 2,
+                        "tests.transfer_dataframe_tests.RedActiveCar": 2
                     }
                 }
             }
@@ -1459,9 +1461,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.extend(Car, cars)
         serialized = df.serialize_all()
         self.assertTrue(len(serialized["gc"]) == 1)
-        self.assertTrue("Car" in serialized["gc"])
-        self.assertTrue(len(serialized["gc"]["Car"]) == 2)
-        for oid, obj_c in serialized["gc"]["Car"].items():
+        self.assertTrue("tests.transfer_dataframe_tests.Car" in serialized["gc"])
+        self.assertTrue(len(serialized["gc"]["tests.transfer_dataframe_tests.Car"]) == 2)
+        for oid, obj_c in serialized["gc"]["tests.transfer_dataframe_tests.Car"].items():
             self.assertTrue(len(obj_c["dims"]) == 4)
             self.assertTrue(len(obj_c["types"]) == 2)
 

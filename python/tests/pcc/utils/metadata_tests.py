@@ -32,11 +32,11 @@ class test_metadata(unittest.TestCase):
     def test_small_base(self):
         small_meta = tc.SmallBase.__rtypes_metadata__
         self.assertEqual("tests.test_classes.SmallBase", small_meta.name)
-        self.assertEqual("tests.test_classes.SmallBase", small_meta.group_name)
+        self.assertEqual("tests.test_classes.SmallBase", small_meta.groupname)
         self.assertEqual(small_meta, small_meta.group_type)
-        self.assertEqual(set(), small_meta.parents)
+        self.assertListEqual(list(), small_meta.parents)
         self.assertEqual(set([small_meta]), small_meta.group_members)
-        self.assertListEqual(list(), small_meta.parameter_types)
+        self.assertDictEqual(dict(), small_meta.parameter_types)
         self.assertEqual(tc.SmallBase.oid, small_meta.primarykey)
         self.assertEqual(None, small_meta.predicate)
         self.assertEqual(None, small_meta.limit)
@@ -52,16 +52,16 @@ class test_metadata(unittest.TestCase):
         self.assertEqual(
             "tests.test_classes.LargeBase", large_meta.name)
         self.assertEqual(
-            "tests.test_classes.LargeBase", large_meta.group_name)
+            "tests.test_classes.LargeBase", large_meta.groupname)
         self.assertEqual(large_meta, large_meta.group_type)
-        self.assertEqual(set(), large_meta.parents)
+        self.assertListEqual(list(), large_meta.parents)
         self.assertEqual(
             set([large_meta,
                  tc.InheritedSubsetLargeBase.__rtypes_metadata__,
                  tc.SubsetLargeBase.__rtypes_metadata__,
                  tc.ProjectLargeBase.__rtypes_metadata__]),
             large_meta.group_members)
-        self.assertListEqual(list(), large_meta.parameter_types)
+        self.assertDictEqual(dict(), large_meta.parameter_types)
         self.assertEqual(tc.LargeBase.oid, large_meta.primarykey)
         self.assertEqual(None, large_meta.predicate)
         self.assertEqual(None, large_meta.limit)
@@ -89,9 +89,9 @@ class test_metadata(unittest.TestCase):
         self.assertEqual(
             "tests.test_classes.SubsetLargeBase", subset_large_meta.name)
         self.assertEqual(
-            "tests.test_classes.LargeBase", subset_large_meta.group_name)
+            "tests.test_classes.LargeBase", subset_large_meta.groupname)
         self.assertEqual(large_meta, subset_large_meta.group_type)
-        self.assertEqual(set([large_meta]), subset_large_meta.parents)
+        self.assertListEqual([large_meta], subset_large_meta.parents)
         self.assertEqual(
             set([tc.LargeBase.__rtypes_metadata__,
                  subset_large_meta,
@@ -99,7 +99,7 @@ class test_metadata(unittest.TestCase):
                  tc.SubsetLargeBase.__rtypes_metadata__,
                  tc.ProjectLargeBase.__rtypes_metadata__]),
             subset_large_meta.group_members)
-        self.assertListEqual(list(), subset_large_meta.parameter_types)
+        self.assertDictEqual(dict(), subset_large_meta.parameter_types)
         self.assertEqual(tc.SubsetLargeBase.oid, subset_large_meta.primarykey)
         self.assertEqual(
             tc.SubsetLargeBase.__predicate__, subset_large_meta.predicate)
@@ -125,9 +125,9 @@ class test_metadata(unittest.TestCase):
             "tests.test_classes.InheritedSubsetLargeBase",
             subset_large_meta.name)
         self.assertEqual(
-            "tests.test_classes.LargeBase", subset_large_meta.group_name)
+            "tests.test_classes.LargeBase", subset_large_meta.groupname)
         self.assertEqual(large_meta, subset_large_meta.group_type)
-        self.assertEqual(set([large_meta]), subset_large_meta.parents)
+        self.assertListEqual([large_meta], subset_large_meta.parents)
         self.assertEqual(
             set([tc.LargeBase.__rtypes_metadata__,
                  subset_large_meta,
@@ -135,7 +135,7 @@ class test_metadata(unittest.TestCase):
                  tc.SubsetLargeBase.__rtypes_metadata__,
                  tc.ProjectLargeBase.__rtypes_metadata__]),
             subset_large_meta.group_members)
-        self.assertListEqual(list(), subset_large_meta.parameter_types)
+        self.assertDictEqual(dict(), subset_large_meta.parameter_types)
         self.assertEqual(
             tc.InheritedSubsetLargeBase.oid, subset_large_meta.primarykey)
         self.assertEqual(
@@ -162,10 +162,8 @@ class test_metadata(unittest.TestCase):
         self.assertEqual(
             "tests.test_classes.ProjectLargeBase",
             project_large_meta.name)
-        self.assertEqual(
-            "tests.test_classes.LargeBase", project_large_meta.group_name)
         self.assertEqual(large_meta, project_large_meta.group_type)
-        self.assertEqual(set([large_meta]), project_large_meta.parents)
+        self.assertListEqual([large_meta], project_large_meta.parents)
         self.assertEqual(
             set([tc.LargeBase.__rtypes_metadata__,
                  project_large_meta,
@@ -173,7 +171,7 @@ class test_metadata(unittest.TestCase):
                  tc.SubsetLargeBase.__rtypes_metadata__,
                  tc.ProjectLargeBase.__rtypes_metadata__]),
             project_large_meta.group_members)
-        self.assertListEqual(list(), project_large_meta.parameter_types)
+        self.assertDictEqual(dict(), project_large_meta.parameter_types)
         self.assertEqual(
             tc.ProjectLargeBase.oid, project_large_meta.primarykey)
         self.assertEqual(None, project_large_meta.limit)

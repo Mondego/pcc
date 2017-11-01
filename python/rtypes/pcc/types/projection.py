@@ -17,5 +17,5 @@ class projection(object):
         # actual_class the class that is being passed from application.
         build_required_attrs(
             actual_class, PCCCategories.projection,
-            set([self.type]), self.dimensions)
+            [self.type], self.dimensions)
         return actual_class

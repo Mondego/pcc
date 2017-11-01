@@ -15,5 +15,5 @@ class union(object):
     def __call__(self, actual_class):
         # actual_class the class that is being passed from application.
         build_required_attrs(
-            actual_class, PCCCategories.union, set(self.types))
+            actual_class, PCCCategories.union, self.types)
         return actual_class

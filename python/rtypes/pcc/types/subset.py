@@ -13,5 +13,5 @@ class subset(object):
 
     def __call__(self, actual_class):
         build_required_attrs(
-            actual_class, PCCCategories.subset, set([self.type]))
+            actual_class, PCCCategories.subset, [self.type])
         return actual_class

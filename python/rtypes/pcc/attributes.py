@@ -158,6 +158,7 @@ class minimum(aggregate):
 
 class namespace_property(property):
     def __init__(self, tp, fget, fset = None, fdel = None, doc = None):
+        self._name = fget.func_name
         self._type = tp
         property.__init__(self, fget, fset, fdel, doc)
 

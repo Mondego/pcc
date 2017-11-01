@@ -23,13 +23,12 @@ class QueueManager(object):
     #################################################
     ### Static Methods ##############################
     #################################################
-    
-    
-    
+
     #################################################
     ### API Methods #################################
     #################################################
-    def add_records(self, applied_records, pcc_change_records, except_app = None):
+
+    def add_records(self, applied_records, pcc_change_records, except_app=None):
         application_to_record = dict()
 
         with self.add_lock:
@@ -46,17 +45,20 @@ class QueueManager(object):
         q = Queue()
         with self.add_lock:
             for t in app_queue.types:
-                self.type_map.setdefault(t.__realname__, list()).append(app_queue.app_name)
+                self.type_map.setdefault(
+                    t.__rtypes_metadata__.name, list()).append(
+                        app_queue.app_name)
             self.queues[app_queue.app_name] = q
         return q
 
     #################################################
     ### Private Methods #############################
     #################################################
-    
+
     def _add_tp_app_record(self, rec, application_to_record, except_app = None):
         event, tpname, groupname, oid, dim_change, full_obj, fk_for_tp = (
-            rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change, rec.full_obj, rec.fk_type)
+            rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change,
+            rec.full_obj, rec.fk_type)
         if tpname in self.type_map:
             for app in self.type_map[tpname]:
                 if app != except_app:
