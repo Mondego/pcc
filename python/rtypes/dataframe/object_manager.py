@@ -287,13 +287,6 @@ class ObjectManager(object):
             return [ChangeRecord(Event.Delete, tp_obj, oid, None, None)]
         return records
 
-    def delete_all(self, tp_obj):
-        records = []
-        if tp_obj.name in self.object_map:
-            for obj in self.object_map[tp_obj.name].values():
-                records.extend(self.delete(tp_obj, obj))
-        return records
-
     def apply_changes(self, df_changes, except_df = None):
         # see __create_objs function for the format of df_changes
         # if master: send changes to all other dataframes attached.

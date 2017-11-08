@@ -4,9 +4,6 @@ from enums import ObjectType
 import os
 import bisect
 
-time_map = {"1": "before", "2": "after"}
-action_map = {"1":"insert", "2":"read", "3":"update", "4":"delete", }
-
 
 class TriggerManager(object):
     """Used to regulate all trigger's that exist in the dataframe.
@@ -61,21 +58,7 @@ class TriggerManager(object):
         for obj in trigger_objs:
             self.__add_trigger(obj)
 
-    def get_trigger(self, tp, time, action):
-        """Method used to get a TriggerProcedure obj attached to a PCC Type.
-
-            Args:
-                tp (PCC Type): Used to determine if the type has an trigger attached to it
-                time (str): Used to specify the activation time of the trigger
-                action (str): Used to specify the activation action of the trigger
-
-            Returns:
-                list: This is a list of TriggerProcedure objs that are associated with
-                      the specified type and activated at the specified time + action
-        """
-        return self.__get_trigger(tp, time, action)
-
-    def execute_trigger(self, tp, time, action, dataframe, new, old, current):
+    def execute_trigger(self, tp_obj, time, action, dataframe, new, old, current):
         """Method used to execute one specific TriggerProcedure obj. 
            Only executes TriggerProcedure objs that meet the specified criteria.
            Passes in arguments "dataframe", "new", "old", and "current" into the procedure
@@ -93,28 +76,8 @@ class TriggerManager(object):
                 None: Does not return anything, only activates procedure objects
         """
         # What arguments would I need in order to allow the trigger to execute ???????
-        self.__execute_trigger(tp, time, action, dataframe, new, old, current)
+        self.__execute_trigger(tp_obj, time, action, dataframe, new, old, current)
         return True # CHANGE THIS WHEN DONE TESTING ??????????????????????????????????????
-
-    def execute_triggers(self, tps, time, action, dataframe, new, old, current):
-        """Method used to execute multiple specific TriggerProcedure objs. 
-           Only executes TriggerProcedure objs that meet the specified criteria.
-           Passes in arguments "dataframe", "new", "old", and "current" into the procedure
-
-            Args:
-                tp (PCC Type): Used to determine if the type has an trigger attached to it
-                time (str): Used to specify the activation time of the trigger
-                action (str): Used to specify the activation action of the trigger
-                dataframe (???): n/a
-                new (???): n/a
-                old (???): n/a
-                current (???): n/a
-
-            Returns:
-                None: Does not return anything, only activates procedure objects
-        """
-        for tp in tps:
-            self.__execute_trigger(tp, time, action, dataframe, new, old, current)
 
     def remove_trigger(self, trigger_obj):
         """Method used to remove TriggerProcedure objs from the trigger_map.
@@ -129,6 +92,9 @@ class TriggerManager(object):
                 None: Does not return anything, only deletes TriggerProcedure obj
         """
         self.__remove_trigger(trigger_obj)
+
+    def trigger_exists(self, tp_obj, time, action):
+       return self.__trigger_in_map(tp_obj.type, time, action)
 
     #################################################
     ### Private Methods #############################
@@ -210,14 +176,15 @@ class TriggerManager(object):
                 None: Does not return anything, only deletes TriggerProcedure obj
         """
         # If the trigger exist in the trigger_map, remove the Procedure from the map
-        if self.__trigger_exist_in_map(trigger_obj):
+        if self.__trigger_obj_in_map(trigger_obj):
             # print(self.procedure_index_location(trigger_obj))
             self.__get_trigger(trigger_obj.pcc_type,
                                trigger_obj.time,
                                trigger_obj.action).pop(
                                    self.__procedure_index_location(trigger_obj))
         else:
-            raise ValueError(str(trigger_obj.pcc_type) + " does not have any triggers attached to the dataframe")
+            raise ValueError(str(trigger_obj.pcc_type)
+                             + " does not have any triggers attached to the dataframe")
 
     def __procedure_index_location(self, trigger_obj):
         """Method determines index position of a TriggerProcedure object in the 
@@ -243,7 +210,7 @@ class TriggerManager(object):
                 == trigger_obj.procedure.__name__):
                 return index
 
-    def __trigger_exist_in_map(self, trigger_obj):
+    def __trigger_obj_in_map(self, trigger_obj):
         """Method determines if the TriggerProcedure obj exist in the trigger_map.
 
             Args:
@@ -253,9 +220,11 @@ class TriggerManager(object):
             Returns:
                 bool: True if the TriggerProcedure exist in the trigger_map, else False
         """
-        return ((trigger_obj.pcc_type in self.trigger_map)
-                and ((trigger_obj.time + trigger_obj.action)
-                in self.trigger_map[trigger_obj.pcc_type])
-                and (trigger_obj
-                in self.trigger_map[trigger_obj.pcc_type][trigger_obj.time
-                                                          + trigger_obj.action]))
+        return self.__trigger_in_map(
+            trigger_obj.pcc_type, trigger_obj.time, trigger_obj.action)
+
+    def __trigger_in_map(self, tp, time ,action):
+        try:
+            return len(self.trigger_map[tp][time + action]) != 0
+        except KeyError:
+            return False

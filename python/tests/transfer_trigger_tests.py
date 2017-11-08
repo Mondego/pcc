@@ -27,9 +27,6 @@ def create_triggers():
     @trigger(Customer, TriggerTime.before, TriggerAction.create, 1)
     def before_create(dataframe, new, old, current):
         print("[BEFORE create] - Procedure Executed")
-        # print("pcc type: " + str(before_create.pcc_type) + " of kind [" + \
-        # (time_map[str(before_create.time)] + action_map[str(before_create.action)]) + \
-        # "] -- executed")
 
     @trigger(Customer, TriggerTime.after, TriggerAction.create, 1)
     def after_create(dataframe, new, old, current):
@@ -190,18 +187,6 @@ class Test_trigger_transfer_test(unittest.TestCase):
             # Check that this kind of trigger has a TriggerProcedure in it's list
             self.assertTrue(TriggerProcedure == type(TM.trigger_map[Customer][t_kind][0]))
 
-    def test_trigger_manager_get_trigger(self):
-        TM = TriggerManager()
-        TM.add_triggers(list(create_triggers()))
-
-        # Check that specifying a pcc_type, time, and action gets the correct trigger
-        #   and that it works for all kinds of triggers 
-        # Also, Check that every kind of trigger has a TriggerProcedure in it's list
-        for time, action in trigger_kinds_seprate():
-            self.assertTrue(
-                type(TM.get_trigger(
-                    Customer, time, action)[0]) == TriggerProcedure)
-
     def test_trigger_manager_execute_trigger(self):
         TM = TriggerManager()
         
@@ -218,10 +203,10 @@ class Test_trigger_transfer_test(unittest.TestCase):
         TM.add_triggers(create_triggers())
 
         for time, action in trigger_kinds_seprate():
-            self.assertTrue(TM.get_trigger(Customer, time, action) != [])
+            self.assertTrue(TM.trigger_map[Customer][time + action] != [])
 
         for trigger in create_triggers():
             TM.remove_trigger(trigger)
 
         for time, action in trigger_kinds_seprate():
-            self.assertTrue(TM.get_trigger(Customer, time, action) == [])
+            self.assertTrue(TM.trigger_map[Customer][time + action] == [])

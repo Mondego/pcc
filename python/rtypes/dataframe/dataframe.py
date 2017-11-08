@@ -114,28 +114,27 @@ class dataframe(object):
             tp_obj = self.type_manager.get_requested_type(tp)
             self.trigger_manager.execute_trigger(
                 tp_obj, TriggerTime.before, TriggerAction.create,
-                "dataframe", "new", "old", "current")
+                self, obj, None, None)
             records = self.object_manager.append(tp_obj, obj)
             self.change_manager.add_records(records)
             self.trigger_manager.execute_trigger(
                 tp_obj, TriggerTime.after, TriggerAction.create,
-                "dataframe", "new", "old", "current")
+                self, obj, None, obj)
 
     def extend(self, tp, objs):
         if (self.type_manager.check_for_new_insert(tp)):
             tp_obj = self.type_manager.get_requested_type(tp)
             for obj in objs:
                 # One pass through objects to see if the types match.
-               self.type_manager.check_obj_type_for_insert(tp, obj)
-            # Do I use tp, tp_obj, or objs ?????????????????????????????????????/
-            self.trigger_manager.execute_trigger(
-                tp_obj, TriggerTime.before, TriggerAction.create,
-                "dataframe", "new", "old", "current")
-            records = self.object_manager.extend(tp_obj, objs)
-            self.change_manager.add_records(records)
-            self.trigger_manager.execute_trigger(
-                tp_obj, TriggerTime.after, TriggerAction.create,
-                "dataframe", "new", "old", "current")
+                self.type_manager.check_obj_type_for_insert(tp, obj)
+                self.trigger_manager.execute_trigger(
+                    tp_obj, TriggerTime.before, TriggerAction.create,
+                    self, obj, None, None)
+
+                self.change_manager.add_records(self.object_manager.append(tp_obj, obj))
+                self.trigger_manager.execute_trigger(
+                    tp_obj, TriggerTime.after, TriggerAction.create,
+                    self, obj, None, obj)
 
     def get(self, tp, oid = None, parameters = None):
         # TODO: Add checks for tp
@@ -144,35 +143,42 @@ class dataframe(object):
         tp_obj = self.type_manager.get_requested_type(tp)
         self.trigger_manager.execute_trigger(
             tp_obj, TriggerTime.before, TriggerAction.read,
-            "dataframe", "new", "old", "current")
-        self.trigger_manager.execute_trigger(
-            tp_obj, TriggerTime.after, TriggerAction.read,
-            "dataframe", "new", "old", "current")
-        return self.object_manager.get(tp_obj, parameters) if oid == None else self.object_manager.get_one(tp_obj, oid, parameters)
+            self, None, None, None)
+        objs = ([self.object_manager.get(tp_obj, parameters)]
+                if oid is None else
+                self.object_manager.get_one(tp_obj, oid, parameters))
+        if self.trigger_manager.trigger_exists(
+            tp_obj, TriggerTime.after, TriggerAction.read):
+            for obj in objs:
+                self.trigger_manager.execute_trigger(
+                    tp_obj, TriggerTime.after, TriggerAction.read,
+                    self, None, obj, obj)
+        return objs[0] if oid is not None else objs
 
     def delete(self, tp, obj):
         # TODO: Add checks for tp
         tp_obj = self.type_manager.get_requested_type(tp)
         self.trigger_manager.execute_trigger(
             tp_obj, TriggerTime.before, TriggerAction.delete,
-            "dataframe", "new", "old", "current")
+            self, None, obj, obj)
         records = self.object_manager.delete(tp_obj, obj)
         self.trigger_manager.execute_trigger(
             tp_obj, TriggerTime.after, TriggerAction.delete,
-            "dataframe", "new", "old", "current")
+            self, None, obj, None)
         self.change_manager.add_records(records)
 
     def delete_all(self, tp):
         # TODO: Add checks for tp
         tp_obj = self.type_manager.get_requested_type(tp)
-        self.trigger_manager.execute_trigger(
-            tp_obj, TriggerTime.before, TriggerAction.delete,
-            "dataframe", "new", "old", "current")
-        records = self.object_manager.delete_all(tp_obj)
-        self.trigger_manager.execute_trigger(
-            tp_obj, TriggerTime.after, TriggerAction.delete,
-            "dataframe", "new", "old", "current")
-        self.change_manager.add_records(records)
+        if tp_obj.name in self.object_map:
+            for obj in self.object_map[tp_obj.name].values():
+                self.trigger_manager.execute_trigger(
+                    tp_obj, TriggerTime.before, TriggerAction.delete,
+                    self, None, obj, obj)
+                self.change_manager.add_records(self.object_manager.delete(tp_obj, obj))
+                self.trigger_manager.execute_trigger(
+                    tp_obj, TriggerTime.after, TriggerAction.delete,
+                    self, None, obj, None)
 
     def clear_joins(self):
         for tp_obj in self.type_manager.get_join_types():
