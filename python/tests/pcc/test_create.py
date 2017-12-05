@@ -109,7 +109,7 @@ class test_create(unittest.TestCase):
         self.assertFalse(hasattr(pl3, "prop3"))
         self.assertFalse(hasattr(pl3, "prop4"))
 
-    def test_join_create1(self):
+  def test_join_create1(self):
         join_list = create(tc.JoinSmallAndLargeBase, self.small_bases, self.large_bases)
         self.assertEqual(1, len(join_list))
         jl1 = join_list[0]
