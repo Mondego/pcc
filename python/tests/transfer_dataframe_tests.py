@@ -9,7 +9,8 @@ from rtypes.dataframe.dataframe_client import dataframe_client
 from rtypes.pcc.types.parameter import parameter, ParameterMode
 from rtypes.pcc.types.join import join
 from rtypes.pcc.types.projection import projection
-from rtypes.dataframe.dataframe_changes.dataframe_changes_json import DataframeChanges, Record, Event
+from rtypes.pcc.utils.enums import Event, Record
+from rtypes.dataframe.dataframe_changes.dataframe_changes_json import DataframeChanges
 from rtypes.dataframe.application_queue import ApplicationQueue
 
 import unittest, json
@@ -1505,9 +1506,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
             i += 1
         values = df.get_record()
         df_c.apply_changes(values)
-        self.assertTrue(len(df_c.get(Car)) == 1000)
-        self.assertTrue(len(df_c.get(ActiveCar)) == 666)
-        self.assertTrue(len(df_c.get(RedActiveCar)) == 157)
+        self.assertEqual(1000, len(df_c.get(Car)))
+        self.assertEqual(666, len(df_c.get(ActiveCar)))
+        self.assertEqual(166, len(df_c.get(RedActiveCar)))
         
         
         

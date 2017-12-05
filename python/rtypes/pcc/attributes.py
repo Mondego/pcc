@@ -34,7 +34,11 @@ class rtype_property(property):
     def __repr__(self):
         return self._name
 
-    def __init__(self, tp, fget, fset = None, fdel = None, doc = None):
+    def __hash__(self):
+        return hash(
+            (self._type, self._dimension, self._name, self._primarykey))
+
+    def __init__(self, tp, fget, fset=None, fdel=None, doc=None):
         setattr(self, "_type", tp)
         setattr(self, "_dimension", True)
         setattr(self, "_name", fget.func_name)
@@ -60,14 +64,20 @@ class rtype_property(property):
         property.__set__(self, obj, value)
         if not hasattr(obj, "__start_tracking__"):
             return
-        if hasattr(obj, "_dataframe_data") and obj._dataframe_data and hasattr(obj, "__primarykey__") and obj.__primarykey__:
+        if (hasattr(obj, "_dataframe_data")
+                and obj._dataframe_data
+                and hasattr(obj, "__primarykey__")
+                and obj.__primarykey__):
             if obj.__start_tracking__:
                 tp_getter, tr, gr, rr = obj._dataframe_data
                 tp_obj = tp_getter(obj.__class__)
-                #rc(obj.__primarykey__, self, value, tp_obj)
-                records = (gr(tp_obj, obj.__primarykey__, {self: value}))
-                records.extend(tr(tp_obj, {obj.__primarykey__: (obj, {self: value})}, to_be_converted = True))
-                rr(records)
+                applied_records = (
+                    gr(tp_obj, obj.__primarykey__, {self: value}))
+                pcc_change_records = (
+                    tr(tp_obj,
+                       {obj.__primarykey__: (obj, {self: value})},
+                       to_be_converted = True))
+                rr(applied_records, pcc_change_records)
                     
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
@@ -75,7 +85,9 @@ class rtype_property(property):
                 obj._primarykey = self
             property.__set__(self, obj, value)
             return
-        if not self._primarykey and "_primarykey" != self._name and rtype_property.GLOBAL_TRACKER:
+        if (not self._primarykey
+                and "_primarykey" != self._name
+                and rtype_property.GLOBAL_TRACKER):
             type_name = get_type(value)
             store_value = value
             if type_name == "dependent":
@@ -89,7 +101,7 @@ class rtype_property(property):
                         obj.__primarykey__, dict())[self._name] = store_value
 
 class primarykey(object):
-    def __init__(self, tp = None, default = True):
+    def __init__(self, tp=None, default=True):
         self.type = tp if tp else "primitive"
         self.default = default
 
@@ -100,7 +112,7 @@ class primarykey(object):
         return x
 
 class dimension(object):
-    def __init__(self, tp = None):
+    def __init__(self, tp=None):
         self.type = tp if tp else "primitive"
 
     def __call__(self, func):
@@ -108,14 +120,17 @@ class dimension(object):
         return x
     
 class aggregate_property(property):
-    def __init__(self, prop, on_call_func, fget = None, fset = None, fdel = None, doc = None):
+    def __init__(
+            self, prop, on_call_func,
+            fget=None, fset=None, fdel=None, doc=None):
         setattr(self, "_name", fget.func_name)
         setattr(self, "_target_prop", prop)
         self.on_call_func = on_call_func
         return property.__init__(self, fget, fset, fdel, doc)
 
     def setter(self, fset):
-        prop = aggregate_property(self._target_prop, self.on_call_func, self.fget, fset)
+        prop = aggregate_property(
+            self._target_prop, self.on_call_func, self.fget, fset)
         for a in self.__dict__:
             setattr(prop, a, self.__dict__[a])
         return prop
@@ -134,7 +149,8 @@ class aggregate(object):
 
     @abstractmethod
     def on_call(self, list_of_target_prop):
-        raise NotImplementedError("Abstract class implementation. Not to be called.")
+        raise NotImplementedError(
+            "Abstract class implementation. Not to be called.")
 
 class summation(aggregate):
     def on_call(self, list_of_target_prop):
@@ -146,7 +162,8 @@ class count(aggregate):
 
 class average(aggregate):
     def on_call(self, list_of_target_prop):
-        return float(sum(list_of_target_prop)) / float(len(list_of_target_prop))
+        return float(
+            sum(list_of_target_prop)) / float(len(list_of_target_prop))
 
 class maximum(aggregate):
     def on_call(self, list_of_target_prop):
@@ -157,7 +174,7 @@ class minimum(aggregate):
         return min(list_of_target_prop)
 
 class namespace_property(property):
-    def __init__(self, tp, fget, fset = None, fdel = None, doc = None):
+    def __init__(self, tp, fget, fset=None, fdel=None, doc=None):
         self._name = fget.func_name
         self._type = tp
         property.__init__(self, fget, fset, fdel, doc)

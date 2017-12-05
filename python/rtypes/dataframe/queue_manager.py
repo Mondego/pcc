@@ -11,6 +11,8 @@ class QueueManager(object):
         self.df_to_tp = dict()
 
         self.attached_dataframes = set()
+        
+        self.all_types_dataframes = set()
 
         self.tp_to_attached_df = dict()
 
@@ -49,6 +51,8 @@ class QueueManager(object):
                     t.__rtypes_metadata__.name, list()).append(
                         app_queue.app_name)
             self.queues[app_queue.app_name] = q
+            if app_queue.all:
+                self.all_types_dataframes.add(app_queue.app_name)
         return q
 
     #################################################
@@ -59,11 +63,12 @@ class QueueManager(object):
         event, tpname, groupname, oid, dim_change, full_obj, fk_for_tp = (
             rec.event, rec.tpname, rec.groupname, rec.oid, rec.dim_change,
             rec.full_obj, rec.fk_type)
+        applist = self.all_types_dataframes
         if tpname in self.type_map:
-            for app in self.type_map[tpname]:
-                if app != except_app:
-                    application_to_record.setdefault(app, list()).append(rec)
+            applist.union(self.type_map[tpname])
         elif fk_for_tp and fk_for_tp in self.type_map:
-            for app in self.type_map[fk_for_tp]:
-                if app != except_app:
-                    application_to_record.setdefault(app, list()).append(rec)
+            applist.union(self.type_map[fk_for_tp])
+
+        for app in applist:
+            if app != except_app:
+                application_to_record.setdefault(app, list()).append(rec)

@@ -106,8 +106,11 @@ def __create_pcc(actual_class, params, collections):
                  for item in actual_class.__query__(
                      *(list(collections) + list(params)))]
     else:
-        items = __generic_query[metadata.final_category](
-            actual_class, collections, params)
+        citems = collections
+        for category in metadata.category_execution_order:
+            citems = (__generic_query[category](
+                actual_class, citems, params),)
+        items = citems[0]
     if hasattr(actual_class, "__order_by__"):
         items = sorted(items, key = actual_class.__order_by__)
     if hasattr(actual_class, "__limit__"):

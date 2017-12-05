@@ -4,8 +4,9 @@
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from Queue import Queue
 from queue_manager import QueueManager
-from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event
 from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
+from rtypes.pcc.utils.enums import Event
+
 
 class ChangeManager(object):
     def __init__(self):
@@ -31,11 +32,8 @@ class ChangeManager(object):
     ### API Methods #################################
     #################################################
 
-    def report_dim_modification(self, records):
-        for record in records:
-            self.__record(
-                record.event, record.tpname, record.groupname, record.oid,
-                record.dim_change, record.full_obj, record.is_projection)
+    def report_dim_modification(self, applied_records, pcc_change_records):
+        self.add_records(applied_records, pcc_change_records)
 
     def add_records(
             self, applied_records, pcc_change_records=None, except_app=None):

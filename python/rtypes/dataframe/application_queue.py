@@ -1,22 +1,28 @@
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
-from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event
+from rtypes.pcc.utils.enums import Event
 from threading import Thread, RLock
 from Queue import Empty
 from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 
 
 class ApplicationQueue(object):
-    def __init__(self, name, types, dataframe):
+    def __init__(self, name, types, dataframe, all=False):
         self.app_name = name
         self.known_objects = RecursiveDictionary()
         self.current_record = RecursiveDictionary()
         self.types = types
         self.dataframe = dataframe
+        self.all = all
+        self.type_changes = dict()
         self.registered_impures, self.queue = self.dataframe.connect_app_queue(
             self)
         self.lock = RLock()
         self.first_run = True
 
+    def add_types(self, pairs_added):
+        for tpname, _ in pairs_added:
+            self.type_changes[tpname] = Event.New
+    
     def merge_records(self, records):
         #new_records_this_cycle = RecursiveDictionary()
         with self.lock:
@@ -60,7 +66,13 @@ class ApplicationQueue(object):
 
         return ApplicationQueue.__convert_to_serializable_dict(
             self.set_known_objects(
-                self.merge_impure_record(self.current_record, objmap)))
+                self.merge_impure_record(self.current_record, objmap)),
+            types=self.set_and_clear_type_changes())
+
+    def set_and_clear_type_changes(self):
+        type_changes = self.type_changes
+        self.type_changes = dict()
+        return type_changes
 
     def clear_record(self):
         self.current_record = RecursiveDictionary()
@@ -120,13 +132,18 @@ class ApplicationQueue(object):
                 for tpname, status in obj_changes["types"].items():
                     if status == Event.New:
                         self.known_objects.setdefault(tpname, set()).add(oid)
-                    elif status == Event.Delete:
+                    elif (status == Event.Delete 
+                              and oid in self.known_objects[tpname]):
                         self.known_objects[tpname].remove(oid)
 
         return current_record
 
     @staticmethod
-    def __convert_to_serializable_dict(current_record):
+    def __convert_to_serializable_dict(current_record, types=dict()):
         df_changes = df_repr.DataframeChanges_Base()
-        df_changes.ParseFromDict({"gc": current_record})
+        dict_changes = (
+            {"gc": current_record, "types": types}
+            if types else
+            {"gc": current_record})
+        df_changes.ParseFromDict(dict_changes)
         return df_changes

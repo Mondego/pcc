@@ -181,7 +181,10 @@ class TypeManager(object):
     def get_name2type_map(self):
         return self.name2class
 
-    def get_impures_in_types(self, types):
+    def get_impures_in_types(self, types, all=False):
+        if all:
+            # Passed by reference. very important!!!
+            return self.impure
         result = set()
         for tp in types:
             tp_obj = self.get_requested_type(tp)

@@ -1,11 +1,14 @@
+import datetime
 from uuid import uuid4
+from dateutil import parser
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from rtypes.pcc.types.parameter import ParameterMode
 
 from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
-from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event, Record
 from rtypes.dataframe.dataframe_type import object_lock
 from rtypes.pcc.create import create, change_type
+from rtypes.pcc.utils._utils import ValueParser
+from rtypes.pcc.utils.enums import Event, Record
 
 class ChangeRecord(object):
     def __init__(
@@ -87,9 +90,9 @@ class ObjectManager(object):
     @staticmethod
     def __convert_to_dim_map(obj):
         return RecursiveDictionary(
-            [(dim, getattr(obj, dim._name))
+            (dim, getattr(obj, dim._name))
              for dim in obj.__rtypes_metadata__.dimensions
-             if hasattr(obj, dim._name)])
+             if hasattr(obj, dim._name))
 
     @staticmethod
     def __make_pcc(
@@ -98,7 +101,7 @@ class ObjectManager(object):
         universe = list()
         param_list = list()
         metadata = pcctype.__rtypes_metadata__
-        for tp_obj in metadata.parents:
+        for tp_obj in metadata.base_parents:
             tp = tp_obj.cls
             universe.append(relevant_objs.setdefault(tp, list()))
 
@@ -188,46 +191,20 @@ class ObjectManager(object):
             ObjectManager.__construct_pccs(pcctype_obj, pccs, universe, params)
         return pccs
 
-    @staticmethod
-    def __get_obj_type(obj, name2class):
-        # both iteratable/dictionary + object type is messed up. Won't work.
-        try:
-            if (hasattr(obj, "__rtypes_metadata__")
-                    and obj.__rtypes_metadata__.name in name2class):
-                return Record.FOREIGN_KEY
-            if isinstance(obj, dict):
-                return Record.DICTIONARY
-            if hasattr(obj, "__iter__"):
-                #print obj
-                return Record.COLLECTION
-            if isinstance(obj, int) or isinstance(obj, long):
-                return Record.INT
-            if isinstance(obj, float):
-                return Record.FLOAT
-            if isinstance(obj, str) or isinstance(obj, unicode):
-                return Record.STRING
-            if isinstance(obj, bool):
-                return Record.BOOL
-            if obj == None:
-                return Record.NULL
-            if hasattr(obj, "__dict__"):
-                return Record.OBJECT
-        except TypeError, e:
-            return -1
-        return -1
-
     #################################################
     ### API Methods #################################
     #################################################
 
     def create_table(self, tpname, basetype=False):
         with object_lock:
-            self.__create_table(tpname, basetype)
+            return self.__create_table(tpname, basetype)
 
     def create_tables(self, tpnames_basetype_pairs):
         with object_lock:
+            records = list()
             for tpname, basetype in tpnames_basetype_pairs:
-                self.__create_table(tpname, basetype)
+                records.extend(self.__create_table(tpname, basetype))
+            return records
 
     def adjust_pcc(self, tp_obj, objs_and_changes, to_be_converted=False):
         if not self.calculate_pcc:
@@ -723,9 +700,30 @@ class ObjectManager(object):
         return objs_new, objs_mod, objs_deleted
 
     def __create_table(self, tpname, basetype):
+        records = list()
         self.object_map.setdefault(tpname, RecursiveDictionary())
         if basetype:
             self.current_state.setdefault(tpname, RecursiveDictionary())
+            return records
+        else:
+            tp_obj = self.type_manager.get_requested_type_from_str(tpname)
+            if tp_obj.is_pure:
+                obj_map = ObjectManager.build_pccs(
+                    [tp_obj], self.object_map, None)
+                self.object_map[tpname] = obj_map[tp_obj.type]
+                records = list()
+                for oid in obj_map[tp_obj.type]:
+                    obj_map[tp_obj.type][oid]._dataframe_data = (
+                        self.type_manager.tp_to_dataframe_payload[tp_obj])
+                    obj_changes = ObjectManager.__convert_to_dim_map(
+                        obj_map[tp_obj.type][oid])
+                    records.extend(
+                        self.__create_records(
+                            Event.New, tp_obj,
+                            oid, obj_changes,
+                            obj_changes))
+            return records
+
 
     def __append(self, tp_obj, obj):
         records = list()
@@ -982,6 +980,8 @@ class ObjectManager(object):
                     (self.__process_record(p["k"], full_record),
                      self.__process_record(p["v"], full_record))
                     for p in record["value"]])
+        if record["type"] == Record.DATETIME:
+            return parser.parse(record["value"])
         if record["type"] == Record.FOREIGN_KEY:
             # value -> {"group_key": group key,
             #           "actual_type": {"name": type name,
@@ -1023,7 +1023,8 @@ class ObjectManager(object):
                    and actual_type_name in full_record[groupname][oid]["types"]
                    and full_record[groupname][
                        oid]["types"][actual_type_name] == Event.New):
-                # Object is in the incoming record. Can build that. Duplicates will not be built anyway.
+                # Object is in the incoming record. Can build that.
+                # Duplicates will not be built anyway.
                 obj, _ = self.__build_dimension_obj(
                     full_record[groupname][oid]["dims"],
                     tm.get_requested_type_from_str(groupname),
@@ -1048,8 +1049,7 @@ class ObjectManager(object):
                     dim_change)
         except TypeError:
             pass
-        dim_type = ObjectManager.__get_obj_type(
-            dim_change, self.type_manager.name2class)
+        dim_type = ValueParser.get_obj_type(dim_change)
         dim = RecursiveDictionary()
         dim["type"] = dim_type
         if dim_type == Record.INT:
@@ -1107,6 +1107,11 @@ class ObjectManager(object):
             dim["value"]["object_key"] = key
             dim["value"]["actual_type"] = RecursiveDictionary()
             dim["value"]["actual_type"]["name"] = convert_type.name
+            return dim
+
+        if dim_type == Record.DATETIME:
+            dim["value"] = "%d-%d-%d" % (
+                dim_change.year, dim_change.month, dim_change.day)
             return dim
 
         raise TypeError("Don't know how to deal with %s" % dim_change)

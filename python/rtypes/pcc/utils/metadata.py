@@ -1,5 +1,5 @@
 from rtypes.pcc.attributes import rtype_property, aggregate_property, namespace_property
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 from rtypes.pcc.this import thisclass, thisattr
 
 
@@ -17,10 +17,12 @@ class Metadata(object):
 
     @property
     def parent_types(self):
-        return [p.cls for p in self.parents]
+        return [p.cls for p in self.base_parents]
 
-    def __init__(self, cls, final_category, parents, projection_dims=None):
+    def __init__(self, cls, final_category, parents,
+                 projection_dims=None, base_parents=None):
         self.name = cls.__module__ + "." + cls.__name__
+        self.shortname = cls.__name__
         self.aliases = set([self.name])
         self.cls = cls
         self.type_pickle = None
@@ -42,6 +44,10 @@ class Metadata(object):
             projection_dims) if projection_dims else set()
         self.final_category = final_category
         self.categories.add(final_category)
+        self.category_execution_order = list()
+        if Metadata.processable_category(final_category):
+            self.category_execution_order.append(final_category)
+
         self.parents = list()
         for p in parents:
             if not hasattr(p, "__rtypes_metadata__"):
@@ -51,6 +57,14 @@ class Metadata(object):
             self.parents.append(p.__rtypes_metadata__)
         self.build_required_attrs()
         self.dimension_map = self.rebuild_dimension_map()
+        self.base_parents = base_parents if base_parents else self.parents
+
+    @staticmethod
+    def processable_category(category):
+        return category in set(
+            [PCCCategories.intersection, PCCCategories.join,
+             PCCCategories.pcc_set, PCCCategories.projection,
+             PCCCategories.subset, PCCCategories.union])
 
     @staticmethod
     def get_properties(cls):
@@ -248,6 +262,13 @@ class Metadata(object):
         parents = self.resolve_anon_class(parents)
         projection_dims = self.resolve_anon_dimensions(projection_dims)
         old_categories = self.categories
-        new_metadata = Metadata(cls, final_category, parents, projection_dims)
+        old_category_order = self.category_execution_order
+        new_metadata = Metadata(
+            cls, final_category, parents,
+            projection_dims, base_parents=self.base_parents)
         new_metadata.categories.update(old_categories)
+        new_metadata.category_execution_order = old_category_order + (
+            [final_category]
+            if Metadata.processable_category(final_category) else
+            [])
         return new_metadata

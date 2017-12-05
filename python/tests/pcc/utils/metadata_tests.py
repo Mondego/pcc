@@ -1,8 +1,8 @@
 from tests import test_classes as tc
 from rtypes.pcc.utils.metadata import Metadata
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 
-import unittest, json
+import unittest
 
 class test_metadata(unittest.TestCase):
     def test_basic_classes(self):
