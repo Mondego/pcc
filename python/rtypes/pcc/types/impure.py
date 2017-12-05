@@ -1,3 +1,8 @@
+from rtypes.pcc.utils.pcc_categories import PCCCategories
+
+
 def impure(cls):
-    cls.__pcc_impure__ = True
+    if not hasattr(cls, "__rtypes_metadata__"):
+        raise TypeError("Class {0} is not a PCC class.".format(repr(cls)))
+    cls.__rtypes_metadata__.categories.add(PCCCategories.impure)
     return cls

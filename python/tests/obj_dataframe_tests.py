@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from rtypes.pcc.attributes import dimension, primarykey, count
+from rtypes.pcc.attributes import dimension, namespace, primarykey, count
 from rtypes.pcc.types.set import pcc_set
 from rtypes.pcc.types.subset import subset
 from rtypes.pcc.types.impure import impure
@@ -259,7 +259,7 @@ def _join_example_data():
         @oid.setter
         def oid(self, value): self._id = value
 
-        @dimension(Person)
+        @namespace(Person)
         def p(self):
             return self._p
 
@@ -267,7 +267,7 @@ def _join_example_data():
         def p(self, value):
             self._p = value
 
-        @dimension(Card)
+        @namespace(Card)
         def c(self):
             return self._c
 
@@ -275,18 +275,13 @@ def _join_example_data():
         def c(self, value):
             self._c = value
 
-        @dimension(Transaction)
+        @namespace(Transaction)
         def t(self):
             return self._t
 
         @t.setter
         def t(self, value):
             self._t = value
-
-        def __init__(self, p, c, t):
-            self.p = p
-            self.c = c
-            self.t = t
 
         @staticmethod
         def __predicate__(p, c, t):
@@ -412,7 +407,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__realname__]) == 1)
+        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__rtypes_metadata__.name]) == 1)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
@@ -427,7 +422,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__realname__]) == 0)
+        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__rtypes_metadata__.name]) == 0)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
@@ -443,8 +438,8 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.add_types([Node, Edge, InEdge, OutEdge])
         df.extend(Node, nodes)
         df.extend(Edge, edges)
-        self.assertTrue(len(df.object_manager.object_map[OutEdge.__realname__]) == 0)
-        self.assertTrue(len(df.object_manager.object_map[InEdge.__realname__]) == 0)
+        self.assertTrue(len(df.object_manager.object_map[OutEdge.__rtypes_metadata__.name]) == 0)
+        self.assertTrue(len(df.object_manager.object_map[InEdge.__rtypes_metadata__.name]) == 0)
         self.assertTrue(len(df.get(OutEdge, parameters = (nodes[0],))) == 3)
         self.assertTrue(isinstance(df.get(OutEdge, parameters = (nodes[0],))[0], OutEdge))
         self.assertTrue(len(df.get(InEdge, parameters = (nodes[0],))) == 0) 
@@ -456,8 +451,8 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.extend(Person, persons)
         df.extend(Card, cards)
         df.extend(Transaction, transactions)
-        self.assertTrue(len(df.object_manager.object_map[RedAlert.__realname__]) == 0)
-        self.assertTrue(len(df.get(RedAlert)) == 2)
+        self.assertEqual(len(df.object_manager.object_map[RedAlert.__rtypes_metadata__.name]), 0)
+        self.assertEqual(len(df.get(RedAlert)), 2)
         for ra in df.get(RedAlert):
             ra.Protect()
         self.assertTrue(transactions[2].flagged == True)
@@ -517,7 +512,7 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, CarForPedestrian])
         df.extend(Car, cars)
-        self.assertTrue(len(df.object_manager.object_map[CarForPedestrian.__realname__]) == 2)
+        self.assertTrue(len(df.object_manager.object_map[CarForPedestrian.__rtypes_metadata__.name]) == 2)
         cars_p = df.get(CarForPedestrian)
         self.assertTrue(len(cars_p) == 2)
         for c in cars_p:

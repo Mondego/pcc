@@ -4,20 +4,12 @@ Create on Feb 27, 2016
 @author: Rohan Achar
 '''
 from __future__ import absolute_import
-from rtypes.pcc.attributes import spacetime_property
-from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
-from rtypes.pcc.create import create, change_type
-from rtypes.pcc.types.parameter import ParameterMode
 from uuid import uuid4
-from threading import Thread
-from Queue import Queue
-from Queue import Empty
 
-from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
-from rtypes.dataframe.dataframe_changes.IDataframeChanges import Event, Record
 from rtypes.dataframe.object_manager import ObjectManager
 from rtypes.dataframe.type_manager import TypeManager
 from rtypes.dataframe.change_manager import ChangeManager
+from rtypes.dataframe.application_queue import ApplicationQueue
 
 BASE_TYPES = set([])
 
@@ -45,7 +37,7 @@ class dataframe(object):
     ##.3d Record buffers (new, mod, and deleted).
     ##.3e clear buffers
     
-    def __init__(self, name = str(uuid4())):
+    def __init__(self, name=str(uuid4()), external_db=None):
         # PCCs to be calculated only if it is in Master Mode.
         self.calculate_pcc = True
 
@@ -61,9 +53,14 @@ class dataframe(object):
         # The object that deals with record management
         self.change_manager = ChangeManager()
 
+        self.external_db = external_db
+
         # Flag to see if the dataframe should keep a record of all changes.
         # Can be used to synchnronize between dataframes.
-        self.start_recording = False
+        self.start_recording = external_db is not None
+
+        self.external_db_queue = ApplicationQueue(
+            "external_db", list(), self, all=True)
         
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
@@ -73,7 +70,9 @@ class dataframe(object):
             self.object_manager.adjust_pcc,  
             self.change_manager.report_dim_modification,
             self.object_manager.create_records_for_dim_modification)
-        self.object_manager.create_tables(pairs_added)
+        records = self.object_manager.create_tables(pairs_added)
+        self.external_db_queue.add_types(pairs_added)
+        self.change_manager.add_records(records)
 
     def add_types(self, types, tracking=False):
         pairs_added = self.type_manager.add_types(
@@ -82,47 +81,51 @@ class dataframe(object):
             self.object_manager.adjust_pcc, 
             self.change_manager.report_dim_modification,
             self.object_manager.create_records_for_dim_modification)
-        self.object_manager.create_tables(pairs_added)
+        records = self.object_manager.create_tables(pairs_added)
+        self.external_db_queue.add_types(pairs_added)
+        self.change_manager.add_records(records)
 
     def has_type(self, tp):
-        self.type_manager.has_types(tp)
+        self.type_manager.has_type(tp)
 
     def reload_types(self, types):
-        # TODO
         self.type_manager.reload_types(types)
 
     def remove_type(self, tp):
-        # TODO
         self.type_manager.remove_type(tp)
 
     def remove_types(self, types):
-        # TODO
         self.type_manager.remove_types(types)
+
     #############################################
 
     ####### OBJECT MANAGEMENT METHODS ###########
     def append(self, tp, obj):
         if (self.type_manager.check_for_new_insert(tp)
-            and self.type_manager.check_obj_type_for_insert(tp, obj)):
+                and self.type_manager.check_obj_type_for_insert(tp, obj)):
             tp_obj = self.type_manager.get_requested_type(tp)
             records = self.object_manager.append(tp_obj, obj)
             self.change_manager.add_records(records)
 
     def extend(self, tp, objs):
-        if (self.type_manager.check_for_new_insert(tp)):
+        if self.type_manager.check_for_new_insert(tp):
             tp_obj = self.type_manager.get_requested_type(tp)
             for obj in objs:
                 # One pass through objects to see if the types match.
-               self.type_manager.check_obj_type_for_insert(tp, obj)
+                self.type_manager.check_obj_type_for_insert(tp, obj)
             records = self.object_manager.extend(tp_obj, objs)
             self.change_manager.add_records(records)
 
-    def get(self, tp, oid = None, parameters = None):
-        # TODO: Add checks for tp
-        if tp.__realname__ not in self.type_manager.observing_types:
-            raise TypeError("%s Type is not registered for observing." % tp.__realname__)
+    def get(self, tp, oid=None, parameters=None):
+        name = tp.__rtypes_metadata__.name
+        if name not in self.type_manager.observing_types:
+            raise TypeError(
+                ("%s Type is not registered for observing."
+                 % name))
         tp_obj = self.type_manager.get_requested_type(tp)
-        return self.object_manager.get(tp_obj, parameters) if oid == None else self.object_manager.get_one(tp_obj, oid, parameters)
+        return (self.object_manager.get(tp_obj, parameters)
+                if oid is None else
+                self.object_manager.get_one(tp_obj, oid, parameters))
 
     def delete(self, tp, obj):
         # TODO: Add checks for tp
@@ -139,24 +142,29 @@ class dataframe(object):
     def clear_joins(self):
         for tp_obj in self.type_manager.get_join_types():
             _ = self.object_manager.delete_all(tp_obj)
+
     #############################################
 
     ####### CHANGE MANAGEMENT METHODS ###########
 
     @property
-    def start_recording(self): return self.change_manager.startrecording
+    def start_recording(self):
+        return self.change_manager.startrecording
 
     @start_recording.setter
-    def start_recording(self, v): self.change_manager.startrecording = v
+    def start_recording(self, v):
+        self.change_manager.startrecording = v
 
-    def apply_changes(self, changes, except_app = None, track = True):
+    def apply_changes(self, changes, except_app=None, track=True):
         if "gc" not in changes:
             return
 
-        applied_records, pcc_change_records, deletes = self.object_manager.apply_changes(changes)
+        applied_records, pcc_change_records, deletes = (
+            self.object_manager.apply_changes(changes))
         self.object_manager.add_buffer_changes(changes, deletes)
         if track:
-            self.change_manager.add_records(applied_records, pcc_change_records, except_app)
+            self.change_manager.add_records(
+                applied_records, pcc_change_records, except_app)
 
     def get_record(self):
         return self.change_manager.get_record()
@@ -165,7 +173,10 @@ class dataframe(object):
         return self.change_manager.clear_record()
 
     def connect_app_queue(self, app_queue):
-        return self.type_manager.get_impures_in_types(app_queue.types), self.change_manager.add_app_queue(app_queue)
+        return (
+            self.type_manager.get_impures_in_types(
+                app_queue.types, all=app_queue.all),
+            self.change_manager.add_app_queue(app_queue))
 
     def convert_to_record(self, results, deleted_oids):
         return self.object_manager.convert_to_records(results, deleted_oids)
@@ -190,3 +201,20 @@ class dataframe(object):
         return self.object_manager.clear_buffer()
 
     #############################################
+
+    ####### EXTERNAL DB MANAGEMENT METHODS ######
+
+    def pull(self):
+        changes, clear_all = self.external_db.__rtypes_query__(
+            [df_tp.type for df_tp in self.type_manager.observing_types])
+        if clear_all:
+            self.clear_all()
+        self.apply_changes(changes, except_app=self.external_db_queue.app_name)
+
+    def push(self):
+        changes = self.external_db_queue.get_record()
+        self.external_db_queue.clear_record()
+        pcc_type_map = {
+            name: tp_obj.type
+            for name, tp_obj in self.type_manager.name2class.iteritems()}
+        self.external_db.__rtypes_write__(changes, pcc_type_map)

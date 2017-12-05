@@ -12,16 +12,14 @@ from dataframe_request import GetDFRequest, \
     PutDFRequest
 
 class dataframe_wrapper(Thread):
-    def __init__(self, name = str(uuid4()), df = None):
+    def __init__(self, name = str(uuid4()), df=None):
         Thread.__init__(self)
         self.name = name
-        self.dataframe = dataframe(name = name)
+        self.dataframe = dataframe(name=name)
         
-        # Insert changes Queue
-        self.put_queue = Queue()
+        # Insert/Get changes Queue
+        self.queue = Queue()
 
-        # Extract changes Queue
-        self.get_queue = Queue()
 
         # Results for get requests
         self.get_token_dict = dict()
@@ -31,23 +29,17 @@ class dataframe_wrapper(Thread):
 
     def run(self):
         while not self.shutdown:
-            try:
-                get_req = self.get_queue.get_nowait()
-                self.process_get_req(get_req, self.get_token_dict)
-            except Empty:
-                pass
-            try:
-                put_req = self.put_queue.get_nowait()
-                self.process_put_req(put_req)
-            except Empty:
-                pass
+            req = self.queue.get()
+            if isinstance(req, GetDFRequest):
+                self.process_get_req(req, self.get_token_dict)
+            else:
+                self.process_put_req(req)
 
     def process_get_req(self, get_req, token_dict):
         if not isinstance(get_req, GetDFRequest):
             return
-        result = self.dataframe.get(get_req.type_object, 
-                                         get_req.oid,
-                                         get_req.param)
+        result = self.dataframe.get(
+            get_req.type_object, get_req.oid, get_req.param)
         token_dict[get_req.token].put(result)
 
     def process_put_req(self, put_req):
@@ -80,7 +72,8 @@ class dataframe_wrapper(Thread):
             deleteall_req.type_object)
 
     def process_apply_req(self, apply_req):
-        self.dataframe.apply_changes(apply_req.df_changes, except_app = apply_req.except_app)
+        self.dataframe.apply_changes(
+            apply_req.df_changes, except_app=apply_req.except_app)
 
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
@@ -107,24 +100,24 @@ class dataframe_wrapper(Thread):
         req = AppendDFRequest()
         req.obj = obj
         req.type_object = tp
-        self.put_queue.put(req)
+        self.queue.put(req)
 
     def extend(self, tp, objs):
         req = ExtendDFRequest()
         req.objs = objs
         req.type_object = tp
-        self.put_queue.put(req)
+        self.queue.put(req)
 
-    def get(self, tp, oid = None, parameters = None):
+    def get(self, tp, oid = None, parameters=None):
         req = GetDFRequest()
         req.type_object = tp
         req.oid = oid
         req.param = parameters
         req.token = uuid4()
         self.get_token_dict[req.token] = Queue()
-        self.get_queue.put(req)
+        self.queue.put(req)
         try:
-            return self.get_token_dict[req.token].get(timeout = 5)
+            return self.get_token_dict[req.token].get(timeout=5)
         except Empty:
             return list()
 
@@ -132,31 +125,34 @@ class dataframe_wrapper(Thread):
         req = DeleteDFRequest()
         req.obj = obj
         req.type_object = tp
-        self.put_queue.put(req)
+        self.queue.put(req)
 
     def delete_all(self, tp):
         req = DeleteAllDFRequest()
         req.type_object = tp
-        self.put_queue.put(req)
+        self.queue.put(req)
 
     #############################################
-    
+
     ####### CHANGE MANAGEMENT METHODS ###########
 
     @property
-    def start_recording(self): return self.dataframe.startrecording
+    def start_recording(self):
+        return self.dataframe.startrecording
 
     @start_recording.setter
-    def start_recording(self, v): self.dataframe.startrecording = v
+    def start_recording(self, v):
+        self.dataframe.startrecording = v
 
     @property
-    def object_manager(self): return self.dataframe.object_manager
+    def object_manager(self):
+        return self.dataframe.object_manager
 
-    def apply_changes(self, changes, except_app = None):
+    def apply_changes(self, changes, except_app=None):
         req = ApplyChangesDFRequest()
         req.df_changes = changes
         req.except_app = except_app
-        self.put_queue.put(req)
+        self.queue.put(req)
 
     def get_record(self):
         return self.dataframe.get_record()

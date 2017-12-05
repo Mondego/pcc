@@ -13,3 +13,5 @@
 *.pyc
 *.sln
 .vs
+CRED.json
+*.vscode/

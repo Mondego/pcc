@@ -11,3 +11,5 @@ from rtypes.pcc.types.join import join
 from rtypes.pcc.types.union import union
 from rtypes.pcc.types.projection import projection
 from rtypes.pcc.types.set import pcc_set
+from rtypes.pcc.this import thisclass
+this = thisclass()

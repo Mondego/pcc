@@ -1,4 +1,5 @@
-﻿# recursive_dictionary.py
+﻿from collections import OrderedDict
+# recursive_dictionary.py
 #     Created 2009-05-20 by Jannis Andrija Schnitzer.
 #
 # Copyright (c) 2009 Jannis Andrija Schnitzer
@@ -23,13 +24,10 @@
 
 __author__ = 'jannis@itisme.org (Jannis Andrija Schnitzer)'
 
-class RecursiveDictionary(dict):
+class RecursiveDictionary(OrderedDict):
         """RecursiveDictionary provides the methods rec_update and iter_rec_update
         that can be used to update member dictionaries rather than overwriting
         them."""
-        def __hash__(self):
-            return super(RecursiveDictionary, self).__hash__()
-
         def rec_update(self, other, **third):
                 """Recursively update the dictionary with the contents of other and
                 third like dict.update() does - but don't overwrite sub-dictionaries.
@@ -67,8 +65,5 @@ class RecursiveDictionary(dict):
                         else:
                                 self[key] = value
         
-        def __repr__(self):
-                return super(self.__class__, self).__repr__()
-
         def CopyFrom(self, other_dict):
             self.rec_update(other_dict)
