@@ -1,6 +1,6 @@
 from tests import test_classes as tc
 from rtypes.pcc.utils.metadata import Metadata
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 from rtypes.pcc import create
 
 import unittest, json
@@ -108,3 +108,15 @@ class test_create(unittest.TestCase):
         self.assertTrue(hasattr(pl3, "prop2"))
         self.assertFalse(hasattr(pl3, "prop3"))
         self.assertFalse(hasattr(pl3, "prop4"))
+
+  def test_join_create1(self):
+        join_list = create(tc.JoinSmallAndLargeBase, self.small_bases, self.large_bases)
+        self.assertEqual(1, len(join_list))
+        jl1 = join_list[0]
+        self.assertEqual(tc.JoinSmallAndLargeBase, type(jl1))
+        self.assertEqual("b1", jl1.oid)
+        self.assertEqual("subset", jl1.sb.sprop1)
+        self.assertEqual("subset", jl1.lb.prop1)
+        self.assertTrue(hasattr(jl1.lb, "prop2"))
+        self.assertTrue(hasattr(jl1.lb, "prop3"))
+        self.assertTrue(hasattr(jl1.lb, "prop4"))

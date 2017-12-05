@@ -3,8 +3,9 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from rtypes.pcc.attributes import spacetime_property
 from rtypes.pcc.utils._utils import build_required_attrs
+from rtypes.pcc.utils.pcc_categories import PCCCategories
+
 
 class join(object):
     def __init__(self, *classes):
@@ -13,17 +14,6 @@ class join(object):
         self.types = classes
 
     def __call__(self, actual_class):
-        build_required_attrs(actual_class)
         # actual_class the class that is being passed from application.
-        actual_class.__dependent_type__ = True
-        actual_class.__ENTANGLED_TYPES__ = self.types
-        actual_class.__PCC_BASE_TYPE__ = False
-        actual_class.__pcc_bases__ = set(self.types)
-        actual_class.__pcc_join__ = True
-        for tp in self.types:
-                if hasattr(tp, "__pcc_bases__"):
-                    actual_class.__pcc_bases__.update(tp.__pcc_bases__)
-
-        actual_class.__start_tracking__ = False
-        actual_class.__pcc_type__ = "join"
+        build_required_attrs(actual_class, PCCCategories.join, self.types)
         return actual_class
