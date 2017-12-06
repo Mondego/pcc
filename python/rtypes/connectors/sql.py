@@ -18,29 +18,29 @@ class RTypesMySQLConnection(MySQLConnection):
         self.start_transaction()
         cursor = self.cursor()
         result = RecursiveDictionary()
-        try:
-            for pcc_type in pcc_types:
-                dims_order, query = convert_to_read_query(pcc_type)
-                cursor.execute(query)
-                metadata = pcc_type.__rtypes_metadata__
-                grp_changes = result.setdefault(
-                    metadata.groupname, RecursiveDictionary())
-                for row in cursor.fetchall():
-                    dim_dict = dict(zip(dims_order, row))
-                    primarykey_value = dim_dict[metadata.primarykey._name]
-                    dim_changes = convert_to_dim_map(dim_dict)
-                    obj_changes = grp_changes.setdefault(
-                        primarykey_value,
-                        RecursiveDictionary())
-                    obj_changes.setdefault(
-                        "types",
-                        RecursiveDictionary())[metadata.name] = Event.New 
-                    obj_changes.setdefault(
-                        "dims", RecursiveDictionary()).rec_update(dim_changes)
-        except errors.Error as err:
-            self.rollback()
-            logger.error("Exeception %s seen during query", repr(err))
-            result = RecursiveDictionary()
+        #try:
+        for pcc_type in pcc_types:
+            dims_order, query = convert_to_read_query(pcc_type)
+            cursor.execute(query)
+            metadata = pcc_type.__rtypes_metadata__
+            grp_changes = result.setdefault(
+                metadata.groupname, RecursiveDictionary())
+            for row in cursor.fetchall():
+                dim_dict = dict(zip(dims_order, row))
+                primarykey_value = dim_dict[metadata.primarykey._name]
+                dim_changes = convert_to_dim_map(dim_dict)
+                obj_changes = grp_changes.setdefault(
+                    primarykey_value,
+                    RecursiveDictionary())
+                obj_changes.setdefault(
+                    "types",
+                    RecursiveDictionary())[metadata.name] = Event.New 
+                obj_changes.setdefault(
+                    "dims", RecursiveDictionary()).rec_update(dim_changes)
+        #except errors.Error as err:
+        #    self.rollback()
+        #    logger.error("Exeception %s seen during query", repr(err))
+        #    result = RecursiveDictionary()
         self.commit()
         cursor.close()
         return {"gc": result}, True

@@ -1,6 +1,6 @@
 from copy import deepcopy
 from itertools import product
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 
 class container(object):
     def __init__(self):
