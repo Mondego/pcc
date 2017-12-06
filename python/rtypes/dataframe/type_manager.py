@@ -3,7 +3,7 @@
 #################################################
 import os
 from rtypes.dataframe.dataframe_type import type_lock, DataframeType
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 
 class TypeManager(object):
 

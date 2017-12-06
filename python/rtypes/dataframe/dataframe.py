@@ -147,7 +147,7 @@ class dataframe(object):
             self, None, None, None)
         objs = (self.object_manager.get(tp_obj, parameters)
                 if oid is None else
-                self.object_manager.get_one(tp_obj, oid, parameters))
+                [self.object_manager.get_one(tp_obj, oid, parameters)])
         if self.trigger_manager.trigger_exists(
             tp_obj, TriggerTime.after, TriggerAction.read):
             for obj in objs:

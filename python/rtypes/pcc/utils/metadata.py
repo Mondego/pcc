@@ -57,6 +57,8 @@ class Metadata(object):
             self.parents.append(p.__rtypes_metadata__)
         self.build_required_attrs()
         self.dimension_map = self.rebuild_dimension_map()
+        if self.distinct or self.limit or self.group_by or self.sort_by:
+            self.categories.add(PCCCategories.impure)
         self.base_parents = base_parents if base_parents else self.parents
 
     @staticmethod
@@ -210,6 +212,8 @@ class Metadata(object):
             setattr(self.cls, d._name, d)
         if hasattr(self.cls, "__predicate__"):
             self.predicate = self.cls.__predicate__
+        if hasattr(self.cls, "__distinct__"):
+            self.distinct = self.cls.__distinct__
         if hasattr(self.cls, "__limit__"):
             self.limit = self.cls.__limit__
         if hasattr(self.cls, "__group_by__"):
