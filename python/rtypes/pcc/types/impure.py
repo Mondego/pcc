@@ -1,4 +1,4 @@
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 
 
 def impure(cls):

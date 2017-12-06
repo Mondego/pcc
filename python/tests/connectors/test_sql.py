@@ -94,11 +94,12 @@ class test_sql(unittest.TestCase):
 
     def cleanup_tables(self):
         cur = self.sql_connection.cursor()
-        try:
-            cur.execute("DROP TABLE BasicTable;")
-        except Exception, e:
-            print "Found exception", e
-            pass
+        for tblname in set(["BasicTable",
+                            "EvenSubsetTable", "EvenSubsetTableProjection"]):
+            try:
+                cur.execute("DROP TABLE {0};".format(tblname))
+            except Error as err:
+                pass
         self.sql_connection.commit()
 
     def test_sql(self):

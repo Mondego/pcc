@@ -1,5 +1,5 @@
 from multiprocessing import RLock
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 
 type_lock = RLock()
 object_lock = RLock()

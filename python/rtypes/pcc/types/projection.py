@@ -4,7 +4,7 @@ Create on Feb 27, 2016
 @author: Rohan Achar
 '''
 from rtypes.pcc.utils._utils import build_required_attrs
-from rtypes.pcc.utils.pcc_categories import PCCCategories
+from rtypes.pcc.utils.enums import PCCCategories
 
 
 class projection(object):
