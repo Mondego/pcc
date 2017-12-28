@@ -1,5 +1,4 @@
 
-
 class TriggerTime(object):
     before = "b"
     after = "a"
@@ -42,6 +41,10 @@ class trigger(object):
 
     def __call__(self, procedure):
         return TriggerProcedure(procedure, self.pcc_type, self.time, self.action, self.priority)
+
+
+class BlockAction (Exception):
+    pass
 
 
 if __name__ == "__main__":

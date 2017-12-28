@@ -94,7 +94,7 @@ class TriggerManager(object):
         self.__remove_trigger(trigger_obj)
 
     def trigger_exists(self, tp_obj, time, action):
-       return self.__trigger_in_map(tp_obj.type, time, action)
+       return self.__trigger_in_map(tp_obj, time, action)
 
     #################################################
     ### Private Methods #############################
@@ -133,8 +133,14 @@ class TriggerManager(object):
                 list: This is a list of TriggerProcedure objs that are associated with
                       the specified type and activated at the specified time + action
         """
-        if tp in self.trigger_map:
+
+        ##################################################################################
+        # This needs to be changed! For some reason, triggers are placed in reverse order
+        ##################################################################################
+
+        if tp in self.trigger_map and ((time + action) in self.trigger_map[tp]):
         # 1a: Check if the pcc_type has any triggers atteched to it
+            self.trigger_map[tp][time + action].reverse()
             return self.trigger_map[tp][time + action]
         else:
         # 1b: Return an empty list
@@ -177,7 +183,6 @@ class TriggerManager(object):
         """
         # If the trigger exist in the trigger_map, remove the Procedure from the map
         if self.__trigger_obj_in_map(trigger_obj):
-            # print(self.procedure_index_location(trigger_obj))
             self.__get_trigger(trigger_obj.pcc_type,
                                trigger_obj.time,
                                trigger_obj.action).pop(

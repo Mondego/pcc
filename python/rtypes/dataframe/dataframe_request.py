@@ -110,3 +110,32 @@ class ApplyChangesDFRequest(object):
     @except_app.setter
     def except_app(self, v):
         self._except_app = v
+
+class UpdateDFRequest(DFRequest):
+    # Token
+    @property
+    def token(self): return self._token
+    @token.setter
+    def token(self, v): self._token = v
+
+    # Object
+    @property
+    def obj(self):
+        try:
+            return self._obj
+        except AttributeError:
+            self._obj = None
+            return self._obj
+    @obj.setter
+    def obj(self, v): self._obj = v
+
+    # New Value
+    def new_value(self):
+        try:
+            return self._new_value
+        except AttributeError:
+            self._new_value = None
+            return self._new_value
+    @new_value.setter
+    def new_value(self, v): self._new_value = v
+

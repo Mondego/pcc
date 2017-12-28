@@ -61,7 +61,30 @@ class rtype_property(property):
         return prop
 
     def __set__(self, obj, value, bypass = False):
-        property.__set__(self, obj, value)
+        """
+        Work that needs to be done:
+        1) When I intercept the set I need to take the change and out it into the queue
+            + Single threaded dataframe
+                - Any time an action happens in the dataframe, 
+                  it goes through the single thread as a work object
+        1:12
+
+        If dataframe is attached:
+            - send the update command to dataframe
+        Else:
+            - do this property.__set__(self, obj, value)
+        """
+
+        property.__set__(self, obj, value) # Pulling the super property out to see
+        ##########################################################################
+        # In regards to this action above
+        """
+                If dataframe is attached:
+            - send the update command to dataframe
+        Else:
+            - do this property.__set__(self, obj, value)
+        """
+
         if not hasattr(obj, "__start_tracking__"):
             return
         if (hasattr(obj, "_dataframe_data")

@@ -9,7 +9,8 @@ from dataframe_request import GetDFRequest, \
     DeleteDFRequest, \
     DeleteAllDFRequest, \
     ApplyChangesDFRequest, \
-    PutDFRequest
+    PutDFRequest, \
+    UpdateDFRequest
 
 class dataframe_wrapper(Thread):
     def __init__(self, name = str(uuid4()), df=None):
@@ -93,6 +94,7 @@ class dataframe_wrapper(Thread):
 
     def remove_types(self, types):
         self.dataframe.remove_types(types)
+
     #############################################
 
     ####### OBJECT MANAGEMENT METHODS ###########
@@ -131,6 +133,46 @@ class dataframe_wrapper(Thread):
         req = DeleteAllDFRequest()
         req.type_object = tp
         self.queue.put(req)
+
+######################################################################################
+    def update(self, tp,  obj, new_value):
+        """
+        Notes about this method:
+            - self.queue is the working queue
+            - the queue you make in the method is the completion queue
+            - dont need to return, just wait for a true or false (done or not)
+
+        Need to make a new request here for update
+            - do this so that an update is a completed action
+            - Needs to do the same thing as get but for update
+            - Make a unique token then wait for a completion from that token
+
+        2 queues
+            - Work request queue
+            - Completed queues
+
+        1:02
+
+        Questions for Rohan:
+            - How will I know when the request is processed?
+              The code never interacts with self.queue after it puts it in.
+              What should I be checking?
+            - Where is the queue processed? In Dataframe? Dataframe's queue_manager
+            - Where is this module used? dataframe_threading
+        """
+        req = UpdateDFRequest()
+        req.type_object = tp
+        req.obj = obj
+        req.new_value = new_value
+        req.token = uuid4()
+        self.get_token_dict[req.token] = Queue() # make a queue for this token and 
+        self.queue.put(req)
+        try:
+            self.get_token_dict[req.token].get(timeout=5)
+            return True
+        except Empty:
+            return False
+######################################################################################
 
     #############################################
 
