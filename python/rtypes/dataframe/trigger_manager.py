@@ -1,4 +1,4 @@
-from rtypes.pcc.triggers import TriggerAction, TriggerTime
+from rtypes.pcc.triggers import TriggerAction, TriggerTime, TriggerProcedure
 
 from enums import ObjectType
 import os
@@ -22,6 +22,7 @@ class TriggerManager(object):
         """Creates a TriggerManager object, and initializes a trigger_map. 
         """
         self.trigger_map = dict()
+        self.__rtypes_current_triggers__ = dict()
 
     #################################################
     ### API Methods #################################
@@ -162,12 +163,50 @@ class TriggerManager(object):
 
             Returns:
                 None: Does not return anything, only activates procedure objects
-        """
-        try:
-            for procedure in self.__get_trigger(tp, time, action):
+        
+            __rtypes_current_triggers__ = {"before_update": [Customer, Transaction]}
+                
+                
+                """
+        for procedure in self.__get_trigger(tp, time, action):
+            """
+            The process below is used to prevent update triggers from creating infinite
+            recursive loops.
+
+            There is a map that is used to do this.
+
+            The map's keys are each procedure object, each key has a set of objets.
+
+            Each set is a literal set of object.
+            
+            These objects show that the procedure has activated on the objects inside
+                the set.
+
+            If there isn't an object in the set, then the trigger hasn't neen activated
+                on it and is free to do so
+            """
+            # update
+            if action == TriggerAction.update and (new or old or current):
+
+                # if the triggers has been mapped to an object
+                if (procedure in self.__rtypes_current_triggers__):
+                    
+                    # If the object is in this map, then dont do anything
+                    if new in self.__rtypes_current_triggers__[procedure]:
+                        pass
+                    # Add the object to the map so there isn't recursion
+                    # also execute the triggerdd
+                    else:
+                        self.__rtypes_current_triggers__[procedure].add(new)
+                        procedure(dataframe=dataframe, new=new, old=old, current=current)
+                # map the trigger in the dictionary
+                else:
+                    self.__rtypes_current_triggers__[procedure] = set([new])
+                    procedure(dataframe=dataframe, new=new, old=old, current=current)
+
+            # create, read, delete
+            else:
                 procedure(dataframe=dataframe, new=new, old=old, current=current)
-        except KeyError:
-            raise
 
     def __remove_trigger(self, trigger_obj):
         """Method used to remove TriggerProcedure objs from the trigger_map.

@@ -74,9 +74,7 @@ class dataframe(object):
         pairs_added = self.type_manager.add_type(
             tp, 
             tracking, 
-            self.object_manager.adjust_pcc,  
-            self.change_manager.report_dim_modification,
-            self.object_manager.create_records_for_dim_modification)
+            self.update)
         records = self.object_manager.create_tables(pairs_added)
         self.external_db_queue.add_types(pairs_added)
         self.change_manager.add_records(records)
@@ -85,9 +83,7 @@ class dataframe(object):
         pairs_added = self.type_manager.add_types(
             types, 
             tracking, 
-            self.object_manager.adjust_pcc, 
-            self.change_manager.report_dim_modification,
-            self.object_manager.create_records_for_dim_modification)
+            self.update)
         records = self.object_manager.create_tables(pairs_added)
         self.external_db_queue.add_types(pairs_added)
         self.change_manager.add_records(records)
@@ -107,6 +103,42 @@ class dataframe(object):
     #############################################
 
     ####### OBJECT MANAGEMENT METHODS ###########
+    def update(self, dimension, obj, value):
+        try:
+            obj.__rtypes_current_triggers__ = set()
+            obj_before_changes = obj
+
+            # 0 - get the object's type
+            tp_obj = self.type_manager.get_requested_type(obj.__class__)
+            self.trigger_manager.execute_trigger(
+                tp_obj.type, TriggerTime.before, TriggerAction.update,
+                self, None, obj, obj)
+
+            # 1 - Update the dimension
+            dimension.update(obj, value)
+
+            # 2 - changes the dimensions of the object in dataframe
+            applied_records = self.object_manager.create_records_for_dim_modification(
+                tp_obj,
+                obj.__primarykey__,
+                {dimension: value})
+
+            # 3 - change any pccs that are changed as a result of this change
+            pcc_change_records = self.object_manager.adjust_pcc(
+                tp_obj,
+                {obj.__primarykey__: (obj, {dimension: value})},
+                to_be_converted = True)
+
+            # 4 - report changes to dataframe so changes can be made in other systems
+            self.change_manager.report_dim_modification(applied_records,
+                                                        pcc_change_records)
+            self.trigger_manager.execute_trigger(
+                tp_obj.type, TriggerTime.after, TriggerAction.update,
+                self, obj, None, obj)
+
+        except BlockAction:
+            pass
+
     def append(self, tp, obj):
         try:
             if (self.type_manager.check_for_new_insert(tp)
@@ -203,16 +235,6 @@ class dataframe(object):
     def clear_joins(self):
         for tp_obj in self.type_manager.get_join_types():
             _ = self.object_manager.delete_all(tp_obj)
-
-##########################################################################################
-    def update(self, tp, obj, new_value):
-        tp_obj = self.type_manager.get_requested_type(tp)
-
-        """
-        This method will be used to call update on dataframe
-        """
-        pass
-##########################################################################################
 
     #############################################
 

@@ -201,8 +201,7 @@ class Test_trigger_transfer_test(unittest.TestCase):
         
         for time, action in trigger_kinds_seprate():
             self.assertTrue(
-                TM.execute_trigger(Customer,time, action, "dataframe",
-                                   "new", "old", "current"))
+                TM.execute_trigger(Customer, time, action, None, None, None, None))
     
     def test_trigger_manager_remove(self):
         TM = TriggerManager()
@@ -226,9 +225,11 @@ class Test_trigger_transfer_test(unittest.TestCase):
             - Cannot read data of type x within a trigger attached to type x
             - After read triggers dont execute unless the read is valid
                 - read isn't valid if you are reading an object that doesn't exist
-    """
-    ####################################################
-    """
+        Update:
+            - Before:
+                - inside the trigger: cannot change dimensions that are being changed in
+                  the actual update action that activated the trigger
+
     Trigger test should be valid for Create, Read, Update, and Delete (CRUD) actions
     Should check that:
         Before:
@@ -248,8 +249,6 @@ class Test_trigger_transfer_test(unittest.TestCase):
             6) Any trigger can insert objects into the dataframe
             7) That overlapping triggers execute in the right order
    """
-    ####################################################
-    ####################################################
 
     #######################
     #### before create ####
@@ -1209,5 +1208,357 @@ class Test_trigger_transfer_test(unittest.TestCase):
         DF.append(Transaction, Transaction("Robert", 0))
 
         DF.delete(Transaction, Transaction("Robert", 10))
+
+        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+    
+    #######################
+    #### before update ####
+
+    def test_bu_1(self):
+        """
+        Tests that before create trigger arguments are the correct values
+        dataframe == dataframe object
+        new == object trigger is dealing with
+        old == None
+        current == None
+        """
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update)
+        def before_update(dataframe, new, old, current):
+            # Need to use this type of assert because this is executes outside this class
+            assert (str(type(dataframe)) ==
+                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
+            assert (new == None)
+            assert (str(type(old)) == "<class 'tests.trigger_test_classes.Transaction'>")
+            assert (str(type(current)) == "<class 'tests.trigger_test_classes.Transaction'>")
+
+        DF = dataframe()
+        DF.add_trigger(before_update)
+        DF.add_type(Transaction)
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
+
+    def test_bu_2(self):
+        """
+        Tests that before create triggers can block creates using BlockAction
+        """
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update)
+        def before_update(datatframe, new, old, current):
+            if old.name == "Robert":
+                raise BlockAction
+
+        DF = dataframe()
+        DF.add_trigger(before_update)
+        DF.add_type(Transaction)
+        DF.append(Transaction, Transaction("Robert", 10))
+        robert = DF.get(Transaction, "Robert")
+
+        robert.amount = 1000 # update the value
+        self.assertEqual(robert.amount, 10) # the value stays the same because of trigger
+        
+    def test_bu_3(self):
+        """
+        Tests that before update triggers can alter an object before it is inserted,
+        but not the same dimensions that are being changed
+        """
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update)
+        def before_update(datatframe, new, old, current):
+            old.name = "Jake"
+            old.amount = 1000
+
+        DF = dataframe()
+        DF.add_trigger(before_update)
+        DF.add_type(Transaction)
+
+        DF.append(Transaction, Transaction("Robert", 10))
+        robert = DF.get(Transaction, "Robert")
+
+        robert.amount = 0
+
+        self.assertEqual(DF.get(Transaction, "Robert").amount, 0)
+        self.assertEqual(DF.get(Transaction, "Robert").name, "Jake")
+
+    def test_bu_4(self):
+        """
+        Tests that before update triggers can [access|change]
+        objects in dataframe of the [same] type
+        """
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update)
+        def before_update(dataframe, new, old, current):
+            if old.name == "Robert":
+                jake = dataframe.get(Transaction, "Jake")
+                jake.amount = 1000
+
+        DF = dataframe()
+        DF.add_trigger(before_update)
+        DF.add_type(Transaction)
+        DF.append(Transaction, Transaction("Jake", 10))
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0 # activate the trigger
+        
+        # check that the trigger worked
+        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+
+    def test_bu_5(self):
+        """
+        Tests that before update triggers can [access|change]
+        objects in dataframe of a [different] type
+        """
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update)
+        def before_update(dataframe, new, old, current):
+            log = dataframe.get(TransactionHistory, "Robert")
+            log.count += 1
+
+        DF = dataframe()
+        DF.add_trigger(before_update)
+        DF.add_types([Transaction, TransactionHistory])
+        
+        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 1
+
+        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+
+    def test_bu_6(self):
+        """
+        Tests that before update triggers can insert objects into the dataframe
+        """
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update)
+        def before_update(dataframe, new, old, current):
+            dataframe.append(TransactionHistory, TransactionHistory(old.name, 0))
+
+        DF = dataframe()
+        DF.add_trigger(before_update)
+        DF.add_types([Transaction, TransactionHistory])
+
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0 
+
+        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+                                   TransactionHistory))
+
+    def test_bu_7(self):
+        """
+        Tests that overlapping before update triggers execute in the right order
+        """
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update, 0)
+        def before_update_0(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(0)
+
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update, 1)
+        def before_update_1(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(1)
+
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update, 2)
+        def before_update_2(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(2)
+
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update, 3)
+        def before_update_3(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(3)
+
+        @trigger(Transaction, TriggerTime.before, TriggerAction.update, 4)
+        def before_update_4(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(4)
+
+        DF = dataframe()
+        DF.add_triggers([before_update_1,
+                         before_update_0,
+                         before_update_3,
+                         before_update_2,
+                         before_update_4])
+
+        DF.add_types([Transaction, TransactionList])
+
+        DF.append(TransactionList, TransactionList("Robert"))
+        DF.append(Transaction, Transaction("Robert", 0))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount =  0
+
+        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+
+    #######################
+    #### after update #####
+
+    def test_au_1(self):
+        """
+        Tests that after update trigger arguments are the correct values
+        dataframe == dataframe object
+        new == object trigger is dealing with
+        old == None
+        current == object trigger is dealing with
+        """
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update)
+        def after_update(dataframe, new, old, current):
+            # Need to use this type of assert because this is executes outside this class
+            assert (str(type(dataframe)) ==
+                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
+            assert (str(type(new)) == "<class 'tests.trigger_test_classes.Transaction'>")
+            assert (old == None)
+            assert (str(type(current)) ==
+                    "<class 'tests.trigger_test_classes.Transaction'>")
+
+
+        DF = dataframe()
+        DF.add_trigger(after_update)
+        DF.add_type(Transaction)
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
+
+    def test_au_2(self):
+        """
+        Tests that raising BlockAction in a after update triggers does nothing concern
+        """
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update)
+        def after_update(datatframe, new, old, current):
+            raise BlockAction
+
+        DF = dataframe()
+        DF.add_trigger(after_update)
+        DF.add_type(Transaction)
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
+
+        self.assertEqual(DF.get(Transaction, "Robert").amount, 0)
+
+    def test_au_3(self):
+        """
+        Tests that after update triggers can alter an object before it is inserted
+        """
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update)
+        def before_update(datatframe, new, old, current):
+            new.amount = 1000
+
+        DF = dataframe()
+        DF.add_trigger(before_update)
+        DF.add_type(Transaction)
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
+
+        self.assertEqual(DF.get(Transaction, "Robert").amount, 1000)
+
+    def test_au_4(self):
+        """
+        Tests that after update triggers can [access|change]
+        objects in dataframe of the [same] type
+        """
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update)
+        def after_update(dataframe, new, old, current):
+            if new.name == "Robert":
+                jake = dataframe.get(Transaction, "Jake")
+                jake.amount = 1000
+
+        DF = dataframe()
+        DF.add_trigger(after_update)
+        DF.add_type(Transaction)
+        DF.append(Transaction, Transaction("Jake", 10))
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
+
+        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+
+    def test_au_5(self):
+        """
+        Tests that after update triggers can [access|change]
+        objects in dataframe of a [different] type
+        """
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update)
+        def after_update(dataframe, new, old, current):
+            log = dataframe.get(TransactionHistory, "Robert")
+            log.count += 1
+
+        DF = dataframe()
+        DF.add_trigger(after_update)
+        DF.add_types([Transaction, TransactionHistory])
+        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
+
+        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+
+    def test_au_6(self):
+        """
+        Tests that after update triggers can insert objects into the dataframe
+        """
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update)
+        def after_update(dataframe, new, old, current):
+            dataframe.append(TransactionHistory, TransactionHistory(new.name, 0))
+
+        DF = dataframe()
+        DF.add_trigger(after_update)
+        DF.add_types([Transaction, TransactionHistory])
+        DF.append(Transaction, Transaction("Robert", 10))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
+
+        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+                                   TransactionHistory))
+
+    def test_au_7(self):
+        """
+        Tests that overlapping after update triggers execute in the right order
+        """
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update, 0)
+        def after_update_0(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(0)
+
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update, 1)
+        def after_update_1(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(1)
+
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update, 2)
+        def after_update_2(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(2)
+
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update, 3)
+        def after_update_3(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(3)
+
+        @trigger(Transaction, TriggerTime.after, TriggerAction.update, 4)
+        def after_update_4(dataframe, new, old, current):
+            log = dataframe.get(TransactionList, "Robert")
+            log.history.append(4)
+
+        DF = dataframe()
+        DF.add_triggers([after_update_1,
+                         after_update_0,
+                         after_update_3,
+                         after_update_2,
+                         after_update_4])
+
+        DF.add_types([Transaction, TransactionList])
+        DF.append(TransactionList, TransactionList("Robert"))
+        DF.append(Transaction, Transaction("Robert", 0))
+
+        robert = DF.get(Transaction, "Robert")
+        robert.amount = 0
 
         self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
