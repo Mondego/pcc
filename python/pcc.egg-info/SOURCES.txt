@@ -17,9 +17,12 @@ rtypes/dataframe/dataframe_request.py
 rtypes/dataframe/dataframe_threading.py
 rtypes/dataframe/dataframe_type.py
 rtypes/dataframe/object_manager.py
+rtypes/dataframe/objectless_dataframe.py
 rtypes/dataframe/queue_manager.py
+rtypes/dataframe/state_manager.py
 rtypes/dataframe/trigger_manager.py
 rtypes/dataframe/type_manager.py
+rtypes/dataframe/type_state.py
 rtypes/dataframe/dataframe_changes/IDataframeChanges.py
 rtypes/dataframe/dataframe_changes/__init__.py
 rtypes/dataframe/dataframe_changes/dataframe_changes_bson.py
@@ -51,5 +54,3 @@ tests/pcc/__init__.py
 tests/pcc/test_create.py
 tests/pcc/utils/__init__.py
 tests/pcc/utils/metadata_tests.py
-tpc/__init__.py
-tpc/datamodel.py
