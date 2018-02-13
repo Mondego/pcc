@@ -65,9 +65,9 @@ class QueueManager(object):
             rec.full_obj, rec.fk_type)
         applist = self.all_types_dataframes
         if tpname in self.type_map:
-            applist.union(self.type_map[tpname])
+            applist.update(self.type_map[tpname])
         elif fk_for_tp and fk_for_tp in self.type_map:
-            applist.union(self.type_map[fk_for_tp])
+            applist.update(self.type_map[fk_for_tp])
 
         for app in applist:
             if app != except_app:

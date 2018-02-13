@@ -1,4 +1,4 @@
-from rtypes.pcc.attributes import rtype_property, aggregate_property, namespace_property
+from rtypes.pcc.attributes import rtype_property, aggregate_property, namespace_property, staticmethod_predicate
 from rtypes.pcc.utils.enums import PCCCategories
 from rtypes.pcc.this import thisclass, thisattr
 
@@ -40,6 +40,8 @@ class Metadata(object):
         self.group_by = None
         self.distinct = None
         self.sort_by = None
+        self.dim_triggers = set()
+        self.dim_to_groupmember_trigger = dict()
         self.projection_dims = set(
             projection_dims) if projection_dims else set()
         self.final_category = final_category
@@ -60,6 +62,10 @@ class Metadata(object):
         if self.distinct or self.limit or self.group_by or self.sort_by:
             self.categories.add(PCCCategories.impure)
         self.base_parents = base_parents if base_parents else self.parents
+        if self.dim_triggers:
+            for dim in self.dim_triggers:
+                self.group_type.dim_to_groupmember_trigger.setdefault(
+                    dim, set()).add(self)
 
     @staticmethod
     def processable_category(category):
@@ -212,6 +218,8 @@ class Metadata(object):
             setattr(self.cls, d._name, d)
         if hasattr(self.cls, "__predicate__"):
             self.predicate = self.cls.__predicate__
+            if isinstance(self.predicate, staticmethod_predicate):
+                self.dim_triggers.update(set(self.predicate.dimensions))
         if hasattr(self.cls, "__distinct__"):
             self.distinct = self.cls.__distinct__
         if hasattr(self.cls, "__limit__"):

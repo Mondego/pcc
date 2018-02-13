@@ -45,7 +45,8 @@ class ChangeManager(object):
              dim_change, full_dim_map, _) = (
                  rec.event, rec.tpname, rec.groupname, rec.oid,
                  rec.dim_change, rec.full_obj, rec.is_projection)
-            self.__record(event, tpname, groupname, oid, dim_change, full_dim_map)
+            self.__record(
+                event, tpname, groupname, oid, dim_change, full_dim_map)
         self.__send_to_queues(applied_records, pcc_change_records, except_app)
 
     def get_record(self):

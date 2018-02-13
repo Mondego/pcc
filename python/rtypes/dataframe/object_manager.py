@@ -238,12 +238,17 @@ class ObjectManager(object):
                          if (othertpname in self.object_map
                              and oid in self.object_map[othertpname]) else
                          Event.New)
-                self.object_map.setdefault(
-                    othertpname,
-                    RecursiveDictionary())[oid] = obj_map[othertp][oid]
-                obj_map[othertp][oid]._dataframe_data = (
-                    self.type_manager.tp_to_dataframe_payload[
-                        self.type_manager.get_requested_type(othertp)])
+                if event == Event.New:
+                    # If it is modification, then the modification should
+                    # already have been applied when updating the object.
+                    # Reassigning the object is going to cause a leak.abs
+                    # Leak seen and fixed on 12th Feb 2018.
+                    self.object_map.setdefault(
+                        othertpname,
+                        RecursiveDictionary())[oid] = obj_map[othertp][oid]
+                    obj_map[othertp][oid]._dataframe_data = (
+                        self.type_manager.tp_to_dataframe_payload[
+                            self.type_manager.get_requested_type(othertp)])
                 obj_changes = (
                     ObjectManager.__convert_to_dim_map(obj_map[othertp][oid])
                     if event == Event.New else
@@ -253,8 +258,7 @@ class ObjectManager(object):
                         event, self.type_manager.get_requested_type(othertp),
                         oid, obj_changes,
                         ObjectManager.__convert_to_dim_map(
-                            obj_map[othertp][oid])))
-
+                            self.object_map[othertpname][oid])))
         for othertp_obj in old_memberships:
             for oid in old_memberships[othertp_obj].difference(
                     set(obj_map[othertp_obj.type])):
@@ -305,7 +309,6 @@ class ObjectManager(object):
 
             return [ChangeRecord(Event.Delete, tp_obj, oid, None, None)]
         return records
-
 
     def apply_changes(self, df_changes, except_df=None):
         # see __create_objs function for the format of df_changes
@@ -413,11 +416,12 @@ class ObjectManager(object):
         self.changelog.clear()
 
     def clear_all(self):
+        for k in self.current_state:
+            self.current_state[k].clear()
+
         for k in self.object_map:
             self.object_map[k].clear()
 
-        for k in self.current_state:
-            self.current_state[k].clear()
 
     #################################################
     ### Private Methods #############################
@@ -554,7 +558,9 @@ class ObjectManager(object):
                 obj._dataframe_data = (
                     self.type_manager.tp_to_dataframe_payload[tp_obj])
                 obj.__start_tracking__ = True
-
+                if (tp_obj in self.deleted_objs
+                        and oid in self.deleted_objs[tp_obj]):
+                    self.deleted_objs[tp_obj].remove(oid)
                 self.object_map.setdefault(
                     tp_obj.name, RecursiveDictionary())[oid] = obj
                 touched_objs.setdefault(
@@ -604,7 +610,6 @@ class ObjectManager(object):
             ]
         }
         '''
-        generated_obj_map = RecursiveDictionary()
         objs_new, objs_mod, objs_deleted = (
             RecursiveDictionary(), RecursiveDictionary(),
             RecursiveDictionary())
@@ -718,7 +723,6 @@ class ObjectManager(object):
                             obj_changes))
             return records
 
-
     def __append(self, tp_obj, obj):
         records = list()
         tp = tp_obj.type
@@ -732,7 +736,8 @@ class ObjectManager(object):
             setattr(obj, tp.__primarykey__._name, str(uuid4()))
             oid = obj.__primarykey__
         tpname = metadata.name
-
+        if oid in self.object_map.setdefault(tpname, RecursiveDictionary()):
+            return list()
 
         # Store the state in records
         self.current_state.setdefault(
@@ -1093,7 +1098,7 @@ class ObjectManager(object):
                 convert_type = fk_type_obj.saveable_parent
             else:
                 raise TypeError(
-                    "Cannot use %s as a foreign key type" % fk_type)
+                    "Cannot use %s as a foreign key type" % repr(fk_type_obj))
 
             foreign_keys.append((key, convert_type, dim_change))
             dim["value"] = RecursiveDictionary()

@@ -66,9 +66,11 @@ class dataframe(object):
         # Can be used to synchnronize between dataframes.
         self.start_recording = external_db is not None
 
-        self.external_db_queue = ApplicationQueue(
-            "external_db", list(), self, all=True)
-        
+        self.external_db_queue = (
+            ApplicationQueue("external_db", list(), self, all=True)
+            if self.external_db else
+            None)
+
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
         pairs_added = self.type_manager.add_type(
@@ -89,7 +91,8 @@ class dataframe(object):
             self.change_manager.report_dim_modification,
             self.object_manager.create_records_for_dim_modification)
         records = self.object_manager.create_tables(pairs_added)
-        self.external_db_queue.add_types(pairs_added)
+        if self.external_db_queue:
+            self.external_db_queue.add_types(pairs_added)
         self.change_manager.add_records(records)
 
     def has_type(self, tp):
@@ -171,12 +174,13 @@ class dataframe(object):
     def delete_all(self, tp):
         # TODO: Add checks for tp
         tp_obj = self.type_manager.get_requested_type(tp)
-        if tp_obj.name in self.object_map:
-            for obj in self.object_map[tp_obj.name].values():
+        if tp_obj.name in self.object_manager.object_map:
+            for obj in self.object_manager.object_map[tp_obj.name].values():
                 self.trigger_manager.execute_trigger(
                     tp_obj, TriggerTime.before, TriggerAction.delete,
                     self, None, obj, obj)
-                self.change_manager.add_records(self.object_manager.delete(tp_obj, obj))
+                self.change_manager.add_records(
+                    self.object_manager.delete(tp_obj, obj))
                 self.trigger_manager.execute_trigger(
                     tp_obj, TriggerTime.after, TriggerAction.delete,
                     self, None, obj, None)
@@ -197,9 +201,12 @@ class dataframe(object):
     def start_recording(self, v):
         self.change_manager.startrecording = v
 
-    def apply_changes(self, changes, except_app=None, track=True):
+    def apply_changes(self, changes,
+                      except_app=None, track=True, only_diff=True):
         if "gc" not in changes:
             return
+        if not only_diff:
+            self.clear_all()
 
         applied_records, pcc_change_records, deletes = (
             self.object_manager.apply_changes(changes))
@@ -248,9 +255,10 @@ class dataframe(object):
     def pull(self):
         changes, clear_all = self.external_db.__rtypes_query__(
             [df_tp.type for df_tp in self.type_manager.observing_types])
-        if clear_all:
-            self.clear_all()
-        self.apply_changes(changes, except_app=self.external_db_queue.app_name)
+        self.apply_changes(
+            changes,
+            except_app=self.external_db_queue.app_name,
+            only_diff=not clear_all)
 
     def push(self):
         changes = self.external_db_queue.get_record()

@@ -2,6 +2,7 @@ import ast
 import inspect
 import logging
 import datetime
+import cPickle
 from mysql.connector import MySQLConnection
 from mysql.connector import errors
 from rtypes.pcc.create import change_type
@@ -18,83 +19,98 @@ class RTypesMySQLConnection(MySQLConnection):
         self.start_transaction()
         cursor = self.cursor()
         result = RecursiveDictionary()
-        #try:
-        for pcc_type in pcc_types:
-            dims_order, query = convert_to_read_query(pcc_type)
-            cursor.execute(query)
-            metadata = pcc_type.__rtypes_metadata__
-            grp_changes = result.setdefault(
-                metadata.groupname, RecursiveDictionary())
-            for row in cursor.fetchall():
-                dim_dict = dict(zip(dims_order, row))
-                primarykey_value = dim_dict[metadata.primarykey._name]
-                dim_changes = convert_to_dim_map(dim_dict)
-                obj_changes = grp_changes.setdefault(
-                    primarykey_value,
-                    RecursiveDictionary())
-                obj_changes.setdefault(
-                    "types",
-                    RecursiveDictionary())[metadata.name] = Event.New 
-                obj_changes.setdefault(
-                    "dims", RecursiveDictionary()).rec_update(dim_changes)
-        #except errors.Error as err:
-        #    self.rollback()
-        #    logger.error("Exeception %s seen during query", repr(err))
-        #    result = RecursiveDictionary()
+        try:
+            for pcc_type in pcc_types:
+                metadata = pcc_type.__rtypes_metadata__
+                # if PCCCategories.impure in metadata.categories:
+                #     continue
+                # if PCCCategories.pcc_set not in metadata.categories:
+                #     continue
+                dims_order, query = convert_to_read_query(pcc_type)
+                cursor.execute(query)
+                # metadata = pcc_type.__rtypes_metadata__
+                grp_changes = result.setdefault(
+                    metadata.groupname, RecursiveDictionary())
+                for row in cursor.fetchall():
+                    dim_dict = dict(zip(dims_order, row))
+                    primarykey_value = dim_dict[metadata.primarykey._name]
+                    dim_changes = convert_to_dim_map(dim_dict)
+                    obj_changes = grp_changes.setdefault(
+                        primarykey_value,
+                        RecursiveDictionary())
+                    obj_changes.setdefault(
+                        "types",
+                        RecursiveDictionary())[metadata.name] = Event.New 
+                    obj_changes.setdefault(
+                        "dims", RecursiveDictionary()).rec_update(dim_changes)
+        except errors.Error as err:
+            self.rollback()
+            # logger.error("Exeception %s seen during query", repr(err))
+            result = RecursiveDictionary()
         self.commit()
         cursor.close()
         return {"gc": result}, True
 
     def __rtypes_write__(self, changes, pcc_type_map):
-        self.start_transaction()
-#        try:
-        cursor = self.cursor()
-        cursor.execute("SHOW TABLES;")
-        rows = cursor.fetchall()
-        existing_tables = set(row[0] for row in rows if row)
-        if "gc" not in changes and "types" not in changes:
-            return
-        queries = list()
-        for typekey, status in changes.setdefault(
-                "types", dict()).iteritems():
-            if typekey not in pcc_type_map:
-                raise TypeError(
-                    "Could not process unregistered type %s", typekey)
-            metadata = pcc_type_map[typekey].__rtypes_metadata__
-            if metadata.shortname.lower() in existing_tables:
-                continue
-            if status == Event.New:
-                queries.append(create_table_query(pcc_type_map[typekey]))
-            if status == Event.Delete:
-                queries.append(drop_table_query(pcc_type_map[typekey]))
-
-        for group_key, group_changes in changes.setdefault(
-                "gc", dict()).iteritems():
-            for oid, obj_changes in group_changes.iteritems():
-                if group_key not in obj_changes["types"]:
+        try:    
+            self.start_transaction()
+        
+            cursor = self.cursor()
+            cursor.execute("SHOW TABLES;")
+            rows = cursor.fetchall()
+            existing_tables = set(row[0] for row in rows if row)
+            if "gc" not in changes and "types" not in changes:
+                return
+            queries = list()
+            for typekey, status in changes.setdefault(
+                    "types", dict()).iteritems():
+                if typekey not in pcc_type_map:
+                    raise TypeError(
+                        "Could not process unregistered type %s", typekey)
+                metadata = pcc_type_map[typekey].__rtypes_metadata__
+                if metadata.shortname.lower() in existing_tables:
                     continue
-                event_type = determine_update_type(
-                    group_key, obj_changes["types"])
-                if event_type == Event.New:
-                    queries.append(
-                        insert_query(
-                            group_key, obj_changes["dims"], pcc_type_map))
-                elif event_type == Event.Modification:
-                    queries.append(
-                        modify_query(
-                            group_key, oid,
-                            obj_changes["dims"], pcc_type_map))
-                elif event_type == Event.Delete:
-                    queries.append(
-                        delete_query(group_key, oid, pcc_type_map))
-        for q, args in queries:
-            cursor.execute(q, args)
-        self.commit()
-        cursor.close()
-#        except errors.Error as err:
-#            self.rollback()
-#            print err
-#            logger.error("Exeception %s seen during write", repr(err))
+                # if PCCCategories.impure in metadata.categories:
+                #     continue
+                # if PCCCategories.pcc_set not in metadata.categories:
+                #     continue
+                if status == Event.New:
+                    queries.append(create_table_query(pcc_type_map[typekey]))
+                if status == Event.Delete:
+                    queries.append(drop_table_query(pcc_type_map[typekey]))
+
+            for group_key, group_changes in changes.setdefault(
+                    "gc", dict()).iteritems():
+                for oid, obj_changes in group_changes.iteritems():
+                    if group_key not in obj_changes["types"]:
+                        continue
+                    event_type = determine_update_type(
+                        group_key, obj_changes["types"])
+                    if event_type == Event.New:
+                        queries.append(
+                            insert_query(
+                                group_key, obj_changes["dims"], pcc_type_map))
+                    elif event_type == Event.Modification:
+                        queries.append(
+                            modify_query(
+                                group_key, oid,
+                                obj_changes["dims"], pcc_type_map))
+                    elif event_type == Event.Delete:
+                        queries.append(
+                            delete_query(group_key, oid, pcc_type_map))
+            for q, args in queries:
+                # print q, args
+                try:
+                    cursor.execute(q, args)
+                except errors.IntegrityError:
+                    continue
+            self.commit()
+            cursor.close()
+        except errors.Error as err:
+            self.reconnect()
+            self.rollback()
+            # print err
+            # logger.error("Exeception %s seen during write", repr(err))
 
 
 def convert_to_dim_map(dim_dict):
@@ -115,6 +131,10 @@ def format_value(tp, value):
     if tp == Record.DATETIME:
         return "%d-%d-%d" % (
             value.year, value.month, value.day)
+    if tp == Record.DICTIONARY:
+        return cPickle.dumps(value)
+    if tp == Record.COLLECTION:
+        return cPickle.dumps(value)
     return value
 
 
@@ -143,7 +163,8 @@ def insert_query(group_key, dims, pcc_type_map):
         ", ".join(["%s"] * len(names))
     )
 
-    return query, [v["value"] for v in values]
+    return query, [format_value(v["type"], v.setdefault("value", None))
+                   for v in values]
 
 
 def modify_query(group_key, oid, dims, pcc_type_map):
@@ -159,7 +180,8 @@ def modify_query(group_key, oid, dims, pcc_type_map):
             metadata.shortname,
             primarykey_field)
 
-    return query, [v["value"] for v in values] + [oid]
+    return query, [format_value(v["type"], v.setdefault("value", None))
+                   for v in values] + [oid]
 
 
 def delete_query(group_key, oid, pcc_type_map):
@@ -196,14 +218,16 @@ def create_obj(sql_obj, dims_order, pcc_type):
 def create_table_query(entity):
     metadata = entity.__rtypes_metadata__
     if metadata.final_category is PCCCategories.pcc_set:
-        query = (("CREATE TABLE %s (" % (metadata.shortname,))
-         + ", ".join([
-             " ".join([d._name, 
-                       convert_type(
-                           d._type, primarykey=(d == metadata.primarykey)), 
-                       "PRIMARY KEY" if d == metadata.primarykey else ""]) 
-             for d in metadata.dimensions]) 
-         + ");") 
+        print metadata.shortname
+        query = (
+            ("CREATE TABLE %s (" % (metadata.shortname,))
+            + ", ".join([
+                " ".join([d._name, 
+                          convert_type(
+                              d._type, primarykey=(d == metadata.primarykey)),
+                          "PRIMARY KEY" if d == metadata.primarykey else ""])
+                for d in metadata.dimensions])
+            + ");") 
         return query, list()
     else:
         # TODO: Make this work for all types of alternate views.
@@ -217,7 +241,10 @@ def create_table_query(entity):
     
 
 def drop_table_query(entity):
-    tbltype = "TABLE" if entity.__PCC_BASE_TYPE__ else "VIEW"
+    metadata = entity.__rtypes_metadata__
+    tbltype = ("TABLE" 
+               if metadata.final_category is PCCCategories.pcc_set else
+               "VIEW")
     return "DROP %s %s;" % (
         tbltype, entity.__rtypes_metadata__.shortname), list()
 
@@ -226,6 +253,7 @@ def read_filters(tp):
     metadata = tp.__rtypes_metadata__
     filter_str = ""
     if metadata.predicate:
+        print metadata.name
         filter_str += "WHERE " + convert_expr(metadata.predicate)
     # Have to implement all the groupby and orderby and all that.
     return filter_str
@@ -317,6 +345,10 @@ def convert_type(tp, primarykey=False):
         return "TEXT"
     if tp == datetime.date:
         return "DATETIME"
+    if tp == dict or tp == RecursiveDictionary:
+        return "TEXT"
+    if tp == list:
+        return "TEXT"
 
 
 class _container(object):

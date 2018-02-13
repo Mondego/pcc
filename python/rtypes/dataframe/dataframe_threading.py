@@ -9,7 +9,8 @@ from dataframe_request import GetDFRequest, \
     DeleteDFRequest, \
     DeleteAllDFRequest, \
     ApplyChangesDFRequest, \
-    PutDFRequest
+    PutDFRequest, \
+    ShutdownDFRequest
 
 class dataframe_wrapper(Thread):
     def __init__(self, name = str(uuid4()), df=None):
@@ -24,16 +25,19 @@ class dataframe_wrapper(Thread):
         # Results for get requests
         self.get_token_dict = dict()
         self.isDaemon = True
-        self.shutdown = False
+        self.stop = False
         self.start()
 
     def run(self):
-        while not self.shutdown:
+        while not self.stop:
             req = self.queue.get()
             if isinstance(req, GetDFRequest):
                 self.process_get_req(req, self.get_token_dict)
             else:
-                self.process_put_req(req)
+                self.process_put_req(req, self.get_token_dict)
+
+    def shutdown(self):
+        self.queue.put(ShutdownDFRequest())
 
     def process_get_req(self, get_req, token_dict):
         if not isinstance(get_req, GetDFRequest):
@@ -42,9 +46,9 @@ class dataframe_wrapper(Thread):
             get_req.type_object, get_req.oid, get_req.param)
         token_dict[get_req.token].put(result)
 
-    def process_put_req(self, put_req):
+    def process_put_req(self, put_req, token_dict):
         if isinstance(put_req, ApplyChangesDFRequest):
-            self.process_apply_req(put_req)
+            self.process_apply_req(put_req, token_dict)
         elif isinstance(put_req, AppendDFRequest):
             self.process_append_req(put_req)
         elif isinstance(put_req, ExtendDFRequest):
@@ -53,6 +57,8 @@ class dataframe_wrapper(Thread):
             self.process_delete_req(put_req)
         elif isinstance(put_req, DeleteAllDFRequest):
             self.process_deleteall_req(put_req)
+        elif isinstance(put_req, ShutdownDFRequest):
+            self.stop = True
         return
 
     def process_append_req(self, append_req):
@@ -71,9 +77,11 @@ class dataframe_wrapper(Thread):
         self.dataframe.delete_all(
             deleteall_req.type_object)
 
-    def process_apply_req(self, apply_req):
+    def process_apply_req(self, apply_req, token_dict):
         self.dataframe.apply_changes(
             apply_req.df_changes, except_app=apply_req.except_app)
+        if apply_req.wait_for_server:
+            token_dict[apply_req.token].put(True)
 
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
@@ -148,11 +156,20 @@ class dataframe_wrapper(Thread):
     def object_manager(self):
         return self.dataframe.object_manager
 
-    def apply_changes(self, changes, except_app=None):
+    def apply_changes(self, changes, except_app=None, wait_for_server=False):
         req = ApplyChangesDFRequest()
         req.df_changes = changes
         req.except_app = except_app
+        req.wait_for_server = wait_for_server
+        if wait_for_server:
+            req.token = uuid4()
+            self.get_token_dict[req.token] = Queue()
         self.queue.put(req)
+        if wait_for_server:
+            try:
+                return self.get_token_dict[req.token].get(timeout=5)
+            except Empty:
+                return False
 
     def get_record(self):
         return self.dataframe.get_record()

@@ -1,6 +1,5 @@
 from rtypes.pcc.triggers import TriggerAction, TriggerTime
 
-from enums import ObjectType
 import os
 import bisect
 

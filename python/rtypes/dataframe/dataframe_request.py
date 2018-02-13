@@ -110,3 +110,27 @@ class ApplyChangesDFRequest(object):
     @except_app.setter
     def except_app(self, v):
         self._except_app = v
+
+    @property
+    def wait_for_server(self):
+        try:
+            return self._wait_for_server
+        except AttributeError:
+            self._wait_for_server = False
+            return self._wait_for_server
+
+    @wait_for_server.setter
+    def wait_for_server(self, v):
+        self._wait_for_server = v
+
+    @property
+    def token(self):
+        return self._token
+
+    @token.setter
+    def token(self, v):
+        self._token = v
+
+
+class ShutdownDFRequest(PutDFRequest):
+    pass

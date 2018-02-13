@@ -90,7 +90,7 @@ class ApplicationQueue(object):
         deleted = RecursiveDictionary()
 
         for tp in self.registered_impures:
-            tpname = tp.__realname__
+            tpname = tp.__rtypes_metadata__.name
             obj_oids = (self.known_objects[tpname]
                         if tpname in self.known_objects else
                         set())

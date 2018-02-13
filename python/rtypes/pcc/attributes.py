@@ -4,7 +4,6 @@ Create on Feb 27, 2016
 @author: Rohan Achar
 '''
 import uuid
-from threading import currentThread
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from abc import ABCMeta, abstractmethod
 
@@ -23,14 +22,12 @@ def get_type(obj):
             return "primitive"
         if hasattr(obj, "__dict__"):
             return "object"
-    except TypeError, e:
+    except TypeError as e:
         return "unknown"
     return "unknown"
 
 class rtype_property(property):
-    change_tracker = RecursiveDictionary()
-    GLOBAL_TRACKER = False
-    
+
     def __repr__(self):
         return self._name
 
@@ -69,15 +66,16 @@ class rtype_property(property):
                 and hasattr(obj, "__primarykey__")
                 and obj.__primarykey__):
             if obj.__start_tracking__:
-                tp_getter, tr, gr, rr = obj._dataframe_data
-                tp_obj = tp_getter(obj.__class__)
+                (get_requested_type, pcc_adjuster, records_creator,
+                 dim_modification_reporter) = obj._dataframe_data
+                tp_obj = get_requested_type(obj.__class__)
                 applied_records = (
-                    gr(tp_obj, obj.__primarykey__, {self: value}))
+                    records_creator(tp_obj, obj.__primarykey__, {self: value}))
                 pcc_change_records = (
-                    tr(tp_obj,
+                    pcc_adjuster(tp_obj,
                        {obj.__primarykey__: (obj, {self: value})},
                        to_be_converted = True))
-                rr(applied_records, pcc_change_records)
+                dim_modification_reporter(applied_records, pcc_change_records)
                     
         if not obj.__start_tracking__ or bypass:
             if self._primarykey and value == None:
@@ -85,20 +83,6 @@ class rtype_property(property):
                 obj._primarykey = self
             property.__set__(self, obj, value)
             return
-        if (not self._primarykey
-                and "_primarykey" != self._name
-                and rtype_property.GLOBAL_TRACKER):
-            type_name = get_type(value)
-            store_value = value
-            if type_name == "dependent":
-                return
-            elif type_name == "object":
-                store_value = dict(value.__dict__)
-
-            rtype_property.change_tracker.setdefault(
-                currentThread().getName(), RecursiveDictionary()).setdefault(
-                    obj.__class__, RecursiveDictionary()).setdefault(
-                        obj.__primarykey__, dict())[self._name] = store_value
 
 class primarykey(object):
     def __init__(self, tp=None, default=True):
@@ -192,3 +176,20 @@ class namespace(object):
     
     def __call__(self, func):
         return namespace_property(self.type, func)
+
+
+class staticmethod_predicate(object):
+    def __init__(self, func, dimensions):
+        self.dimensions = dimensions
+        self.func = func
+    
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+
+class predicate(object):
+    def __init__(self, *dimensions):
+        self.dimensions = dimensions
+
+    def __call__(self, func):
+        return staticmethod_predicate(func, self.dimensions)

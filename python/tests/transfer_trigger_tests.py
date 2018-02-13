@@ -26,35 +26,35 @@ def create_triggers():
 
     @trigger(Customer, TriggerTime.before, TriggerAction.create, 1)
     def before_create(dataframe, new, old, current):
-        print("[BEFORE create] - Procedure Executed")
+        ("[BEFORE create] - Procedure Executed")
 
     @trigger(Customer, TriggerTime.after, TriggerAction.create, 1)
     def after_create(dataframe, new, old, current):
-        print("[AFTER create] -- Procedure Executed")
+        ("[AFTER create] -- Procedure Executed")
 
     @trigger(Customer, TriggerTime.before, TriggerAction.read, 1)
     def before_read(dataframe, new, old, current):
-        print("[BEFORE READ] --- Procedure Executed")
+        ("[BEFORE READ] --- Procedure Executed")
 
     @trigger(Customer, TriggerTime.after, TriggerAction.read, 1)
     def after_read(dataframe, new, old, current):
-        print("[AFTER READ] ---- Procedure Executed")
+        ("[AFTER READ] ---- Procedure Executed")
 
     @trigger(Customer, TriggerTime.before, TriggerAction.update, 1)
     def before_update(dataframe, new, old, current):
-        print("[BEFORE UPDATE] - Procedure Executed")
+        ("[BEFORE UPDATE] - Procedure Executed")
 
     @trigger(Customer, TriggerTime.after, TriggerAction.update, 1)
     def after_update(dataframe, new, old, current):
-        print("[AFTER UPDATE] -- Procedure Executed")
+        ("[AFTER UPDATE] -- Procedure Executed")
 
     @trigger(Customer, TriggerTime.before, TriggerAction.delete, 1)
     def before_delete(dataframe, new, old, current):
-        print("[BEFORE DELETE] - Procedure Executed")
+        ("[BEFORE DELETE] - Procedure Executed")
 
     @trigger(Customer, TriggerTime.after, TriggerAction.delete, 1)
     def after_delete(dataframe, new, old, current):
-        print("[AFTER DELETE] -- Procedure Executed")
+        ("[AFTER DELETE] -- Procedure Executed")
 
     return before_create, after_create, before_read, after_read, \
         before_update, after_update, before_delete, after_delete
