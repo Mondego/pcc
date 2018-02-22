@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from rtypes.pcc.attributes import dimension, primarykey
 from rtypes.pcc.types.set import pcc_set
+from rtypes.dataframe import dataframe
 
 class Customer(object):
     pass

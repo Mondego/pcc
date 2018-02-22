@@ -1,7 +1,6 @@
-from rtypes.pcc.triggers import TriggerAction, TriggerTime, TriggerProcedure
+from rtypes.pcc.triggers import TriggerAction, TriggerTime
 
 from enums import ObjectType
-import os
 import bisect
 
 
@@ -9,8 +8,8 @@ class TriggerManager(object):
     """Used to regulate all trigger's that exist in the dataframe.
        Can do the following:
        - Add triggers
-       - Get triggers 
-       - Delete triggers 
+       - Get triggers
+       - Delete triggers
        - Execute triggers
 
     Attributes:
@@ -19,7 +18,7 @@ class TriggerManager(object):
     """
 
     def __init__(self):
-        """Creates a TriggerManager object, and initializes a trigger_map. 
+        """Creates a TriggerManager object, and initializes a trigger_map.
         """
         self.trigger_map = dict()
         self.__rtypes_current_triggers__ = dict()
@@ -60,7 +59,7 @@ class TriggerManager(object):
             self.__add_trigger(obj)
 
     def execute_trigger(self, tp_obj, time, action, dataframe, new, old, current):
-        """Method used to execute one specific TriggerProcedure obj. 
+        """Method used to execute one specific TriggerProcedure obj.
            Only executes TriggerProcedure objs that meet the specified criteria.
            Passes in arguments "dataframe", "new", "old", and "current" into the procedure
 
@@ -95,7 +94,7 @@ class TriggerManager(object):
         self.__remove_trigger(trigger_obj)
 
     def trigger_exists(self, tp_obj, time, action):
-       return self.__trigger_in_map(tp_obj, time, action)
+        return self.__trigger_in_map(tp_obj, time, action)
 
     #################################################
     ### Private Methods #############################
@@ -134,21 +133,16 @@ class TriggerManager(object):
                 list: This is a list of TriggerProcedure objs that are associated with
                       the specified type and activated at the specified time + action
         """
-
-        ##################################################################################
-        # This needs to be changed! For some reason, triggers are placed in reverse order
-        ##################################################################################
-
         if tp in self.trigger_map and ((time + action) in self.trigger_map[tp]):
         # 1a: Check if the pcc_type has any triggers atteched to it
-            self.trigger_map[tp][time + action].reverse()
+            self.trigger_map[tp][time + action]
             return self.trigger_map[tp][time + action]
         else:
         # 1b: Return an empty list
             return list()
 
     def __execute_trigger(self, tp, time, action, dataframe, new, old, current):
-        """Method used to execute speciific TriggerProcedure objs. 
+        """Method used to execute speciific TriggerProcedure objs.
            Only executes TriggerProcedure objs that meet the specified criteria.
            Passes in arguments "dataframe", "new", "old", and "current" into the procedure
 
@@ -163,10 +157,7 @@ class TriggerManager(object):
 
             Returns:
                 None: Does not return anything, only activates procedure objects
-        
             __rtypes_current_triggers__ = {"before_update": [Customer, Transaction]}
-                
-                
                 """
         for procedure in self.__get_trigger(tp, time, action):
             """
@@ -178,7 +169,7 @@ class TriggerManager(object):
             The map's keys are each procedure object, each key has a set of objets.
 
             Each set is a literal set of object.
-            
+
             These objects show that the procedure has activated on the objects inside
                 the set.
 
@@ -189,13 +180,13 @@ class TriggerManager(object):
             if action == TriggerAction.update and (new or old or current):
 
                 # if the triggers has been mapped to an object
-                if (procedure in self.__rtypes_current_triggers__):
-                    
+                if procedure in self.__rtypes_current_triggers__:
+
                     # If the object is in this map, then dont do anything
                     if new in self.__rtypes_current_triggers__[procedure]:
                         pass
                     # Add the object to the map so there isn't recursion
-                    # also execute the triggerdd
+                    # also execute the trigger
                     else:
                         self.__rtypes_current_triggers__[procedure].add(new)
                         procedure(dataframe=dataframe, new=new, old=old, current=current)
@@ -231,7 +222,7 @@ class TriggerManager(object):
                              + " does not have any triggers attached to the dataframe")
 
     def __procedure_index_location(self, trigger_obj):
-        """Method determines index position of a TriggerProcedure object in the 
+        """Method determines index position of a TriggerProcedure object in the
            trigger_map's list of TriggerProcedure objs.
 
             Args:
@@ -246,12 +237,12 @@ class TriggerManager(object):
         # changing the __eq__ method
 
         for index in range((len(
-            self.trigger_map[trigger_obj.pcc_type][trigger_obj.time
-                                                   + trigger_obj.action]))):
+                self.trigger_map[trigger_obj.pcc_type][trigger_obj.time
+                                                       + trigger_obj.action]))):
             if (self.trigger_map[
-                trigger_obj.pcc_type][trigger_obj.time
-                                      + trigger_obj.action][index].procedure.__name__ 
-                == trigger_obj.procedure.__name__):
+                    trigger_obj.pcc_type][trigger_obj.time
+                                          + trigger_obj.action][index].procedure.__name__
+                    == trigger_obj.procedure.__name__):
                 return index
 
     def __trigger_obj_in_map(self, trigger_obj):
@@ -267,7 +258,7 @@ class TriggerManager(object):
         return self.__trigger_in_map(
             trigger_obj.pcc_type, trigger_obj.time, trigger_obj.action)
 
-    def __trigger_in_map(self, tp, time ,action):
+    def __trigger_in_map(self, tp, time, action):
         try:
             return len(self.trigger_map[tp][time + action]) != 0
         except KeyError:

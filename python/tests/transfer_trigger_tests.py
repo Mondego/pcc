@@ -10,11 +10,6 @@ from rtypes.dataframe import dataframe
 
 import unittest
 
-# IMPORTANT #
-# Triggers are inserted in reverse order... not sure why. I dont really understand the 
-# sorting  method so this is best to ask Rohan!
-# The issue can be found in the trigger_manager __get_trigger method
-
 ####################################################
 ################### Triggers Here ##################
 ####################################################
@@ -24,42 +19,34 @@ def create_triggers():
 
     @trigger(Customer, TriggerTime.before, TriggerAction.create, 1)
     def before_create(dataframe, new, old, current):
-        #print("[BEFORE create] - Procedure Executed")
         pass
 
     @trigger(Customer, TriggerTime.after, TriggerAction.create, 1)
     def after_create(dataframe, new, old, current):
-        #print("[AFTER create] -- Procedure Executed")
         pass
 
     @trigger(Customer, TriggerTime.before, TriggerAction.read, 1)
     def before_read(dataframe, new, old, current):
-        #print("[BEFORE READ] --- Procedure Executed")
         pass
 
     @trigger(Customer, TriggerTime.after, TriggerAction.read, 1)
     def after_read(dataframe, new, old, current):
-        #print("[AFTER READ] ---- Procedure Executed")
         pass
 
     @trigger(Customer, TriggerTime.before, TriggerAction.update, 1)
     def before_update(dataframe, new, old, current):
-        #print("[BEFORE UPDATE] - Procedure Executed")
         pass
 
     @trigger(Customer, TriggerTime.after, TriggerAction.update, 1)
     def after_update(dataframe, new, old, current):
-        #print("[AFTER UPDATE] -- Procedure Executed")
         pass
 
     @trigger(Customer, TriggerTime.before, TriggerAction.delete, 1)
     def before_delete(dataframe, new, old, current):
-        #print("[BEFORE DELETE] - Procedure Executed")
         pass
 
     @trigger(Customer, TriggerTime.after, TriggerAction.delete, 1)
     def after_delete(dataframe, new, old, current):
-        #print("[AFTER DELETE] -- Procedure Executed")
         pass
 
     return before_create, after_create, before_read, after_read, \
@@ -217,8 +204,6 @@ class Test_trigger_transfer_test(unittest.TestCase):
         for time, action in trigger_kinds_seprate():
             self.assertTrue(TM.trigger_map[Customer][time + action] == [])
 
-    # Do I need to test .extend??? 
-    ####################################################
     """
     Notes:
         Read:
@@ -261,19 +246,19 @@ class Test_trigger_transfer_test(unittest.TestCase):
         old == None
         current == None
         """
+        results = list()
         @trigger(Transaction, TriggerTime.before, TriggerAction.create)
         def before_create(dataframe, new, old, current):
             # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (str(type(new)) == "<class 'tests.trigger_test_classes.Transaction'>")
-            assert (old == None)
-            assert (current == None)
+            results.append(("before_create", dataframe, new, old, current))
 
-        DF = dataframe()
-        DF.add_trigger(before_create)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(before_create)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+
+        self.assertListEqual([("before_create", df, obj, None, None)], results)
 
     def test_bc_2(self):
         """
@@ -284,12 +269,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
             if new.name == "Robert":
                 raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(before_create)
-        DF.add_type(Transaction)
-        self.assertEqual([], DF.get(Transaction)) # Nothing before creation of object
-        DF.append(Transaction, Transaction("Robert", 10))
-        self.assertEqual([], DF.get(Transaction)) # Nothing after creation of object
+        df = dataframe()
+        df.add_trigger(before_create)
+        df.add_type(Transaction)
+        self.assertEqual([], df.get(Transaction)) # Nothing before creation of object
+        df.append(Transaction, Transaction("Robert", 10))
+        self.assertEqual([], df.get(Transaction)) # Nothing after creation of object
 
     def test_bc_3(self):
         """
@@ -300,12 +285,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
             if new.name == "Robert":
                 new.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(before_create)
-        DF.add_type(Transaction)
+        df = dataframe()
+        df.add_trigger(before_create)
+        df.add_type(Transaction)
 
-        DF.append(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Robert").amount, 1000)
+        df.append(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Robert").amount, 1000)
 
     def test_bc_4(self):
         """
@@ -318,12 +303,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
                 jake = dataframe.get(Transaction, "Jake")
                 jake.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(before_create)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        DF.append(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+        df = dataframe()
+        df.add_trigger(before_create)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Jake", 10))
+        df.append(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Jake").amount, 1000)
 
     def test_bc_5(self):
         """
@@ -335,15 +320,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(before_create)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_create)
+        df.add_types([Transaction, TransactionHistory])
         
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_bc_6(self):
         """
@@ -353,13 +338,13 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def before_create(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory(new.name, 0))
 
-        DF = dataframe()
-        DF.add_trigger(before_create)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_create)
+        df.add_types([Transaction, TransactionHistory])
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_bc_7(self):
@@ -391,19 +376,19 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([before_create_1,
+        df = dataframe()
+        df.add_triggers([before_create_1,
                          before_create_0,
                          before_create_3,
                          before_create_2,
                          before_create_4])
 
-        DF.add_types([Transaction, TransactionList])
+        df.add_types([Transaction, TransactionList])
 
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.append(Transaction, Transaction("Robert", 0))
+        df.append(TransactionList, TransactionList("Robert"))
+        df.append(Transaction, Transaction("Robert", 0))
 
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])
 
     #######################
     #### after create #####
@@ -416,20 +401,18 @@ class Test_trigger_transfer_test(unittest.TestCase):
         old == None
         current == object trigger is dealing with
         """
+        result = list()
+
         @trigger(Transaction, TriggerTime.after, TriggerAction.create)
         def after_create(dataframe, new, old, current):
-            # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (str(type(new)) == "<class 'tests.trigger_test_classes.Transaction'>")
-            assert (old == None)
-            assert (str(type(current)) ==
-                    "<class 'tests.trigger_test_classes.Transaction'>")
+            result.append(("after_create", dataframe, new, old, current))
 
-        DF = dataframe()
-        DF.add_trigger(after_create)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(after_create)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+        self.assertListEqual([("after_create", df, obj, None, obj)], result)
 
     def test_ac_2(self):
         """
@@ -440,11 +423,11 @@ class Test_trigger_transfer_test(unittest.TestCase):
             if new.name == "Robert":
                 raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(after_create)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-        self.assertTrue(DF.get(Transaction, "Robert"), Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(after_create)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
+        self.assertTrue(df.get(Transaction, "Robert"), Transaction("Robert", 10))
 
     def test_ac_3(self):
         """
@@ -454,12 +437,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_create(datatframe, new, old, current):
             new.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(after_create)
-        DF.add_type(Transaction)
+        df = dataframe()
+        df.add_trigger(after_create)
+        df.add_type(Transaction)
         test = Transaction("Robert", 10)
-        DF.append(Transaction, test)
-        self.assertTrue(DF.get(Transaction, "Robert") == test)
+        df.append(Transaction, test)
+        self.assertTrue(df.get(Transaction, "Robert") == test)
 
     def test_ac_4(self):
         """
@@ -472,12 +455,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
                 jake = dataframe.get(Transaction, "Jake")
                 jake.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(after_create)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        DF.append(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+        df = dataframe()
+        df.add_trigger(after_create)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Jake", 10))
+        df.append(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Jake").amount, 1000)
 
     def test_ac_5(self):
         """
@@ -489,15 +472,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(after_creeate)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(after_creeate)
+        df.add_types([Transaction, TransactionHistory])
         
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_ac_6(self):
         """
@@ -507,13 +490,13 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_create(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory(new.name, 0))
 
-        DF = dataframe()
-        DF.add_trigger(after_create)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(after_create)
+        df.add_types([Transaction, TransactionHistory])
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_ac_7(self):
@@ -545,19 +528,19 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([after_create_1,
+        df = dataframe()
+        df.add_triggers([after_create_1,
                          after_create_0,
                          after_create_3,
                          after_create_2,
                          after_create_4])
 
-        DF.add_types([Transaction, TransactionList])
+        df.add_types([Transaction, TransactionList])
 
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.append(Transaction, Transaction("Robert", 0))
+        df.append(TransactionList, TransactionList("Robert"))
+        df.append(Transaction, Transaction("Robert", 0))
 
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])
 
     #######################
     ##### before read #####
@@ -570,19 +553,18 @@ class Test_trigger_transfer_test(unittest.TestCase):
         old == None
         current == None
         """
+        result = list()
         @trigger(Transaction, TriggerTime.before, TriggerAction.read)
         def before_read(dataframe, new, old, current):
-            # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (new == None)
-            assert (old == None)
-            assert (current == None)
+            result.append(("before_read", dataframe, new, old, current))
 
-        DF = dataframe()
-        DF.add_trigger(before_read)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(before_read)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+        test = df.get(Transaction, "Robert")
+        self.assertListEqual([("before_read", df, None, None, None)], result)
 
     def test_br_2(self):
         """
@@ -592,33 +574,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def before_read(datatframe, new, old, current):
             raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(before_read)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-        test = DF.get(Transaction)
+        df = dataframe()
+        df.add_trigger(before_read)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
+        test = df.get(Transaction)
         self.assertEqual(test, None)
-
-    # test_br_3 cannot access objects before read - this test is irrelivant
-
-    # Cannot read data of type x within a trigger attached to type x
-    '''
-    def test_br_4(self):
-        """
-        Tests that before create triggers can [access|change]
-        objects in dataframe of the [same] type
-        """
-        @trigger(Transaction, TriggerTime.before, TriggerAction.read)
-        def before_create(dataframe, new, old, current):
-            jake = dataframe.get(Transaction, "Jake")
-            jake.amount += 1
-
-        DF = dataframe()
-        DF.add_trigger(before_create)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        print(DF.get(Transaction, "Jake").amount)
-    '''
 
     def test_br_5(self):
         """
@@ -630,15 +591,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(before_read)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_read)
+        df.add_types([Transaction, TransactionHistory])
         
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
 
-        DF.get(Transaction)
+        df.get(Transaction)
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_br_6(self):
         """
@@ -648,12 +609,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def before_read(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory("Robert", 0))
 
-        DF = dataframe()
-        DF.add_trigger(before_read)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_read)
+        df.add_types([Transaction, TransactionHistory])
 
-        DF.get(Transaction)
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        df.get(Transaction)
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_br_7(self):
@@ -685,18 +646,18 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([before_r_1,
+        df = dataframe()
+        df.add_triggers([before_r_1,
                          before_r_0,
                          before_r_3,
                          before_r_2,
                          before_r_4])
 
-        DF.add_types([Transaction, TransactionList])
+        df.add_types([Transaction, TransactionList])
 
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.get(Transaction)
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        df.append(TransactionList, TransactionList("Robert"))
+        df.get(Transaction)
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])
 
     #######################
     ##### after read ######
@@ -709,22 +670,18 @@ class Test_trigger_transfer_test(unittest.TestCase):
         old == object trigger is dealing with
         current == object trigger is dealing with
         """
+        result = list()
         @trigger(Transaction, TriggerTime.after, TriggerAction.read)
         def after_read(dataframe, new, old, current):
-            # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (new == None)
-            assert (str(type(old)) ==
-                    "<class 'tests.trigger_test_classes.Transaction'>")
-            assert (str(type(current)) ==
-                    "<class 'tests.trigger_test_classes.Transaction'>")
+            result.append(("after_read", dataframe, new, old, current))
 
-        DF = dataframe()
-        DF.add_trigger(after_read)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.get(Transaction)
+        df = dataframe()
+        df.add_trigger(after_read)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+        test = df.get(Transaction)
+        self.assertListEqual([("after_read", df, None, obj, obj)], result)
 
     def test_ar_2(self):
         """
@@ -735,12 +692,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
             if old.name == "Robert":
                 raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(after_read)
-        DF.add_type(Transaction)
+        df = dataframe()
+        df.add_trigger(after_read)
+        df.add_type(Transaction)
         test_1 = Transaction("Robert", 10)
-        DF.append(Transaction, test_1)
-        self.assertEqual(DF.get(Transaction, "Robert"), test_1)
+        df.append(Transaction, test_1)
+        self.assertEqual(df.get(Transaction, "Robert"), test_1)
 
     def test_ar_3(self):
         """
@@ -751,32 +708,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
             old.amount = 100
             current.amount = 100
 
-        DF = dataframe()
-        DF.add_trigger(after_read)
-        DF.add_type(Transaction)
+        df = dataframe()
+        df.add_trigger(after_read)
+        df.add_type(Transaction)
         test = Transaction("Robert", 10)
-        DF.append(Transaction, test)
-        self.assertTrue(DF.get(Transaction, "Robert") == test)
-
-    # Cannot read data of type x within a trigger attached to type x
-    '''
-    def test_ar_4(self):
-        """
-        Tests that after read triggers can [access|change]
-        objects in dataframe of the [same] type
-        """
-        @trigger(Transaction, TriggerTime.after, TriggerAction.read)
-        def after_read(dataframe, new, old, current):
-            jake = dataframe.get(Transaction, "Jake")
-            jake.amount = 1000
-
-        DF = dataframe()
-        DF.add_trigger(after_read)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        DF.append(Transaction, Transaction("Robert", 10))
-        print(DF.get(Transaction))
-    '''
+        df.append(Transaction, test)
+        self.assertTrue(df.get(Transaction, "Robert") == test)
 
     def test_ar_5(self):
         """
@@ -788,17 +725,17 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(after_read)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(after_read)
+        df.add_types([Transaction, TransactionHistory])
         
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        DF.get(Transaction, "Robert")
+        df.get(Transaction, "Robert")
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_ar_6(self):
         """
@@ -810,15 +747,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_read(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory("Robert", 0))
 
-        DF = dataframe()
-        DF.add_trigger(after_read)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(after_read)
+        df.add_types([Transaction, TransactionHistory])
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        DF.get(Transaction, "Robert")
+        df.get(Transaction, "Robert")
 
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_ar_7(self):
@@ -850,19 +787,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([ar_1,
-                         ar_0,
-                         ar_3,
-                         ar_2,
-                         ar_4])
+        df = dataframe()
+        df.add_triggers([ar_1, ar_0, ar_3, ar_2, ar_4])
 
-        DF.add_types([Transaction, TransactionList])
+        df.add_types([Transaction, TransactionList])
 
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.get(Transaction)
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        df.append(TransactionList, TransactionList("Robert"))
+        df.append(Transaction, Transaction("Robert", 10))
+        df.get(Transaction)
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])
 
     #######################
     #### before delete ####
@@ -871,27 +804,22 @@ class Test_trigger_transfer_test(unittest.TestCase):
         """
         Tests that before delete trigger arguments are the correct values
         dataframe == dataframe object
-        new == object trigger is dealing with
-        old == None
-        current == None
+        new == None
+        old == object trigger is dealing with
+        current == object trigger is dealing with
         """
+        result = list()
         @trigger(Transaction, TriggerTime.before, TriggerAction.delete)
         def before_delete(dataframe, new, old, current):
-            # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (new == None)
-            assert (str(type(old)) ==
-                    "<class 'tests.trigger_test_classes.Transaction'>")
-            assert (str(type(current)) ==
-                    "<class 'tests.trigger_test_classes.Transaction'>")
+            result.append(("before_delete", dataframe, new, old, current))
 
-        DF = dataframe()
-        DF.add_trigger(before_delete)
-        DF.add_type(Transaction)
-        test = Transaction("Robert", 10)
-        DF.append(Transaction, test)
-        DF.delete(Transaction, test)
+        df = dataframe()
+        df.add_trigger(before_delete)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+        df.delete(Transaction, obj)
+        self.assertListEqual([("before_delete", df, None, obj, obj)], result)
 
     def test_bd_2(self):
         """
@@ -902,12 +830,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
             if old.name == "Robert":
                 raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(before_delete)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Robert"), Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(before_delete)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Robert"), Transaction("Robert", 10))
 
     # You can change the object, but it is going to be deleted right after...
     # Unless you have a block, the delete will remove the object
@@ -922,13 +850,13 @@ class Test_trigger_transfer_test(unittest.TestCase):
             if old.name == "Robert":
                 old.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(before_delete)
-        DF.add_type(Transaction)
+        df = dataframe()
+        df.add_trigger(before_delete)
+        df.add_type(Transaction)
 
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Robert"), None)
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Robert"), None)
 
     def test_bd_3_b(self):
         """
@@ -940,13 +868,13 @@ class Test_trigger_transfer_test(unittest.TestCase):
                 old.amount = 1000
                 raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(before_delete)
-        DF.add_type(Transaction)
+        df = dataframe()
+        df.add_trigger(before_delete)
+        df.add_type(Transaction)
 
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Robert"), Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Robert"), Transaction("Robert", 10))
 
     def test_bd_4(self):
         """
@@ -959,13 +887,13 @@ class Test_trigger_transfer_test(unittest.TestCase):
                 jake = dataframe.get(Transaction, "Jake")
                 jake.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(before_delete)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+        df = dataframe()
+        df.add_trigger(before_delete)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Jake", 10))
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Jake").amount, 1000)
 
     def test_bd_5(self):
         """
@@ -977,16 +905,16 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(before_delete)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_delete)
+        df.add_types([Transaction, TransactionHistory])
         
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        DF.delete(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_bd_6(self):
         """
@@ -996,13 +924,13 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def before_delete(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory(new.name, 0))
 
-        DF = dataframe()
-        DF.add_trigger(before_delete)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_delete)
+        df.add_types([Transaction, TransactionHistory])
 
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_bd_7(self):
@@ -1034,21 +962,21 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([before_delete_1,
+        df = dataframe()
+        df.add_triggers([before_delete_1,
                          before_delete_0,
                          before_delete_3,
                          before_delete_2,
                          before_delete_4])
 
-        DF.add_types([Transaction, TransactionList])
+        df.add_types([Transaction, TransactionList])
 
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.append(Transaction, Transaction("Robert", 0))
+        df.append(TransactionList, TransactionList("Robert"))
+        df.append(Transaction, Transaction("Robert", 0))
 
-        DF.delete(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
 
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])
 
     #######################
     #### after delete #####
@@ -1061,19 +989,18 @@ class Test_trigger_transfer_test(unittest.TestCase):
         old == object trigger is dealing with
         current == None
         """
+        result = list()
         @trigger(Transaction, TriggerTime.after, TriggerAction.delete)
         def after_delete(dataframe, new, old, current):
-            # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (new == None)
-            assert (str(type(old)) == "<class 'tests.trigger_test_classes.Transaction'>")
-            assert (current == None)
+            result.append(("after_delete", dataframe, new, old, current))
 
-        DF = dataframe()
-        DF.add_trigger(after_delete)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(after_delete)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+        df.delete(Transaction, obj)
+        self.assertListEqual([("after_delete", df, None, obj, None)], result)
 
     def test_ad_2(self):
         """
@@ -1083,12 +1010,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_create(datatframe, new, old, current):
             raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(after_create)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Robert"), None)
+        df = dataframe()
+        df.add_trigger(after_create)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Robert"), None)
 
     def test_ad_3(self):
         """
@@ -1099,12 +1026,12 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_delete(datatframe, new, old, current):
             old.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(after_delete)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Robert"), None)
+        df = dataframe()
+        df.add_trigger(after_delete)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Robert"), None)
 
     def test_ad_4(self):
         """
@@ -1117,13 +1044,13 @@ class Test_trigger_transfer_test(unittest.TestCase):
                 jake = dataframe.get(Transaction, "Jake")
                 jake.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(after_delete)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        DF.append(Transaction, Transaction("Robert", 10))
-        DF.delete(Transaction, Transaction("Robert", 10))
-        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+        df = dataframe()
+        df.add_trigger(after_delete)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Jake", 10))
+        df.append(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
+        self.assertEqual(df.get(Transaction, "Jake").amount, 1000)
 
     def test_ad_5(self):
         """
@@ -1135,17 +1062,17 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(after_delete)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(after_delete)
+        df.add_types([Transaction, TransactionHistory])
         
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        DF.delete(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_ad_6(self):
         """
@@ -1155,15 +1082,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_delete(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory(old.name, 0))
 
-        DF = dataframe()
-        DF.add_trigger(after_delete)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(after_delete)
+        df.add_types([Transaction, TransactionHistory])
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        DF.delete(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
 
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_ad_7(self):
@@ -1195,21 +1122,21 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([ad_1,
+        df = dataframe()
+        df.add_triggers([ad_1,
                          ad_0,
                          ad_3,
                          ad_2,
                          ad_4])
 
-        DF.add_types([Transaction, TransactionList])
+        df.add_types([Transaction, TransactionList])
 
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.append(Transaction, Transaction("Robert", 0))
+        df.append(TransactionList, TransactionList("Robert"))
+        df.append(Transaction, Transaction("Robert", 0))
 
-        DF.delete(Transaction, Transaction("Robert", 10))
+        df.delete(Transaction, Transaction("Robert", 10))
 
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])
     
     #######################
     #### before update ####
@@ -1218,26 +1145,23 @@ class Test_trigger_transfer_test(unittest.TestCase):
         """
         Tests that before create trigger arguments are the correct values
         dataframe == dataframe object
-        new == object trigger is dealing with
-        old == None
-        current == None
+        new == None
+        old == obj
+        current == obj
         """
+        result = list()
         @trigger(Transaction, TriggerTime.before, TriggerAction.update)
         def before_update(dataframe, new, old, current):
-            # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (new == None)
-            assert (str(type(old)) == "<class 'tests.trigger_test_classes.Transaction'>")
-            assert (str(type(current)) == "<class 'tests.trigger_test_classes.Transaction'>")
+            result.append(("before_update", dataframe, new, old, current))
 
-        DF = dataframe()
-        DF.add_trigger(before_update)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-
-        robert = DF.get(Transaction, "Robert")
+        df = dataframe()
+        df.add_trigger(before_update)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
+        self.assertListEqual([("before_update", df, None, obj, obj)], result)
 
     def test_bu_2(self):
         """
@@ -1248,11 +1172,11 @@ class Test_trigger_transfer_test(unittest.TestCase):
             if old.name == "Robert":
                 raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(before_update)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-        robert = DF.get(Transaction, "Robert")
+        df = dataframe()
+        df.add_trigger(before_update)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
+        robert = df.get(Transaction, "Robert")
 
         robert.amount = 1000 # update the value
         self.assertEqual(robert.amount, 10) # the value stays the same because of trigger
@@ -1267,17 +1191,17 @@ class Test_trigger_transfer_test(unittest.TestCase):
             old.name = "Jake"
             old.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(before_update)
-        DF.add_type(Transaction)
+        df = dataframe()
+        df.add_trigger(before_update)
+        df.add_type(Transaction)
 
-        DF.append(Transaction, Transaction("Robert", 10))
-        robert = DF.get(Transaction, "Robert")
+        df.append(Transaction, Transaction("Robert", 10))
+        robert = df.get(Transaction, "Robert")
 
         robert.amount = 0
 
-        self.assertEqual(DF.get(Transaction, "Robert").amount, 0)
-        self.assertEqual(DF.get(Transaction, "Robert").name, "Jake")
+        self.assertEqual(df.get(Transaction, "Robert").amount, 0)
+        self.assertEqual(df.get(Transaction, "Robert").name, "Jake")
 
     def test_bu_4(self):
         """
@@ -1290,17 +1214,17 @@ class Test_trigger_transfer_test(unittest.TestCase):
                 jake = dataframe.get(Transaction, "Jake")
                 jake.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(before_update)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(before_update)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Jake", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0 # activate the trigger
         
         # check that the trigger worked
-        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+        self.assertEqual(df.get(Transaction, "Jake").amount, 1000)
 
     def test_bu_5(self):
         """
@@ -1312,17 +1236,17 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(before_update)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_update)
+        df.add_types([Transaction, TransactionHistory])
         
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 1
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_bu_6(self):
         """
@@ -1332,16 +1256,16 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def before_update(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory(old.name, 0))
 
-        DF = dataframe()
-        DF.add_trigger(before_update)
-        DF.add_types([Transaction, TransactionHistory])
+        df = dataframe()
+        df.add_trigger(before_update)
+        df.add_types([Transaction, TransactionHistory])
 
-        DF.append(Transaction, Transaction("Robert", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0 
 
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_bu_7(self):
@@ -1373,22 +1297,22 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([before_update_1,
+        df = dataframe()
+        df.add_triggers([before_update_1,
                          before_update_0,
                          before_update_3,
                          before_update_2,
                          before_update_4])
 
-        DF.add_types([Transaction, TransactionList])
+        df.add_types([Transaction, TransactionList])
 
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.append(Transaction, Transaction("Robert", 0))
+        df.append(TransactionList, TransactionList("Robert"))
+        df.append(Transaction, Transaction("Robert", 0))
 
-        robert = DF.get(Transaction, "Robert")
-        robert.amount =  0
+        robert = df.get(Transaction, "Robert")
+        robert.amount = 0
 
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])
 
     #######################
     #### after update #####
@@ -1401,24 +1325,20 @@ class Test_trigger_transfer_test(unittest.TestCase):
         old == None
         current == object trigger is dealing with
         """
+        result = list()
         @trigger(Transaction, TriggerTime.after, TriggerAction.update)
         def after_update(dataframe, new, old, current):
-            # Need to use this type of assert because this is executes outside this class
-            assert (str(type(dataframe)) ==
-                    "<class 'rtypes.dataframe.dataframe.dataframe'>")
-            assert (str(type(new)) == "<class 'tests.trigger_test_classes.Transaction'>")
-            assert (old == None)
-            assert (str(type(current)) ==
-                    "<class 'tests.trigger_test_classes.Transaction'>")
+            result.append(("after_update", dataframe, new, old, current))
 
 
-        DF = dataframe()
-        DF.add_trigger(after_update)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
-
-        robert = DF.get(Transaction, "Robert")
+        df = dataframe()
+        df.add_trigger(after_update)
+        df.add_type(Transaction)
+        obj = Transaction("Robert", 10)
+        df.append(Transaction, obj)
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
+        self.assertListEqual([("after_update", df, obj, None, obj)], result)
 
     def test_au_2(self):
         """
@@ -1428,15 +1348,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_update(datatframe, new, old, current):
             raise BlockAction
 
-        DF = dataframe()
-        DF.add_trigger(after_update)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(after_update)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
 
-        self.assertEqual(DF.get(Transaction, "Robert").amount, 0)
+        self.assertEqual(df.get(Transaction, "Robert").amount, 0)
 
     def test_au_3(self):
         """
@@ -1446,15 +1366,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def before_update(datatframe, new, old, current):
             new.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(before_update)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(before_update)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
 
-        self.assertEqual(DF.get(Transaction, "Robert").amount, 1000)
+        self.assertEqual(df.get(Transaction, "Robert").amount, 1000)
 
     def test_au_4(self):
         """
@@ -1467,16 +1387,16 @@ class Test_trigger_transfer_test(unittest.TestCase):
                 jake = dataframe.get(Transaction, "Jake")
                 jake.amount = 1000
 
-        DF = dataframe()
-        DF.add_trigger(after_update)
-        DF.add_type(Transaction)
-        DF.append(Transaction, Transaction("Jake", 10))
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(after_update)
+        df.add_type(Transaction)
+        df.append(Transaction, Transaction("Jake", 10))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
 
-        self.assertEqual(DF.get(Transaction, "Jake").amount, 1000)
+        self.assertEqual(df.get(Transaction, "Jake").amount, 1000)
 
     def test_au_5(self):
         """
@@ -1488,16 +1408,16 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionHistory, "Robert")
             log.count += 1
 
-        DF = dataframe()
-        DF.add_trigger(after_update)
-        DF.add_types([Transaction, TransactionHistory])
-        DF.append(TransactionHistory, TransactionHistory("Robert", 0))
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(after_update)
+        df.add_types([Transaction, TransactionHistory])
+        df.append(TransactionHistory, TransactionHistory("Robert", 0))
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
 
-        self.assertEqual(DF.get(TransactionHistory, "Robert").count, 1)
+        self.assertEqual(df.get(TransactionHistory, "Robert").count, 1)
 
     def test_au_6(self):
         """
@@ -1507,15 +1427,15 @@ class Test_trigger_transfer_test(unittest.TestCase):
         def after_update(dataframe, new, old, current):
             dataframe.append(TransactionHistory, TransactionHistory(new.name, 0))
 
-        DF = dataframe()
-        DF.add_trigger(after_update)
-        DF.add_types([Transaction, TransactionHistory])
-        DF.append(Transaction, Transaction("Robert", 10))
+        df = dataframe()
+        df.add_trigger(after_update)
+        df.add_types([Transaction, TransactionHistory])
+        df.append(Transaction, Transaction("Robert", 10))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
 
-        self.assertTrue(isinstance(DF.get(TransactionHistory, "Robert"),
+        self.assertTrue(isinstance(df.get(TransactionHistory, "Robert"),
                                    TransactionHistory))
 
     def test_au_7(self):
@@ -1547,18 +1467,18 @@ class Test_trigger_transfer_test(unittest.TestCase):
             log = dataframe.get(TransactionList, "Robert")
             log.history.append(4)
 
-        DF = dataframe()
-        DF.add_triggers([after_update_1,
+        df = dataframe()
+        df.add_triggers([after_update_1,
                          after_update_0,
                          after_update_3,
                          after_update_2,
                          after_update_4])
 
-        DF.add_types([Transaction, TransactionList])
-        DF.append(TransactionList, TransactionList("Robert"))
-        DF.append(Transaction, Transaction("Robert", 0))
+        df.add_types([Transaction, TransactionList])
+        df.append(TransactionList, TransactionList("Robert"))
+        df.append(Transaction, Transaction("Robert", 0))
 
-        robert = DF.get(Transaction, "Robert")
+        robert = df.get(Transaction, "Robert")
         robert.amount = 0
 
-        self.assertEqual(DF.get(TransactionList, "Robert").history, [0,1,2,3,4])
+        self.assertEqual(df.get(TransactionList, "Robert").history, [0, 1, 2, 3, 4])

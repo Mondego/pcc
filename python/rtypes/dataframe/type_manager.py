@@ -136,7 +136,7 @@ class TypeManager(object):
                 "declare it as pcc_set." % tp.__class__.__name__)
         metadata = tp.__rtypes_metadata__
         if metadata.name not in self.name2class:
-            raise TypeError("Type %s hasnt been registered" % tp.__realname__)
+            raise TypeError("Type %s hasnt been registered" % metadata.name)
         tp_obj = self.name2class[metadata.name]
         if not tp_obj in self.observing_types:
             raise TypeError(

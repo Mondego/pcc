@@ -52,7 +52,8 @@ class dataframe(object):
         self.type_manager = TypeManager()
 
         # The object that deals with object management
-        self.object_manager = ObjectManager(self.type_manager)
+        self.object_manager = ObjectManager(
+            self.type_manager, self.execute_trigger)
 
         # The object that deals with record management
         self.change_manager = ChangeManager()
@@ -105,11 +106,10 @@ class dataframe(object):
     ####### OBJECT MANAGEMENT METHODS ###########
     def update(self, dimension, obj, value):
         try:
-            obj.__rtypes_current_triggers__ = set()
             obj_before_changes = obj
 
             # 0 - get the object's type
-            tp_obj = self.type_manager.get_requested_type(obj.__class__)
+            tp_obj = self.type_manager.get_requested_type(obj.__class__.__rtypes_metadata__.cls)
             self.trigger_manager.execute_trigger(
                 tp_obj.type, TriggerTime.before, TriggerAction.update,
                 self, None, obj, obj)
@@ -127,7 +127,7 @@ class dataframe(object):
             pcc_change_records = self.object_manager.adjust_pcc(
                 tp_obj,
                 {obj.__primarykey__: (obj, {dimension: value})},
-                to_be_converted = True)
+                to_be_converted=True)
 
             # 4 - report changes to dataframe so changes can be made in other systems
             self.change_manager.report_dim_modification(applied_records,
@@ -325,3 +325,7 @@ class dataframe(object):
     def remove_trigger(self, trigger_obj):
          """ can remove a trigger from the trigger_manager into the dataframe """
          self.trigger_manager.remove_trigger(trigger_obj)
+
+    def execute_trigger(self, tp_obj, time, action, new, old, current):
+        self.trigger_manager.execute_trigger(
+            tp_obj.type, time, action, self, new, old, current)

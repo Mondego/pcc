@@ -17,19 +17,19 @@ class TriggerProcedure(object):
         self.pcc_type = pcc_type
         self.time = time
         self.action = action
-        self.priority = priority 
+        self.priority = priority
 
     def __call__(self, dataframe=None, new=None, old=None, current=None):
         return self.procedure(dataframe, new, old, current)
 
     def __eq__(self, v):
-        return v.priority == self.priority
+        return  self.priority == v.priority
 
     def __lt__(self, v):
-        return v.priority < self.priority
+        return self.priority < v.priority
 
     def __gt__(self, v):
-        return v.priority < self.priority
+        return self.priority > v.priority
 
 class trigger(object):
 
@@ -43,7 +43,7 @@ class trigger(object):
         return TriggerProcedure(procedure, self.pcc_type, self.time, self.action, self.priority)
 
 
-class BlockAction (Exception):
+class BlockAction(Exception):
     pass
 
 
