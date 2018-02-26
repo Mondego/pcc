@@ -46,13 +46,11 @@ class OrderedSliceableDict(OrderedDict):
                 raise KeyError("Cannot slice empty dictionary")
             start = key.start if key.start else root[1 if reverse else 0][2]
             stop = (map[key.stop] if key.stop else root)[1 if reverse else 0][2]
-            print start, stop
             if start == stop:
                 return list()
             items = list()
             curr = map[start]
             while True:
-                print curr[2], stop, key, root[0][2]
                 items.append(self[curr[2]])
                 if curr[2] == stop:
                     break

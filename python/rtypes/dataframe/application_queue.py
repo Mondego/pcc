@@ -1,12 +1,18 @@
+import time
+from threading import Thread
+
+from multiprocess import RLock
+from multiprocess.queues import Empty
+
+from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from rtypes.pcc.utils.enums import Event
-from threading import Thread, RLock
-from Queue import Empty
-from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 
 
 class ApplicationQueue(object):
-    def __init__(self, name, types, dataframe, all=False):
+    def __init__(
+            self, name, types, dataframe,
+            all=False, compress_in_parallel=False):
         self.app_name = name
         self.known_objects = RecursiveDictionary()
         self.current_record = RecursiveDictionary()
@@ -18,50 +24,69 @@ class ApplicationQueue(object):
             self)
         self.lock = RLock()
         self.first_run = True
+        if compress_in_parallel:
+            self.p = Thread(
+                target=self.merge_parallel,
+                name="Thread_ApplicationQueue_MergeParallel")
+            self.p.daemon = True
+            self.p.start()
+
+    def merge_parallel(self):
+        records = list()
+        while True:
+            with self.lock:
+                while True:
+                    try:
+                        records.extend(self.queue.get_nowait())
+                    except Empty:
+                        self.merge_records(records)
+                        records = list()
+                        break
+            time.sleep(2)
 
     def add_types(self, pairs_added):
         for tpname, _ in pairs_added:
             self.type_changes[tpname] = Event.New
-    
+
     def merge_records(self, records):
         #new_records_this_cycle = RecursiveDictionary()
-        with self.lock:
-            for rec in records:
-                event, tpname, groupname, oid, dim_change, full_obj = (
-                    rec.event, rec.tpname, rec.groupname,
-                    rec.oid, rec.dim_change, rec.full_obj)
-                obj_changes = self.current_record.setdefault(
-                    groupname, RecursiveDictionary()).setdefault(
-                        oid, RecursiveDictionary())
-                type_changes = obj_changes.setdefault(
-                    "types", RecursiveDictionary())
-                if (tpname in type_changes
-                        and type_changes[tpname] == Event.Delete):
-                    continue
-                is_known = (tpname in self.known_objects
-                            and oid in self.known_objects[tpname])
-                if event == Event.New:
-                    type_changes[tpname] = event
+        for rec in records:
+            event, tpname, groupname, oid, dim_change, full_obj = (
+                rec.event, rec.tpname, rec.groupname,
+                rec.oid, rec.dim_change, rec.full_obj)
+            obj_changes = self.current_record.setdefault(
+                groupname, RecursiveDictionary()).setdefault(
+                    oid, RecursiveDictionary())
+            type_changes = obj_changes.setdefault(
+                "types", RecursiveDictionary())
+            if (tpname in type_changes
+                    and type_changes[tpname] == Event.Delete):
+                continue
+            is_known = (tpname in self.known_objects
+                        and oid in self.known_objects[tpname])
+            if event == Event.New:
+                type_changes[tpname] = event
+                obj_changes.setdefault(
+                    "dims", RecursiveDictionary()).rec_update(full_obj)
+            elif event == Event.Modification:
+                type_changes[tpname] = event if is_known else Event.New
+                change = dim_change if is_known else full_obj
+                if change:
                     obj_changes.setdefault(
-                        "dims", RecursiveDictionary()).rec_update(full_obj)
-                elif event == Event.Modification:
-                    type_changes[tpname] = event if is_known else Event.New
-                    change = dim_change if is_known else full_obj
-                    if change:
-                        obj_changes.setdefault(
-                            "dims", RecursiveDictionary()).rec_update(change)
-                elif event == Event.Delete:
-                    type_changes[tpname] = event
+                        "dims", RecursiveDictionary()).rec_update(change)
+            elif event == Event.Delete:
+                type_changes[tpname] = event
 
     def get_record(self):
         records = list()
-        while True:
-            try:
-                records.extend(self.queue.get_nowait())
-            except Empty:
-                self.merge_records(records)
-                records = list()
-                break
+        with self.lock:
+            while True:
+                try:
+                    records.extend(self.queue.get_nowait())
+                except Empty:
+                    self.merge_records(records)
+                    records = list()
+                    break
         objmap = self.fetch_impure_types()
 
         return ApplicationQueue.__convert_to_serializable_dict(
@@ -75,7 +100,8 @@ class ApplicationQueue(object):
         return type_changes
 
     def clear_record(self):
-        self.current_record = RecursiveDictionary()
+        with self.lock:
+            self.current_record = RecursiveDictionary()
 
     def fetch_impure_types(self):
         objmap = RecursiveDictionary()
@@ -132,8 +158,9 @@ class ApplicationQueue(object):
                 for tpname, status in obj_changes["types"].items():
                     if status == Event.New:
                         self.known_objects.setdefault(tpname, set()).add(oid)
-                    elif (status == Event.Delete 
-                              and oid in self.known_objects[tpname]):
+                    elif (status == Event.Delete
+                          and oid in self.known_objects.setdefault(
+                              tpname, set())):
                         self.known_objects[tpname].remove(oid)
 
         return current_record

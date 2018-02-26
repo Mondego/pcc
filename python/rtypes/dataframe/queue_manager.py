@@ -1,5 +1,6 @@
-from multiprocessing import RLock
-from Queue import Empty, Queue
+from multiprocess import RLock
+from multiprocess import Queue
+from multiprocess.queues import Empty
 
 #################################################
 #### Attached Dataframe Stuff ###################

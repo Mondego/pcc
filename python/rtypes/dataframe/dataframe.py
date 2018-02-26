@@ -67,7 +67,9 @@ class dataframe(object):
         self.start_recording = external_db is not None
 
         self.external_db_queue = (
-            ApplicationQueue("external_db", list(), self, all=True)
+            ApplicationQueue(
+                "external_db", list(), self,
+                all=True, compress_in_parallel=True)
             if self.external_db else
             None)
 
@@ -215,8 +217,8 @@ class dataframe(object):
             self.change_manager.add_records(
                 applied_records, pcc_change_records, except_app)
 
-    def get_record(self):
-        return self.change_manager.get_record()
+    def get_record(self, changelist=None):
+        return self.change_manager.get_record(changelist)
 
     def clear_record(self):
         return self.change_manager.clear_record()

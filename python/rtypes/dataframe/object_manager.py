@@ -87,6 +87,18 @@ class ObjectManager(object):
     def propagate_changes(self, v):
         self._pc = v
 
+    @property
+    def ignore_buffer_changes(self):
+        try:
+            return self._ibc
+        except AttributeError:
+            self._ibc = True
+            return self._ibc
+
+    @ignore_buffer_changes.setter
+    def ignore_buffer_changes(self, v):
+        self._ibc = v
+
     @staticmethod
     def __convert_to_dim_map(obj):
         return RecursiveDictionary(
@@ -310,6 +322,13 @@ class ObjectManager(object):
             return [ChangeRecord(Event.Delete, tp_obj, oid, None, None)]
         return records
 
+    def delete_all(self, tp_obj):
+        records = []
+        if tp_obj.name in self.object_map:
+            for obj in self.object_map(tp_obj.name).itervalues():
+                records.extend(self.delete(tp_obj, obj))
+        return records
+
     def apply_changes(self, df_changes, except_df=None):
         # see __create_objs function for the format of df_changes
         # if master: send changes to all other dataframes attached.
@@ -370,6 +389,8 @@ class ObjectManager(object):
             RecursiveDictionary())
 
     def add_buffer_changes(self, changes, deletes):
+        if self.ignore_buffer_changes:
+            return
         try:
             if "gc" not in changes:
                 return
@@ -528,14 +549,14 @@ class ObjectManager(object):
         for tp_obj in objs_mod:
             if tp_obj.name not in self.object_map:
                 continue
-            for oid, obj_and_change in objs_mod[tp_obj].items():
+            for oid, obj_and_change in objs_mod[tp_obj].iteritems():
                 obj, change = obj_and_change
                 if oid not in self.object_map[tp_obj.name]:
                     # Treat as a new object
                     # Not sure what to do.
                     pass
                 elif obj != None:
-                    self.object_map[tp_obj.name][oid].__dict__.rec_update(
+                    self.object_map[tp_obj.name][oid].__dict__.update(
                         obj.__dict__)
                 touched_objs.setdefault(
                     tp_obj.group_key, RecursiveDictionary())[oid] = change
@@ -635,6 +656,12 @@ class ObjectManager(object):
                         obj_changes["dims"],
                         group_type,
                         df_changes["gc"])
+                elif (groupname in self.current_state
+                         and oid in self.current_state[groupname]):
+                    # This is required in case it is an update where type
+                    # changes, but the object data is already with the class.
+                    new_obj = self.__create_fake_class()()
+                    new_obj.__dict__ = self.current_state[groupname][oid]
 
                 # For all type and status changes for that object
                 for found_member, status in obj_changes["types"].items():
@@ -777,8 +804,8 @@ class ObjectManager(object):
                 del self.record_obj[tp_obj.group_key][oid]
         elif event == Event.New:
             self.record_obj.setdefault(
-                tp_obj.group_key, RecursiveDictionary()).setdefault(
-                    oid, RecursiveDictionary()).rec_update(full_obj_map)
+                tp_obj.group_key, RecursiveDictionary())[oid] = (
+                    RecursiveDictionary(full_obj_map))
         elif event == Event.Modification:
             if (tp_obj.group_key in self.record_obj
                    and oid in self.record_obj[tp_obj.group_key]

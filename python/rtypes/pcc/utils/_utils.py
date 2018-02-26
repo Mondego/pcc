@@ -1,7 +1,8 @@
 import datetime
-
+from dateutil import parser
 from rtypes.pcc.utils.metadata import Metadata
 from rtypes.pcc.utils.enums import Record
+from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 
 
 def build_required_attrs(cooked_cls, category, parents, projection_dims=None):
@@ -25,6 +26,12 @@ def build_required_attrs(cooked_cls, category, parents, projection_dims=None):
 
 
 class ValueParser(object):
+    @staticmethod
+    def create_fake_class():
+        class container(object):
+            pass
+        return container
+
     @staticmethod
     def get_obj_type(obj):
         # both iteratable/dictionary + object type is messed up. Won't work.
@@ -53,3 +60,54 @@ class ValueParser(object):
         except TypeError, e:
             return -1
         return -1
+
+    @staticmethod
+    def parse(record):
+        if record["type"] == Record.INT:
+            # the value will be in record["value"]
+            return long(record["value"])
+        if record["type"] == Record.FLOAT:
+            # the value will be in record["value"]
+            return float(record["value"])
+        if record["type"] == Record.STRING:
+            # the value will be in record["value"]
+            return record["value"]
+        if record["type"] == Record.BOOL:
+            # the value will be in record["value"]
+            return record["value"]
+        if record["type"] == Record.NULL:
+            # No value, just make it None
+            return None
+
+        if record["type"] == Record.OBJECT:
+            # The value is {
+            #    "omap": <Dictionary Record form of the object (__dict__)>,
+            #    "type": {"name": <name of type,
+            #             "type_pickled": pickled type <- optional part
+            #  }
+
+            # So parse it like a dict and update the object dict
+            new_record = RecursiveDictionary()
+            new_record["type"] = Record.DICTIONARY
+            new_record["value"] = record["value"]["omap"]
+
+            dict_value = ValueParser.parse(new_record)
+            value = ValueParser.create_fake_class()()
+            # Set type of object from record.value.object.type. Future work.
+            value.__dict__ = dict_value
+            return value
+        if record["type"] == Record.COLLECTION:
+            # Assume it is list, as again, don't know this type
+            # value is just list of records
+            return [
+                ValueParser.parse(rec)
+                for rec in record["value"]]
+        if record["type"] == Record.DICTIONARY:
+            # Assume it is dictionary, as again, don't know this type
+            # value-> [{"k": key_record, "v": val_record}]
+            # Has to be a list because keys may not be string.
+            return RecursiveDictionary([
+                    (ValueParser.parse(p["k"]), ValueParser.parse(p["v"]))
+                    for p in record["value"]])
+        if record["type"] == Record.DATETIME:
+            return parser.parse(record["value"])

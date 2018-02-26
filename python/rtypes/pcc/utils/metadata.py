@@ -19,6 +19,12 @@ class Metadata(object):
     def parent_types(self):
         return [p.cls for p in self.base_parents]
 
+    @property
+    def is_new_type_predicate(self):
+        if self.predicate is None:
+            return True
+        return isinstance(self.predicate, staticmethod_predicate)
+
     def __init__(self, cls, final_category, parents,
                  projection_dims=None, base_parents=None):
         self.name = cls.__module__ + "." + cls.__name__
@@ -41,6 +47,7 @@ class Metadata(object):
         self.distinct = None
         self.sort_by = None
         self.dim_triggers = set()
+        self.dim_triggers_str = set()
         self.dim_to_groupmember_trigger = dict()
         self.projection_dims = set(
             projection_dims) if projection_dims else set()
@@ -218,8 +225,10 @@ class Metadata(object):
             setattr(self.cls, d._name, d)
         if hasattr(self.cls, "__predicate__"):
             self.predicate = self.cls.__predicate__
-            if isinstance(self.predicate, staticmethod_predicate):
+            if self.is_new_type_predicate:
                 self.dim_triggers.update(set(self.predicate.dimensions))
+                self.dim_triggers_str.update(
+                    set(d._name for d in self.predicate.dimensions))
         if hasattr(self.cls, "__distinct__"):
             self.distinct = self.cls.__distinct__
         if hasattr(self.cls, "__limit__"):

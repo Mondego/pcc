@@ -111,7 +111,8 @@ class TypeManager(object):
 
     def add_types(
             self, types, tracking=False, pcc_adjuster=None,
-            dim_modification_reporter=None, records_creator=None):
+            dim_modification_reporter=None, records_creator=None,
+            check_new_type_predicate=False):
         pairs_added = set()
         with type_lock:
             for tp in types:
@@ -119,7 +120,8 @@ class TypeManager(object):
                     tp, tracking=tracking, pairs_added=pairs_added,
                     pcc_adjuster=pcc_adjuster,
                     dim_modification_reporter=dim_modification_reporter,
-                    records_creator=records_creator)
+                    records_creator=records_creator,
+                    check_new_type_predicate=check_new_type_predicate)
         return pairs_added
 
     def has_type(self, tp):
@@ -203,15 +205,22 @@ class TypeManager(object):
     ### Private Methods #############################
     #################################################
 
-    def __check_type(self, tp):
+    def __check_type(self, tp, check_new_type_predicate):
         if not hasattr(tp, "__rtypes_metadata__"):
             raise TypeError("Type {0} has to be a PCC Type".format(repr(tp)))
+        metadata = tp.__rtypes_metadata__
+        if check_new_type_predicate and not metadata.is_new_type_predicate:
+            raise TypeError(
+                "Type {0} has to be a PCC Type with the alternate form of "
+                "predicate (Use @predicate to define the predicate)".format(
+                    repr(tp)))
 
     def __add_type(
             self, tp, except_type=None, tracking=False, not_member=False,
             pairs_added=set(), pcc_adjuster=None,
-            dim_modification_reporter=None, records_creator=None):
-        self.__check_type(tp)
+            dim_modification_reporter=None, records_creator=None,
+            check_new_type_predicate=False):
+        self.__check_type(tp, check_new_type_predicate)
         metadata = tp.__rtypes_metadata__
         name = metadata.name
         categories = TypeManager.__categorize(tp)

@@ -134,3 +134,24 @@ class ApplyChangesDFRequest(object):
 
 class ShutdownDFRequest(PutDFRequest):
     pass
+
+class GetRecordDFRequest(object):
+    @property
+    def changelist(self):
+        try:
+            return self._changelist
+        except AttributeError:
+            self._changelist = None
+            return self._changelist
+
+    @changelist.setter
+    def changelist(self, v):
+        self._changelist = v
+
+    @property
+    def token(self):
+        return self._token
+
+    @token.setter
+    def token(self, v):
+        self._token = v

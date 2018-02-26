@@ -39,7 +39,6 @@ class rtype_property(property):
         setattr(self, "_type", tp)
         setattr(self, "_dimension", True)
         setattr(self, "_name", fget.func_name)
-        setattr(self, "change", dict())
         setattr(self, "_primarykey", None)
 
         # the next 2 is only for dataframe use

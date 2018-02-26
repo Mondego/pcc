@@ -1,9 +1,10 @@
 #################################################
 #### Record keeping (Atomic Needed) #############
 #################################################
+from multiprocess import Queue
+
+from rtypes.dataframe.queue_manager import QueueManager
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
-from Queue import Queue
-from queue_manager import QueueManager
 from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 from rtypes.pcc.utils.enums import Event
 
@@ -49,7 +50,9 @@ class ChangeManager(object):
                 event, tpname, groupname, oid, dim_change, full_dim_map)
         self.__send_to_queues(applied_records, pcc_change_records, except_app)
 
-    def get_record(self):
+    def get_record(self, changelist=None):
+        # Ignore changelist here. Not required for full dataframe.
+        # Used only for objectless dataframe.
         return self.convert_to_serializable_dict(self.current_record)
 
     def add_app_queue(self, app_queue):

@@ -1,7 +1,10 @@
 from threading import Thread
-from Queue import Queue, Empty
-from rtypes.dataframe import dataframe
 from uuid import uuid4
+
+from multiprocess import Queue
+from multiprocess.queues import Empty
+
+from rtypes.dataframe import dataframe
 
 from dataframe_request import GetDFRequest, \
     AppendDFRequest, \
@@ -10,28 +13,29 @@ from dataframe_request import GetDFRequest, \
     DeleteAllDFRequest, \
     ApplyChangesDFRequest, \
     PutDFRequest, \
-    ShutdownDFRequest
+    ShutdownDFRequest, \
+    GetRecordDFRequest
 
 class dataframe_wrapper(Thread):
-    def __init__(self, name = str(uuid4()), df=None):
-        Thread.__init__(self)
+    def __init__(self, name=str(uuid4()), dataframe=None):
+        Thread.__init__(self, name="Thread_dataframe_wrapper_{0}".format(name))
         self.name = name
-        self.dataframe = dataframe(name=name)
-        
+        self.dataframe = dataframe if dataframe is not None else dataframe(
+            name=name)
+
         # Insert/Get changes Queue
         self.queue = Queue()
 
-
         # Results for get requests
         self.get_token_dict = dict()
-        self.isDaemon = True
+        self.daemon = True
         self.stop = False
-        self.start()
 
     def run(self):
         while not self.stop:
             req = self.queue.get()
-            if isinstance(req, GetDFRequest):
+            if (isinstance(req, GetDFRequest)
+                    or isinstance(req, GetRecordDFRequest)):
                 self.process_get_req(req, self.get_token_dict)
             else:
                 self.process_put_req(req, self.get_token_dict)
@@ -40,10 +44,12 @@ class dataframe_wrapper(Thread):
         self.queue.put(ShutdownDFRequest())
 
     def process_get_req(self, get_req, token_dict):
-        if not isinstance(get_req, GetDFRequest):
-            return
-        result = self.dataframe.get(
-            get_req.type_object, get_req.oid, get_req.param)
+        result = None
+        if isinstance(get_req, GetDFRequest):
+            result = self.dataframe.get(
+                get_req.type_object, get_req.oid, get_req.param)
+        elif isinstance(get_req, GetRecordDFRequest):
+            result = self.dataframe.get_record(get_req.changelist)
         token_dict[get_req.token].put(result)
 
     def process_put_req(self, put_req, token_dict):
@@ -171,8 +177,16 @@ class dataframe_wrapper(Thread):
             except Empty:
                 return False
 
-    def get_record(self):
-        return self.dataframe.get_record()
+    def get_record(self, changelist=None):
+        req = GetRecordDFRequest()
+        req.changelist = changelist
+        req.token = uuid4()
+        self.get_token_dict[req.token] = Queue()
+        self.queue.put(req)
+        try:
+            return self.get_token_dict[req.token].get(timeout=5)
+        except Empty:
+            return dict()
 
     def clear_record(self):
         return self.dataframe.clear_record()

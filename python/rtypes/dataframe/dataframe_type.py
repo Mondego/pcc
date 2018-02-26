@@ -1,4 +1,4 @@
-from multiprocessing import RLock
+from multiprocess import RLock
 from rtypes.pcc.utils.enums import PCCCategories
 
 type_lock = RLock()

@@ -1,12 +1,13 @@
 
 import datetime
-import dill
+import copy
+import time
 from uuid import uuid4
 from dateutil import parser
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from rtypes.dataframe.type_manager import TypeManager
 from rtypes.pcc.types.parameter import ParameterMode
-
+from rtypes.pcc.utils.enums import PCCCategories
 from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 from rtypes.dataframe.dataframe_type import object_lock
 from rtypes.pcc.create import create, change_type
@@ -22,14 +23,59 @@ from rtypes.dataframe.type_state import TypeState
 
 class StateManager(object):
     def __init__(self):
-        # <group key> -> id -> object state.
-        # (Might have to make this even better)
-        # object state is {"base": base state, "type 1": extra fields etc., ...}
-        self.type_to_objstate = dict()
+        
+        # A map of the form
+        # self.type_to_obj_dimstate = {
+        #     group_key1 : {
+        #         oid1 : RecursiveDictionary({  RecursiveDictionary is ordered.
+        #             timestamp1 : {
+        #                 "dims": <dimension changes>
+        #             },
+        #             timestamp2: {
+        #                 "dims": <dimension changes>
+        #             }, ... More timestamps
+        #         }), ... More objects
+        #     }, ... More groups
+        # }
+        self.type_to_obj_dimstate = dict()
 
-        self.type_to_transformation = dict()
+        # self.type_to_obj_typestate = {
+        #     tpname1 : {
+        #         oid1 : RecursiveDictionary({  RecursiveDictionary is ordered.
+        #             timestamp1 : {
+        #                 tpname: Event.<New|Modification|Delete>
+        #             },
+        #             timestamp2: {
+        #                 tpname: Event.<New|Modification|Delete>
+        #             }, ... More timestamps
+        #         }), ... More objects
+        #     }, ... More types
+        # }
+        self.type_to_obj_typestate = dict()
+
+        # self.type_to_obj_transformation = {
+        #     group_key1 : {
+        #         oid1 : RecursiveDictionary({  RecursiveDictionary is ordered.
+        #             timestamp1 : {
+        #                 "next_timestamp": timestampX,
+        #                 "dims": <dimension changes>
+        #             },
+        #             timestamp2: {
+        #                 "next_timestamp": timestampY,
+        #                 "transform": {
+        #                     "dims": <dimension changes>
+        #                 }
+        #             }, ... More timestamps
+        #         }), ... More objects
+        #     }, ... More groups
+        # }
+        self.type_to_obj_transformation = dict()
+
+        # self.type_to_obj_transformation = {
+        #     tpname1: set([oid1, oid2, ...]),
+        #     tpname2: set([...]), ...}
+        self.type_to_objids = dict()
         self.type_manager = TypeManager()
-        self.typename_state_map = dict()
 
 
     #################################################
@@ -42,60 +88,199 @@ class StateManager(object):
     #################################################
 
     def add_types(self, types):
-        pairs = self.type_manager.add_types(types)
+        pairs = self.type_manager.add_types(
+            types, check_new_type_predicate=True)
         self.create_tables(pairs)
     
     def add_type(self, tp):
         pairs = self.type_manager.add_type(tp)
-        self.create_table(tp)
-    
-    def create_table(self, tpname):
-        with object_lock:
-            return self.__create_table(tpname)
+        self.create_tables(pairs)
 
     def create_tables(self, tpnames_basetype_pairs):
         with object_lock:
             for tpname, _ in tpnames_basetype_pairs:
                 self.__create_table(tpname)
 
-
     def apply_changes(self, df_changes):
-        existing_type_updates = dict()
-        if "types" in df_changes:
-            types_added, types_deleted = self.__parse_type_changes(
-                df_changes["types"])
-            self.type_manager.delete_types(types_deleted)
-            self.remove_tables(types_deleted)
-            pairs = self.type_manager.add_types(types_added)
-            self.create_tables(pairs)
         if "gc" in df_changes:
-            existing_type_updates = self.__parse_changes(df_changes["gc"])
-        return existing_type_updates
+            self.__apply_changes(df_changes["gc"])
 
     def clear_all(self):
-        self.type_to_objstate.clear()
+        for tpname in self.type_to_obj_typestate:
+            if tpname in self.type_to_obj_dimstate:
+                self.type_to_obj_dimstate[tpname].clear()
+                self.type_to_obj_transformation[tpname].clear()
+            self.type_to_obj_typestate[tpname].clear()
 
-    def remove_tables(self, types):
-        for tp in types:
-            if tp.name in self.type_to_objstate:
-                del self.type_to_objstate[tp.name]
+    def get_records(self, changelist):
+        final_record = RecursiveDictionary()
+        pcc_types_to_process = set()
+        no_change_groups = set()
+        for tpname in changelist:
+            if tpname in self.type_to_obj_dimstate:
+                # It is a base type. Can pull dim state for it directly.
+                new_oids, mod_oids, del_oids = (
+                    self.__get_oid_change_buckets(tpname, changelist[tpname]))
+                tp_record = (
+                    self.__get_dim_changes_for_basetype(
+                        tpname, changelist[tpname],
+                        new_oids, mod_oids, del_oids))
+                if tp_record:
+                    final_record[tpname] = tp_record
+                    self.__set_type_change_status(
+                        tpname, new_oids, mod_oids, del_oids,
+                        final_record[tpname])
+                else:
+                    no_change_groups.add(tpname)
+            else:
+                pcc_types_to_process.add(tpname)
+
+        for tpname in pcc_types_to_process:
+            tp_obj = self.type_manager.get_requested_type_from_str(tpname)
+            groupname = tp_obj.group_key
+            new_oids, mod_oids, del_oids = self.__get_oid_change_buckets(
+                    tpname, changelist[tpname])
+            metadata = tp_obj.metadata
+
+            tp_record = dict()
+            if (groupname not in final_record
+                    and groupname not in no_change_groups):
+                # The client is only pulling pcc record of this type. Not the
+                # main type as well. We havent built updates, so pull updates.
+                tp_record = (
+                    self.__get_dim_changes_for_basetype(
+                        groupname, changelist[tpname],
+                        new_oids, mod_oids, del_oids,
+                        projection_dims=metadata.projection_dims))
+                if not tp_record:
+                    final_record[groupname] = tp_record
+
+            # If there are new objs, deleted objects or some objects actually
+            # changed, then set status of the types.
+            if (new_oids or del_oids or tp_record):
+                final_record[groupname] = tp_record
+                self.__set_type_change_status(
+                    tpname, new_oids, mod_oids if tp_record else set(),
+                    del_oids, final_record[groupname])
+                self.__set_latest_versions(
+                    groupname, new_oids, final_record[groupname])
+
+        return {"gc": final_record}
 
     #################################################
     ### Private Methods #############################
     #################################################
 
-    def __parse_type_changes(self, type_changes):
-        types_added = set()
-        types_deleted = set()
-        for tpname, changes in type_changes.iteritems():
-            if changes["status"] == Event.New:
-                types_added.add(dill.loads(changes["serial"]))
-            elif (changes["status"] == Event.Delete
-                  and tpname in self.type_manager.name2type):
-                types_deleted.add(self.type_manager.name2type[tpname])
-        return types_added, types_deleted
+    def __set_latest_versions(self, tpname, new_oids, final_changes):
+        for oid in new_oids:
+            final_changes[oid]["version"] = [
+                None, self.type_to_obj_dimstate[tpname][oid].lastkey()]
 
-    def __parse_changes(self, df_changes):
+    def __set_type_change_status(
+            self, tpname, new_oids, mod_oids, del_oids, changes):
+        for oid in new_oids:
+            changes.setdefault(oid, dict()).setdefault(
+                "types", RecursiveDictionary())[tpname] = Event.New
+        for oid in del_oids:
+            changes.setdefault(oid, dict()).setdefault(
+                "types", RecursiveDictionary())[tpname] = Event.Delete
+        for oid in mod_oids:
+            # If there are no dim changes, it cannot be modification.
+            if oid not in changes:
+                continue
+            changes[oid].setdefault(
+                "types", RecursiveDictionary())[tpname] = (
+                    Event.Modification)
+    
+    def __get_oid_change_buckets(self, tpname, changelist):
+        new_oids = self.type_to_objids[tpname].difference(
+            set(changelist.keys()))
+        mod_oids = self.type_to_objids[tpname].intersection(
+            set(changelist.keys()))
+        del_oids = set(changelist.keys()).difference(
+            self.type_to_objids[tpname])
+        return new_oids, mod_oids, del_oids
+
+
+    def __get_dim_changes_for_basetype(
+            self, tpname, changelist, new_oids,
+            mod_oids, del_oids, projection_dims=None):
+        final_record = dict()
+        for oid in new_oids:
+            final_record[oid] = (
+                self.__merge_records(
+                    self.type_to_obj_dimstate[tpname][oid][:], projection_dims))
+            final_record[oid]["version"] = [
+                None, 
+                self.type_to_obj_dimstate[tpname][oid].lastkey()]
+        for oid in del_oids:
+            final_record[oid] = dict()
+        for oid in mod_oids:
+            curr_vn = changelist[oid]
+            dim_changes = self.__get_dim_changes_since(
+                tpname, oid, curr_vn, projection_dims)
+            if dim_changes:
+                final_record[oid] = dim_changes
+                final_record[oid]["version"] = [
+                    changelist[oid], 
+                    self.type_to_obj_dimstate[tpname][oid].lastkey()]
+
+        return final_record
+
+    def __merge_records(self, records, projection_dims):
+        if not records:
+            return dict()
+        # Doing a deep copy so that we dont make modifications on existing
+        # changelists by mistake.
+        projection_dims_str = (
+            set([d._name for d in projection_dims])
+            if projection_dims else
+            set())
+        record1_copy = copy.deepcopy(records[0])
+        if projection_dims_str:
+            final_record = {
+                "dims": {
+                    d: v
+                    for d, v in record1_copy.setdefault(
+                        "dims", dict()).iteritems()
+                    if d in projection_dims_str}}
+        else:
+            final_record = record1_copy
+        final_record_dims = final_record.setdefault("dims", dict())
+
+        for rec in records[1:]:
+            for dim, value in (
+                    rec["dims"] if "dims" in rec else dict()).iteritems():
+                if projection_dims:
+                    # In case of projection, copy only req dimensions.
+                    if dim in projection_dims_str:
+                        final_record_dims[dim] = value
+                else:
+                    final_record_dims[dim] = value
+        return final_record
+
+    def __get_dim_changes_since(self, tpname, oid, curr_vn, projection_dims):
+        if curr_vn is None:
+            return self.type_to_obj_dimstate[:]
+        tform_type = self.type_to_obj_transformation[tpname]
+        if curr_vn in self.type_to_obj_dimstate[tpname][oid]:
+            return self.__merge_records(
+                self.type_to_obj_dimstate[tpname][oid][curr_vn:],
+                projection_dims)
+        elif oid in tform_type and curr_vn in tform_type[oid]:
+            next_tp = tform_type[oid][curr_vn]["next_timestamp"]
+            return self.__merge_records(
+                tform_type[oid][curr_vn]["transform"] +
+                self.type_to_obj_dimstate[tpname][oid][next_tp:],
+                projection_dims)
+        else:
+            # How the hell is it here?!
+            raise RuntimeError(
+                "Didnt find timestamp for oid %s of type %s "
+                "in master or transformation branches." % (
+                    oid, tpname))
+
+    def __apply_changes(self, df_changes):
         '''
         all_changes is a dictionary in this format
         
@@ -118,226 +303,120 @@ class StateManager(object):
                         "type_name": <status of type. Enum values can be
                                         found in Event class>,
                         <More type to status mappings>...
-                    }
+                    },
+                    "version": [old_version, new_version]
                 },
                 <More object change logs> ...
             },
             <More group change logs> ...
         }
         '''
-
         tm = self.type_manager
-        final_applied_changes = dict()
+        next_timestamp = time.time()
+        objects_to_check_pcc = dict()
+        deleted_objs = dict()
         for groupname, group_changes in df_changes.iteritems():
+            if groupname not in self.type_to_obj_dimstate:
+                continue
+            group_changelist = self.type_to_obj_dimstate[groupname]
+
+            for oid, obj_changes in group_changes.iteritems():
+                prev_version, curr_version = obj_changes["version"]
+                if oid not in group_changelist:
+                    if "dims" in obj_changes and prev_version is None:
+                        # Should be a new object.
+                        group_changelist.setdefault(
+                            oid, RecursiveDictionary())[curr_version] = {
+                                "dims": obj_changes["dims"]}
+                        objects_to_check_pcc.setdefault(
+                            groupname, set()).add(oid)
+                        self.type_to_objids[groupname].add(oid)
+                    elif "dims" in obj_changes:
+                        raise RuntimeError(
+                            "Something went wrong. Obj not in record, "
+                            "but has last known version? What gives?")
+                    # No dims no object, ignore and continue
+                    continue
+                if (groupname in obj_changes["types"]
+                        and obj_changes["types"] == Event.Delete):
+                    # Delete all records of the object. Not required any more.
+                    del group_changelist[oid]
+                    deleted_objs.setdefault(groupname, set()).add(oid)
+                    continue
+                # Not a delete or a new object. (modification)
+                objects_to_check_pcc.setdefault(
+                    groupname, set()).add(oid)
+                server_last_version = group_changelist[oid].lastkey()
+                # latest version number might not be curr_version in case 
+                # of having to do a merge update.
+                if server_last_version == prev_version:
+                    # Alright, no need for transformations. Straightforward
+                    # merge.
+                    group_changelist[oid][curr_version] = {
+                        "dims": obj_changes["dims"]}
+                    # Do not need to change latest_version_number
+                else:
+                    # Have to do a merge.
+                    changes_from_prev = self.__get_dim_changes_since(
+                        groupname, oid, prev_version, None)
+                    transformation = self.__calculate_transform(
+                        changes_from_prev, {"dims": obj_changes["dims"]})
+                    self.type_to_obj_transformation[groupname].setdefault(
+                        oid, dict())[prev_version] = {
+                            "next_timestamp": next_timestamp,
+                            "transform": transformation}
+                    group_changelist[oid][next_timestamp] = {
+                        "dims": obj_changes["dims"]}
+
+        # start pcc calculations now.
+        for groupname, oids in deleted_objs.iteritems():
             try:
                 group_type = tm.get_requested_type_from_str(groupname)
             except TypeError:
                 continue
-            final_applied_changes[groupname] = dict()
-            for oid, obj_changes in group_changes.items():
-                if "version" not in obj_changes:
-                    continue
-                obj_changelist = self.type_to_objstate.setdefault(
-                    group_type, RecursiveDictionary()).setdefault(
-                        oid, RecursiveDictionary())
+            for pcc_type in group_type.pure_group_members:
+                if pcc_type.name in self.type_to_objids:
+                    self.type_to_objids[pcc_type.name].difference_update(oids)
+        
+        for groupname, oids in objects_to_check_pcc.iteritems():
+            try:
+                group_type = tm.get_requested_type_from_str(groupname)
+            except TypeError:
+                continue
+            for oid in oids:
+                dim_changes = df_changes[groupname][oid]["dims"]
+                dims_touched = set(dim_changes.keys())
+                pccs_to_check = [
+                    pcc_type
+                    for pcc_type in group_type.pure_group_members
+                    if pcc_type.metadata.dim_triggers_str.difference(
+                        dims_touched) == set()]
+                for pcc_type in pccs_to_check:
+                    metadata = pcc_type.metadata
+                    if PCCCategories.subset in metadata.categories:
+                        if pcc_type.metadata.predicate(
+                                *(ValueParser.parse(dim_changes[d])
+                                for d in pcc_type.metadata.dim_triggers_str)):
+                            self.type_to_objids[pcc_type.name].add(oid)
+                        elif oid in self.type_to_objids[pcc_type.name]:
+                            self.type_to_objids[pcc_type.name].remove(oid)
+                    if PCCCategories.projection in metadata.categories:
+                        self.type_to_objids[pcc_type.name].add(oid)
 
-                inc_version = obj_changes["version"]
-                last_known_version = obj_changes["last_known_version"]
-                current_version = self.type_to_objstate[group_type][oid].lastkey()
-                if current_version is None:
-                    applied_changes = self.__parse_as_new(
-                        group_type, oid, obj_changes, obj_changelist)
-                else:
-                    applied_changes = self.__process_as_updated(
-                        group_type, oid, obj_changes, obj_changelist, last_known_version)
-                final_applied_changes[groupname][oid] = applied_changes
-        self.resolve_rtypes_changes(final_applied_changes)
-            
-    def __parse_as_new(self, group_type, oid, obj_changes, obj_changelist):
-        self.type_to_objstate[group_type][oid][obj_changelist] = obj_changes
-        self.type_to_transformation[group_type][oid] = dict()
-        return obj_changes
-
-    def __parse_as_updated(self, group_type, oid, obj_changes, obj_changelist, last_known_version):
-        all_changes = self.type_to_objstate[group_type][oid][last_known_version:][1:]
-        current_master_changelist = self.type_to_objstate[group_type][oid].lastkey()
-        conflated_changes = self.conflate_changes(group_type, all_changes)
-        self.resolve_changes(
-            group_type, conflate_changes, obj_changes,
-            obj_changelist, self.type_to_transformation[group_type][oid],
-            current_master_changelist)
-        master_changes = self.conflate_changes(
-            group_type,
-            self.type_to_objstate[group_type][oid][current_master_changelist:][1:])
-        return master_changes
-
-    def conflate_changes(self, group_name, changes):
-        final_change = dict()
-        for change in changes:
-            final_change = self.merge_change(group_name, final_change, change)
-        return final_change
-
-    def merge_change(self, group_name, dest, src):
-        if not dest:
-            dest.update(src)
-            return dest
-        dest_event = dest["types"][group_name]
-        src_event = src["types"][group_name]
-        if dest_event == Event.Delete:
-            if src_event != Event.New:
-                # If the previous record is Delete,
-                # and the next record is not new,
-                # delete the next record.
-                # This case should not happen
-                # unless src_event is Event.Modification
-                return dest
-            # This case could easily happen.
-            # Do not return src directly, always a copy.
-            return dict(src)
-        if src_event == Event.Delete:
-            return dict(src)
-        if dest_event == Event.Modification and src_event == Event.New:
-            # Error. This case is a merge conflict.
-            # Should already have been taken care off.
-            # How is it there?
-            raise RuntimeError("Bad condition reached. Investigate")
-        if src_event == Event.Modification:
-            # Should be the only condition left to merge on.
-            if "dims" not in src:
-                # Nothing to merge actually.
-                return dest
-            dest.setdefault("dims", RecursiveDictionary()).update(src["dims"])
-            # The type map should remain whatever dest type map is.
-            # New should remain new, modification should remain modification.
-            return dest
-        raise RuntimeError("Why did it reach this line. It should not be here.")
-
-    def resolve_changes(
-            self, group_type, old_change, new_change,
-            changelist, transformation_group, master_changelist):
-        old_event = old_change["types"][group_type]
-        new_event = new_change["types"][group_type]
-        if old_event == Event.Delete:
-            if new_event == Event.Delete:
-                # The changes conflict, however, there is
-                # nothing to resolve, both events do the same thing
-                # Add a NoOp transformation from new_change to end of master.
-                
-                transformation_group[changelist] = {
-                    "resolved_changelist": master_changelist,
-                    "NOOP": True}
-                return
-            # Change is a conflict, add a delete transformation
-            # from new change to end of master.
-            transformation_group[changelist] = {
-                "resolved_changelist": master_changelist,
-                "NOOP": False,
-                "transformation": old_change
-            }
-            return
-        if old_event == Event.New:
-            if new_event == Event.New:
-                # The changes conflict.
-                # Add Modifiy transformation from new change to end of
-                # master. The new object is essentially deleted.
-                # Mode of resolution is accept master.
-                transformation_group[changelist] = {
-                    "resolved_changelist": master_changelist,
-                    "NOOP": False,
-                    "transformation": old_change
-                }
-            # The changes conflict. Likely scenario is that
-            # the obj was deleted and recreated in the master.
-            # This means that the inc changes were on another
-            # obj which does not exist now. This inc obj should
-            # be deleted and the new obj should take its place.
-            # Think this is the safest option.
-            transformation_group[changelist] = {
-                "resolved_changelist": master_changelist,
-                "NOOP": False,
-                "transformation": old_change
-            }
-        if old_event == Event.Modification:
-            if new_event == Event.New:
-                # If this happens, it means that the 
-                # dataframe deleted the obj,
-                # and created a new copy.
-                # Mode is accept incoming? <--Think about it.
-                self.type_to_objstate[group_type][oid][str(uuid.uuid4())] = {
-                    "types": {
-                        group_type: Event.Delete
-                    }
-                }
-                self.type_to_objstate[group_type][oid][changelist] = new_change
-            if new_event == Event.Delete:
-                # Merge, no conflict.
-                # Just add the delete event to the master.
-                self.type_to_objstate[group_type][oid][changelist] = new_change
-            if new_event == Event.Modification:
-                # Merge dimension by dimension,
-                # There might be a transformation
-                # between inc and new node.
-                # Added to master: (old - inc) + NoOp
-                # Added to fork: (inc - old) pointing to NoOp node.
-                
-                # This is the transformation for master -> new state
-                new_changelist = str(uuid.uuid4())
-                if "dims" in new_change and len(new_change["dims"]) > 0:
-                    self.type_to_objstate[group_type][oid][new_changelist] = new_change
-                else:
-                    self.type_to_objstate[group_type][oid][new_changelist] = {
-                        "types": {
-                            group_type: Event.Modification
-                        }
-                    }
-                if "dims" in old_change and len(old_change["dims"]) > 0:
-                    new_changes_diff = {
-                        "dims": {
-                            dim: old_change["dims"][dim]
-                            for dim in old_change["dims"]
-                            if dim not in new_change.setdefault("dims", RecursiveDictionary())
-                        },
-                        "types": {
-                            group_type: Event.Modification
-                        }
-                    }
-                    if len(new_changes_diff["dims"]) > 0:
-                        transformation_group[changelist] = {
-                            "resolved_changelist": new_changelist,
-                            "NOOP": True
-                        }
-                    else:
-                        transformation_group[changelist] = {
-                            "resolved_changelist": new_changelist,
-                            "NOOP": False,
-                            "transformation": new_changes_diff
-                        }
-        return
-
-    def resolve_rtypes_changes(self, applied_changes):
-        for group_name in applied_changes:
-            group_tp_obj = self.type_manager.get_requested_type_from_str(group_name)
-            dim_to_type = group_tp_obj.dim_to_groupmember_trigger
-            for oid, obj_changes in applied_changes[group_name]:
-                if obj_changes["types"][group_name] == Event.Delete:
-                    for gm in group_tp_obj.group_members:
-                        if gm.name in self.type_to_objstate and oid in self.type_to_objstate[gm.name]:
-                            self.type_to_transformation.setdefault(
-                                
-
-                            )
-                else:
-                    pass
+    def __calculate_transform(self, inplace_changes, new_changes):
+        new_changes = {"dims": dict()}
+        if "dims" in inplace_changes:
+            for dimname, dimchange in inplace_changes["dims"].iteritems():
+                if dimname not in new_changes["dims"]:
+                    new_changes["dims"][dimname] = dimchange
+        return new_changes
 
     def __create_table(self, tpname):
         tp_obj = self.type_manager.get_requested_type_from_str(tpname)
-        self.type_to_objstate.setdefault(tpname, TypeState(tp_obj))
-
-
-    def get_records(self, type_to_stamp):
-        final_record = RecursiveDictionary()
-        for tp in type_to_stamp:
-            final_record.rec_update(
-                TypeState.merge_state(
-                    self.type_to_objstate[tp][type_to_stamp[tp]:]))
-        return final_record
+        self.type_to_obj_dimstate.setdefault(
+            tp_obj.group_key, RecursiveDictionary())
+        self.type_to_obj_typestate.setdefault(tpname, RecursiveDictionary())
+        self.type_to_obj_transformation.setdefault(
+            tp_obj.group_key, RecursiveDictionary())
+        self.type_to_objids.setdefault(tp_obj.group_key, set())
+        self.type_to_objids.setdefault(tpname, set())

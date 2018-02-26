@@ -7,7 +7,17 @@ class container(object):
     def __init__(self):
         pass
 
-    
+def __run_predicate(actual_class, item, param):
+    metadata = actual_class.__rtypes_metadata__
+    if not metadata.is_new_type_predicate:
+        return actual_class.__predicate__(
+            *([item] if param == tuple() else [item] + list(param)))
+    dimvalues = [
+        getattr(item, dim._name)
+        for dim in actual_class.__predicate__.dimensions]
+    return actual_class.__predicate__(
+        *(dimvalues if param == tuple() else dimvalues + list(param)))
+
 def __subset_generic_query(actual_class, collection, param):
     if len(collection) > 1:
         raise TypeError(
@@ -18,12 +28,10 @@ def __subset_generic_query(actual_class, collection, param):
         return __convert_to_grp(
             actual_class,
             [item for item in collection[0]
-             if actual_class.__predicate__(
-                 *([item] if param == tuple() else [item] + list(param)))])
+             if __run_predicate(actual_class, item, param)])
     return [change_type(item, actual_class)
             for item in collection[0]
-            if actual_class.__predicate__(
-                *([item] if param == tuple() else [item] + list(param)))]
+            if __run_predicate(actual_class, item, param)]
 
 def setup_join_obj(cls, objs):
     final_obj = change_type(container(), cls)
@@ -50,7 +58,7 @@ def __join_generic_query(actual_class, collections, param):
             if actual_class.__predicate__(*(list(one_cross) + list(param)))]
 
 def __union_generic_query(actual_class, collections, *param):
-    parents =actual_class.__rtypes_metadata__.parents
+    parents = actual_class.__rtypes_metadata__.parents
     if actual_class.__rtypes_metadata__.group_dimensions:
         return __convert_to_grp(
             actual_class, [
@@ -151,4 +159,3 @@ def __convert_to_grp(actual_class, list_of_objs):
                      for gobj in objs_for_grp]))
         final_result.append(obj)
     return final_result
-        
