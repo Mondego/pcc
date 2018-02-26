@@ -1083,7 +1083,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         ac = df.get(ActiveCar)[0]
         self.assertTrue(ac.velocity == 5)
         try:
-            print df.get(Car)
+            _ = df.get(Car)
             self.fail()
         except TypeError:
             self.assertTrue(True)
@@ -1300,18 +1300,19 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
     def test_dataframe_apply_get_new(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
+        df.object_manager.ignore_buffer_changes = False
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.apply_changes(update_json1)
 
-        self.assertTrue(len(df.get_new(Car)) == 4)
-        self.assertTrue(len(df.get_mod(Car)) == 0)  
-        self.assertTrue(len(df.get_deleted(Car)) == 0)  
-        self.assertTrue(len(df.get_new(ActiveCar)) == 2)
-        self.assertTrue(len(df.get_mod(ActiveCar)) == 0)
-        self.assertTrue(len(df.get_deleted(ActiveCar)) == 0)  
-        self.assertTrue(len(df.get_new(RedActiveCar)) == 1)
-        self.assertTrue(len(df.get_mod(RedActiveCar)) == 0)
-        self.assertTrue(len(df.get_deleted(RedActiveCar)) == 0)  
+        self.assertEqual(len(df.get_new(Car)), 4)
+        self.assertEqual(len(df.get_mod(Car)), 0)
+        self.assertEqual(len(df.get_deleted(Car)), 0)
+        self.assertEqual(len(df.get_new(ActiveCar)), 2)
+        self.assertEqual(len(df.get_mod(ActiveCar)), 0)
+        self.assertEqual(len(df.get_deleted(ActiveCar)), 0)
+        self.assertEqual(len(df.get_new(RedActiveCar)), 1)
+        self.assertEqual(len(df.get_mod(RedActiveCar)), 0)
+        self.assertEqual(len(df.get_deleted(RedActiveCar)), 0)
 
     #def test_dataframe_apply_get_new_with_existing_objs(self):
     #    Car, ActiveCar, RedActiveCar, cars = create_cars()
@@ -1333,6 +1334,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
     def test_dataframe_apply_get_mod(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
+        df.object_manager.ignore_buffer_changes = False
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
         df.apply_changes(update_json2)
@@ -1347,6 +1349,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
     def test_dataframe_apply_get_mod2(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
+        df.object_manager.ignore_buffer_changes = False
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
         df.apply_changes(update_json3)
@@ -1363,6 +1366,7 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
     def test_dataframe_apply_get_delete1(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
         df = dataframe()
+        df.object_manager.ignore_buffer_changes = False
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
         df.apply_changes(update_json6)

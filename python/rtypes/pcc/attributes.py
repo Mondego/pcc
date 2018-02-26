@@ -15,7 +15,6 @@ def get_type(obj):
         if dict in type(obj).mro():
             return "dictionary"
         if hasattr(obj, "__iter__"):
-            print obj
             return "collection"
         if len(set([float, int, str, unicode, type(None)]).intersection(
             set(type(obj).mro()))) > 0:

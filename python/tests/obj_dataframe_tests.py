@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 
+import unittest
+import json
+
 from rtypes.pcc.attributes import dimension, namespace, primarykey, count
 from rtypes.pcc.types.set import pcc_set
 from rtypes.pcc.types.subset import subset
@@ -8,8 +11,6 @@ from rtypes.dataframe.dataframe import dataframe
 from rtypes.pcc.types.parameter import parameter, ParameterMode
 from rtypes.pcc.types.join import join
 from rtypes.pcc.types.projection import projection
-    
-import unittest, json
 
 def _load_edge_nodes():
     @pcc_set
@@ -21,7 +22,7 @@ def _load_edge_nodes():
         @oid.setter
         def oid(self, value):
             self._id = value
-    
+
         @dimension(float)
         def pagerank(self):
             return self._pagerank
@@ -31,7 +32,7 @@ def _load_edge_nodes():
             self._pagerank = value
 
         def __init__(self, oid, pagerank):
-            self.oid, self.pagerank = oid, pagerank
+            self._id, self._pagerank = oid, pagerank
 
     @pcc_set
     class Edge(object):
@@ -42,7 +43,7 @@ def _load_edge_nodes():
         @oid.setter
         def oid(self, value):
             self._id = value
-    
+
         @dimension(Node)
         def start(self):
             return self._start
@@ -58,9 +59,9 @@ def _load_edge_nodes():
         @end.setter
         def end(self, value):
             self._end = value
-    
+
         def __init__(self, n1, n2):
-            self.start, self.end = (n1, n2)
+            self._start, self._end = (n1, n2)
 
     return Node, Edge
 
@@ -71,22 +72,23 @@ def _CreateNodesAndEdges():
     for i in range(4):
         nodes.append(Node(i, 0.25))
 
-    edges.append(Edge(nodes[0],nodes[1]))
-    edges.append(Edge(nodes[0],nodes[2]))
-    edges.append(Edge(nodes[0],nodes[3]))
-    edges.append(Edge(nodes[1],nodes[2]))
-    edges.append(Edge(nodes[3],nodes[2]))
+    edges.append(Edge(nodes[0], nodes[1]))
+    edges.append(Edge(nodes[0], nodes[2]))
+    edges.append(Edge(nodes[0], nodes[3]))
+    edges.append(Edge(nodes[1], nodes[2]))
+    edges.append(Edge(nodes[3], nodes[2]))
     return Node, Edge, nodes, edges
 
 def _subset_classes():
-    
     @pcc_set
     class Transaction(object):
         @primarykey(str)
-        def oid(self): return self._id
+        def oid(self):
+            return self._id
 
         @oid.setter
-        def oid(self, value): self._id = value
+        def oid(self, value):
+            self._id = value
 
         @dimension(int)
         def card(self):
@@ -113,12 +115,14 @@ def _subset_classes():
             self._suspicious = value
 
         def __init__(self, card, amount):
-            self.card = card
-            self.amount = amount
-            self.suspicious = False
+            self._card = card
+            self._amount = amount
+            self._suspicious = False
 
         def declare(self):
-            print str(self.card) + "/" + str(self.amount) + ": This transaction is " + ("suspicious" if self.suspicious else " not suspicious")
+            print (str(self.card) + "/" + str(self.amount)
+                   + ": This transaction is " + (
+                       "suspicious" if self.suspicious else " not suspicious"))
 
 
     @subset(Transaction)
@@ -133,17 +137,17 @@ def _subset_classes():
     t1 = Transaction(1, 100)
     t2 = Transaction(2, 1000)
     t3 = Transaction(0, 10000)
-    return Transaction, HighValueTransaction, [t1,t2,t3]
+    return Transaction, HighValueTransaction, [t1, t2, t3]
 
 def _CreateInAndOutEdgeTypes(Edge, Node):
-    @parameter(Node, mode = ParameterMode.Singleton)
+    @parameter(Node, mode=ParameterMode.Singleton)
     @subset(Edge)
     class InEdge(Edge):
         @staticmethod
         def __predicate__(e, n):
             return e.end.oid == n.oid
 
-    @parameter(Node, mode = ParameterMode.Singleton)
+    @parameter(Node, mode=ParameterMode.Singleton)
     @subset(Edge)
     class OutEdge(Edge):
         @staticmethod
@@ -155,10 +159,12 @@ def _join_example_data():
     @pcc_set
     class Transaction(object):
         @primarykey(str)
-        def oid(self): return self._id
+        def oid(self):
+            return self._id
 
         @oid.setter
-        def oid(self, value): self._id = value
+        def oid(self, value):
+            self._id = value
 
         @dimension(int)
         def card(self):
@@ -185,9 +191,9 @@ def _join_example_data():
             self._flagged = value
 
         def __init__(self, card, amount):
-            self.card = card
-            self.amount = amount
-            self.flagged = False
+            self._card = card
+            self._amount = amount
+            self._flagged = False
 
         def flag(self):
             self.flagged = True
@@ -201,7 +207,7 @@ def _join_example_data():
         @oid.setter
         def oid(self, value):
             self._id = value
-        
+
         @dimension(bool)
         def holdstate(self):
             return self._holdstate
@@ -217,11 +223,11 @@ def _join_example_data():
         @owner.setter
         def owner(self, value):
             self._owner = value
-        
+
         def __init__(self, oid, owner):
-            self.oid = oid
-            self.owner = owner
-            self.holdstate = False
+            self._id = oid
+            self._owner = owner
+            self._holdstate = False
 
         def hold(self):
             self.holdstate = True
@@ -245,8 +251,8 @@ def _join_example_data():
             self._name = value
 
         def __init__(self, oid, name):
-            self.oid = oid
-            self.name = name
+            self._id = oid
+            self._name = name
 
         def notify(self):
             pass
@@ -254,10 +260,12 @@ def _join_example_data():
     @join(Person, Card, Transaction)
     class RedAlert(object):
         @primarykey(str)
-        def oid(self): return self._id
+        def oid(self):
+            return self._id
 
         @oid.setter
-        def oid(self, value): self._id = value
+        def oid(self, value):
+            self._id = value
 
         @namespace(Person)
         def p(self):
@@ -304,7 +312,8 @@ def _join_example_data():
     t3 = Transaction(0, 10000)
     #Also RedAlert Card but not Vishnu's
     t4 = Transaction(3, 10000)
-    return Person, Card, Transaction, RedAlert, [p1, p2, p3], [c1p1, c2p1, c1p2, c1p3], [t1, t2, t3, t4]
+    return (Person, Card, Transaction, RedAlert,
+            [p1, p2, p3], [c1p1, c2p1, c1p2, c1p3], [t1, t2, t3, t4])
 
 def _CreateProjectionTypesAndObjects():
     @pcc_set
@@ -327,7 +336,8 @@ def _CreateProjectionTypesAndObjects():
         def velocity(self, value): self._velocity = value
 
         def __init__(self, id, owner, location, velocity):
-            (self.id, self.owner, self.location, self.velocity) = (id, owner, location, velocity)
+            (self.id, self.owner, self.location, self.velocity) = (
+                id, owner, location, velocity)
 
         def change_owner(self, owner, license):
             self.owner, self.license = owner, license
@@ -342,7 +352,7 @@ def _CreateProjectionTypesAndObjects():
     car1 = Car(1, "Murugan", "himalaya", 299792458)
     car2 = Car(2, "Shiva", "himalaya", 299792459)
 
-    return Car, CarForPedestrian, [car1, car2] 
+    return Car, CarForPedestrian, [car1, car2]
 
 def _CreateSubsetWithDistinct():
     @pcc_set
@@ -389,7 +399,7 @@ def _CreateSubsetWithDistinct():
     obj2.prop2 = "b"
     obj3.prop2 = "a"
     return BaseClass, DistinctSubset, [obj1, obj2, obj3]
-        
+
 class Test_dataframe_object_tests(unittest.TestCase):
     def test_base_set_addition(self):
         Node, Edge, nodes, edges = _CreateNodesAndEdges()
@@ -407,14 +417,18 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__rtypes_metadata__.name]) == 1)
+        self.assertTrue(
+            len(df.object_manager.object_map[
+                HighValueTransaction.__rtypes_metadata__.name]) == 1)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
             hvt.flag()
         self.assertTrue(len(df.get(Transaction)) == 3)
-        self.assertTrue([t.suspicious for t in df.get(Transaction)].count(False) == 2)
-        self.assertTrue([t.suspicious for t in df.get(Transaction)].count(True) == 1)    
+        self.assertTrue(
+            [t.suspicious for t in df.get(Transaction)].count(False) == 2)
+        self.assertTrue(
+            [t.suspicious for t in df.get(Transaction)].count(True) == 1)
 
     def test_impure_subset_get(self):
         Transaction, HighValueTransaction, ts = _subset_classes()
@@ -422,14 +436,18 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Transaction, HighValueTransaction])
         df.extend(Transaction, ts)
-        self.assertTrue(len(df.object_manager.object_map[HighValueTransaction.__rtypes_metadata__.name]) == 0)
+        self.assertTrue(
+            len(df.object_manager.object_map[
+                HighValueTransaction.__rtypes_metadata__.name]) == 0)
         hvts = df.get(HighValueTransaction)
         self.assertTrue(len(hvts) == 1)
         for hvt in hvts:
             hvt.flag()
         self.assertTrue(len(df.get(Transaction)) == 3)
-        self.assertTrue([t.suspicious for t in df.get(Transaction)].count(False) == 2)
-        self.assertTrue([t.suspicious for t in df.get(Transaction)].count(True) == 1)    
+        self.assertTrue(
+            [t.suspicious for t in df.get(Transaction)].count(False) == 2)
+        self.assertTrue(
+            [t.suspicious for t in df.get(Transaction)].count(True) == 1)
 
     def test_parameter_supplied(self):
         Node, Edge, nodes, edges = _CreateNodesAndEdges()
@@ -438,20 +456,28 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df.add_types([Node, Edge, InEdge, OutEdge])
         df.extend(Node, nodes)
         df.extend(Edge, edges)
-        self.assertTrue(len(df.object_manager.object_map[OutEdge.__rtypes_metadata__.name]) == 0)
-        self.assertTrue(len(df.object_manager.object_map[InEdge.__rtypes_metadata__.name]) == 0)
-        self.assertTrue(len(df.get(OutEdge, parameters = (nodes[0],))) == 3)
-        self.assertTrue(isinstance(df.get(OutEdge, parameters = (nodes[0],))[0], OutEdge))
-        self.assertTrue(len(df.get(InEdge, parameters = (nodes[0],))) == 0) 
+        self.assertTrue(len(
+            df.object_manager.object_map[
+                OutEdge.__rtypes_metadata__.name]) == 0)
+        self.assertTrue(len(
+            df.object_manager.object_map[InEdge.__rtypes_metadata__.name]) == 0)
+        self.assertTrue(
+            len(df.get(OutEdge, parameters = (nodes[0], ))) == 3)
+        self.assertTrue(
+            isinstance(df.get(OutEdge, parameters = (nodes[0], ))[0], OutEdge))
+        self.assertTrue(len(df.get(InEdge, parameters = (nodes[0], ))) == 0) 
 
     def test_join_get(self):
-        Person, Card, Transaction, RedAlert, persons, cards, transactions = _join_example_data()
+        (Person, Card, Transaction,
+         RedAlert, persons, cards, transactions) = _join_example_data()
         df = dataframe()
         df.add_types([Person, Card, Transaction, RedAlert])
         df.extend(Person, persons)
         df.extend(Card, cards)
         df.extend(Transaction, transactions)
-        self.assertEqual(len(df.object_manager.object_map[RedAlert.__rtypes_metadata__.name]), 0)
+        self.assertEqual(
+            len(df.object_manager.object_map[
+                RedAlert.__rtypes_metadata__.name]), 0)
         self.assertEqual(len(df.get(RedAlert)), 2)
         for ra in df.get(RedAlert):
             ra.Protect()
@@ -497,7 +523,9 @@ class Test_dataframe_object_tests(unittest.TestCase):
             def __predicate__(ac):
                 return ac.color == "RED"
 
-        cars = [Car(0, "BLUE"), Car(0, "RED"), Car(1, "GREEN"), Car(1, "RED"), Car(2, "RED")]
+        cars = [
+            Car(0, "BLUE"), Car(0, "RED"), Car(1, "GREEN"),
+            Car(1, "RED"), Car(2, "RED")]
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])
         df.extend(Car, cars)
@@ -512,7 +540,9 @@ class Test_dataframe_object_tests(unittest.TestCase):
         df = dataframe()
         df.add_types([Car, CarForPedestrian])
         df.extend(Car, cars)
-        self.assertTrue(len(df.object_manager.object_map[CarForPedestrian.__rtypes_metadata__.name]) == 2)
+        self.assertTrue(
+            len(df.object_manager.object_map[
+                CarForPedestrian.__rtypes_metadata__.name]) == 2)
         cars_p = df.get(CarForPedestrian)
         self.assertTrue(len(cars_p) == 2)
         for c in cars_p:
@@ -606,7 +636,9 @@ class Test_dataframe_object_tests(unittest.TestCase):
             def __predicate__(c):
                 return c.velocity != 0
 
-        cars = [Car(0, "RED"), Car(1, "RED"), Car(2, "RED"), Car(2, "BLUE"), Car(0, "BLUE")]
+        cars = [
+            Car(0, "RED"), Car(1, "RED"), Car(2, "RED"),
+            Car(2, "BLUE"), Car(0, "BLUE")]
         df = dataframe()
         df.add_types([Car, ActiveCarCountByColor])
         df.extend(Car, cars)

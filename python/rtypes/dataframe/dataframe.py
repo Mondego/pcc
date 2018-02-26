@@ -82,7 +82,8 @@ class dataframe(object):
             self.change_manager.report_dim_modification,
             self.object_manager.create_records_for_dim_modification)
         records = self.object_manager.create_tables(pairs_added)
-        self.external_db_queue.add_types(pairs_added)
+        if self.external_db_queue:
+            self.external_db_queue.add_types(pairs_added)
         self.change_manager.add_records(records)
 
     def add_types(self, types, tracking=False):

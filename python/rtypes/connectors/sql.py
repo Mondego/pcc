@@ -128,7 +128,7 @@ def convert_to_dim_value(value):
 
 
 def format_value(tp, value):
-    if tp == Record.DATETIME:
+    if tp == Record.DATETIME and not isinstance(value, str):
         return "%d-%d-%d" % (
             value.year, value.month, value.day)
     if tp == Record.DICTIONARY:
@@ -218,7 +218,6 @@ def create_obj(sql_obj, dims_order, pcc_type):
 def create_table_query(entity):
     metadata = entity.__rtypes_metadata__
     if metadata.final_category is PCCCategories.pcc_set:
-        print metadata.shortname
         query = (
             ("CREATE TABLE %s (" % (metadata.shortname,))
             + ", ".join([
@@ -253,7 +252,6 @@ def read_filters(tp):
     metadata = tp.__rtypes_metadata__
     filter_str = ""
     if metadata.predicate:
-        print metadata.name
         filter_str += "WHERE " + convert_expr(metadata.predicate)
     # Have to implement all the groupby and orderby and all that.
     return filter_str

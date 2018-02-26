@@ -141,8 +141,8 @@ class test_sql(unittest.TestCase):
         rows = cur.fetchall()
         self.assertSetEqual(
             set([(self.uuid1, "o1", 1, datetime.datetime(1989, 10, 28)),
-             (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
-             (self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))]),
+                 (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
+                 (self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))]),
             set(rows))
         cur.close()
 
@@ -173,10 +173,15 @@ class test_sql(unittest.TestCase):
             "SELECT oid, prop1, prop2, prop3 FROM BasicTable;")
         rows = cur.fetchall()
         self.assertSetEqual(
-            set([(self.uuid1, "o1", 10, datetime.datetime(1989, 10, 28)),
-             (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
-             (self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11)),
-             (self.uuid4, "o4", 4, datetime.datetime(2018, 1, 1))]), set(rows))
+            set([(unicode(self.uuid1), u"o1", 1,
+                  datetime.datetime(1989, 10, 28)),
+                 (unicode(self.uuid2), u"o2", 2,
+                  datetime.datetime(1990, 04, 17)),
+                 (unicode(self.uuid3), u"o3", 3,
+                  datetime.datetime(2017, 11, 11)),
+                 (unicode(self.uuid4), u"o4", 4,
+                  datetime.datetime(2018, 1, 1))]),
+             set(rows))
         cur.close()
 
     def sql_basic_objs_delete(self):
