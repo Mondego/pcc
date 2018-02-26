@@ -9,6 +9,7 @@ from rtypes.dataframe.dataframe_type import object_lock
 from rtypes.pcc.create import create, change_type
 from rtypes.pcc.utils._utils import ValueParser
 from rtypes.pcc.utils.enums import Event, Record
+from rtypes.pcc.triggers import TriggerAction, TriggerTime, BlockAction
 
 class ChangeRecord(object):
     def __init__(
@@ -30,7 +31,7 @@ class ChangeRecord(object):
 
 
 class ObjectManager(object):
-    def __init__(self, type_manager, calculate_pcc=True):
+    def __init__(self, type_manager, bound_execute_trigger_fn):
         # <group key> -> id -> object state.
         # (Might have to make this even better)
         # object state is {"base": base state, "type 1": extra fields etc., ...}
@@ -38,7 +39,7 @@ class ObjectManager(object):
 
         self.object_map = dict()
 
-        self.calculate_pcc = calculate_pcc
+        self.calculate_pcc = True
 
         self.deleted_objs = RecursiveDictionary()
 
@@ -47,6 +48,8 @@ class ObjectManager(object):
         self.changelog = RecursiveDictionary()
 
         self.record_obj = RecursiveDictionary()
+        
+        self.bound_execute_trigger_fn = bound_execute_trigger_fn
 
     #################################################
     ### Static Methods ##############################
@@ -210,7 +213,7 @@ class ObjectManager(object):
     def create_table(self, tpname, basetype=False):
         with object_lock:
             return self.__create_table(tpname, basetype)
-
+ 
     def create_tables(self, tpnames_basetype_pairs):
         with object_lock:
             records = list()
@@ -250,6 +253,21 @@ class ObjectManager(object):
                          if (othertpname in self.object_map
                              and oid in self.object_map[othertpname]) else
                          Event.New)
+
+                try:
+                    # Before {either mod or new} - pass
+                    if (event == Event.Modification): # before update
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.before, TriggerAction.update,
+                            None, self.object_map[othertpname][oid],
+                            self.object_map[othertpname][oid])
+                    else: # Before create
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.before, TriggerAction.create,
+                            obj_map[othertp][oid], None, None)
+                except BlockAction:
+                    pass
+
                 if event == Event.New:
                     # If it is modification, then the modification should
                     # already have been applied when updating the object.
@@ -271,6 +289,22 @@ class ObjectManager(object):
                         oid, obj_changes,
                         ObjectManager.__convert_to_dim_map(
                             self.object_map[othertpname][oid])))
+
+                try:
+                    # After {either mod or new} - pass
+                    if (event == Event.Modification): # after update
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.after, TriggerAction.update,
+                            self.object_map[othertpname][oid], None,
+                            self.object_map[othertpname][oid])
+                    else: # After create
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.after, TriggerAction.create,
+                            self.object_map[othertpname][oid], None,
+                            self.object_map[othertpname][oid])
+                except BlockAction:
+                    pass
+
         for othertp_obj in old_memberships:
             for oid in old_memberships[othertp_obj].difference(
                     set(obj_map[othertp_obj.type])):
@@ -279,7 +313,29 @@ class ObjectManager(object):
                     records.append(
                         ChangeRecord(
                             Event.Delete, othertp_obj, oid, None, None))
+
+                    # Before - pass
+                    try:
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.before, TriggerAction.delete,
+                            self.object_map[othertp_obj.name][oid], None, None)
+                    except BlockAction:
+                        pass
+
+                    self.object_map[othertp_obj.name][oid].__dict__ = dict(
+                        self.object_map[othertp_obj.name][oid].__dict__)
+                    self.object_map[othertp_obj.name][oid].__start_tracking__ = False
+
+                    obj = self.object_map[othertp_obj.name][oid]
                     del self.object_map[othertp_obj.name][oid]
+
+                    # After - pass
+                    try:
+                        self.bound_execute_trigger_fn(
+                        tp_obj, TriggerTime.after, TriggerAction.delete,
+                            obj, None, obj)
+                    except BlockAction:
+                        pass
 
         return records
 
@@ -474,7 +530,6 @@ class ObjectManager(object):
 
     def __delete_marked_objs(self, objs_deleted, records):
         # objs_deleted -> {tp_obj: [oid1, oid2, oid3, ....]}
-
         # first pass goes through all the base types.
         # Delete base type object, and delete pccs being calculated from that
         # For Eg: If Car is deleted, ActiveCar obj should also be deleted.
@@ -487,6 +542,14 @@ class ObjectManager(object):
             completed_tp.add(tp_obj)
             for oid in objs_deleted[tp_obj]:
                 if oid not in self.deleted_objs.setdefault(tp_obj, set()):
+                    df_obj = self.object_map[tp_obj.group_key][oid]
+                    try:
+                        # Before delete trigger - con
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.before, TriggerAction.delete,
+                            None, df_obj, df_obj)
+                    except BlockAction:
+                        continue
                     self.deleted_objs[tp_obj].add(oid)
                     if oid in self.object_map[tp_obj.group_key]:
                         self.object_map[tp_obj][oid].__start_tracking__ = False
@@ -501,10 +564,27 @@ class ObjectManager(object):
                         deletes.setdefault(
                             tp_obj.name, RecursiveDictionary())[oid] = (
                                 self.object_map[tp_obj.group_key][oid])
-                        del self.object_map[tp_obj.group_key][oid]
+                    # Delete the object
+                    del self.object_map[tp_obj.group_key][oid]
+                    try:
+                        # After delete trigger - pass
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.after, TriggerAction.delete,
+                            None, df_obj, None)
+                    except BlockAction:
+                        pass
 
+                    # Delete any objs related to the one we just deleted
                     for pure_related_pccs_tp in tp_obj.pure_group_members:
                         if oid in self.object_map[pure_related_pccs_tp.name]:
+                            df_obj = self.object_map[pure_related_pccs_tp.name][oid]
+                            try:
+                                # Before delete trigger (for related pcc) - pass
+                                self.bound_execute_trigger_fn(
+                                    tp_obj, TriggerTime.before, TriggerAction.delete,
+                                    None, df_obj, df_obj)
+                            except BlockAction:
+                                pass # Can't stop this from happening, they must be deleted
                             self.object_map[
                                 pure_related_pccs_tp.name][
                                     oid].__start_tracking__ = False
@@ -519,16 +599,32 @@ class ObjectManager(object):
                                 tp_obj.name, RecursiveDictionary())[oid] = (
                                     self.object_map[
                                         pure_related_pccs_tp.name][oid])
+                            # Delete the related obj
                             del self.object_map[pure_related_pccs_tp.name][oid]
-
+                            try:
+                                # After delete trigger (for related pcc) - pass
+                                self.bound_execute_trigger_fn(
+                                tp_obj, TriggerTime.after, TriggerAction.delete,
+                                None, df_obj, None)
+                            except BlockAction:
+                                pass
                     del self.current_state[tp_obj.group_key][oid]
 
         for tp_obj in (tp for tp in objs_deleted if tp not in completed_tp):
             for oid in objs_deleted[tp_obj]:
                 if oid not in self.deleted_objs.setdefault(tp_obj, set()):
-                    self.deleted_objs[tp_obj].add(oid)
                     if oid in self.object_map[tp_obj.name]:
-                        self.object_map[tp_obj][oid].start_tracking = False
+                        df_obj = self.current_state[tp_obj.group_key][oid]
+                        try:
+                            # Before trigger - con
+                            self.bound_execute_trigger_fn(
+                                tp_obj, TriggerTime.before, TriggerAction.delete,
+                                None, df_obj, df_obj)
+                        except BlockAction:
+                            continue
+                        self.object_map[tp_obj][oid].__dict__ = dict(
+                            self.object_map[tp_obj][oid].__dict__)
+                        self.object_map[tp_obj][oid].__start_tracking__ = False
                         if self.propagate_changes:
                             records.append(ChangeRecord(
                                 Event.Delete, tp_obj, oid, None, None,
@@ -537,12 +633,21 @@ class ObjectManager(object):
                             tp_obj.name, RecursiveDictionary())[oid] = (
                                 self.object_map[tp_obj.name][oid])
                         del self.object_map[tp_obj.name][oid]
+                        try:
+                            # After trigger - pass
+                            self.bound_execute_trigger_fn(
+                                tp_obj, TriggerTime.after, TriggerAction.delete,
+                                None, df_obj, None)
+                        except BlockAction:
+                            pass
+                        # Delete the original object as well
                         if len([othertp for othertp in tp_obj.group_members
                                 if (othertp.name in self.object_map
                                     and oid in self.object_map[othertp.name])
-                               ]) == 0:
+                            ]) == 0:
                             del self.current_state[tp_obj.group_key][oid]
-                            # delete the original object as well
+                    self.deleted_objs[tp_obj].add(oid)
+                            
         return deletes
 
     def __change_modified(self, objs_mod, records, touched_objs):
@@ -556,8 +661,24 @@ class ObjectManager(object):
                     # Not sure what to do.
                     pass
                 elif obj != None:
+                    df_obj = self.object_map[tp_obj.name][oid]
+                    try:
+                        # Before trigger
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.before, TriggerAction.update,
+                            None, df_obj, df_obj)
+                    except BlockAction:
+                        continue
+                    # Make the update
                     self.object_map[tp_obj.name][oid].__dict__.update(
                         obj.__dict__)
+                    try:
+                        # After trigger
+                        self.bound_execute_trigger_fn(
+                            tp_obj, TriggerTime.after, TriggerAction.update,
+                            df_obj, None, df_obj)
+                    except BlockAction:
+                        pass
                 touched_objs.setdefault(
                     tp_obj.group_key, RecursiveDictionary())[oid] = change
                 if self.propagate_changes:
@@ -573,6 +694,12 @@ class ObjectManager(object):
                 RecursiveDictionary())
             for oid, obj_and_change in objs_new[tp_obj.name].items():
                 obj, change = obj_and_change
+                try:
+                    self.bound_execute_trigger_fn(
+                        tp_obj, TriggerTime.before, TriggerAction.create,
+                        obj, None, None)
+                except BlockAction:
+                    continue
                 tp_current_state.setdefault(
                     oid, RecursiveDictionary()).rec_update(obj.__dict__)
                 obj.__dict__ = tp_current_state[oid]
@@ -582,6 +709,12 @@ class ObjectManager(object):
                 if (tp_obj in self.deleted_objs
                         and oid in self.deleted_objs[tp_obj]):
                     self.deleted_objs[tp_obj].remove(oid)
+                try:
+                    self.bound_execute_trigger_fn(
+                        tp_obj, TriggerTime.after, TriggerAction.create,
+                        obj, None, None)
+                except BlockAction:
+                    pass
                 self.object_map.setdefault(
                     tp_obj.name, RecursiveDictionary())[oid] = obj
                 touched_objs.setdefault(
@@ -590,7 +723,6 @@ class ObjectManager(object):
                     records.extend(
                         self.__create_records(
                             Event.New, tp_obj, oid, change, change, True))
-
 
     def __parse_changes(self, df_changes):
         '''

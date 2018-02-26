@@ -97,30 +97,23 @@ class TypeManager(object):
     ### API Methods #################################
     #################################################
 
-    def add_type(
-            self, tp, tracking=False, pcc_adjuster=None,
-            dim_modification_reporter=None, records_creator=None):
+    def add_type(self, tp, tracking=False, update=None):
         pairs_added = set()
         with type_lock:
             self.__add_type(
                 tp, tracking=tracking, pairs_added=pairs_added,
-                pcc_adjuster=pcc_adjuster,
-                dim_modification_reporter=dim_modification_reporter,
-                records_creator=records_creator)
+                update=update)
         return pairs_added
 
     def add_types(
-            self, types, tracking=False, pcc_adjuster=None,
-            dim_modification_reporter=None, records_creator=None,
+            self, types, tracking=False, update=None,
             check_new_type_predicate=False):
         pairs_added = set()
         with type_lock:
             for tp in types:
                 self.__add_type(
                     tp, tracking=tracking, pairs_added=pairs_added,
-                    pcc_adjuster=pcc_adjuster,
-                    dim_modification_reporter=dim_modification_reporter,
-                    records_creator=records_creator,
+                    update=update,
                     check_new_type_predicate=check_new_type_predicate)
         return pairs_added
 
@@ -144,7 +137,7 @@ class TypeManager(object):
                 "declare it as pcc_set." % tp.__class__.__name__)
         metadata = tp.__rtypes_metadata__
         if metadata.name not in self.name2class:
-            raise TypeError("Type %s hasnt been registered" % tp.__realname__)
+            raise TypeError("Type %s hasnt been registered" % metadata.name)
         tp_obj = self.name2class[metadata.name]
         if not tp_obj in self.observing_types:
             raise TypeError(
@@ -217,10 +210,10 @@ class TypeManager(object):
 
     def __add_type(
             self, tp, except_type=None, tracking=False, not_member=False,
-            pairs_added=set(), pcc_adjuster=None,
-            dim_modification_reporter=None, records_creator=None,
+            pairs_added=set(), update=None,
             check_new_type_predicate=False):
         self.__check_type(tp, check_new_type_predicate)
+
         metadata = tp.__rtypes_metadata__
         name = metadata.name
         categories = TypeManager.__categorize(tp)
@@ -235,9 +228,7 @@ class TypeManager(object):
         elif key != name:
             key_obj = self.__add_type(
                 keytp, except_type=tp, not_member=True,
-                pcc_adjuster=pcc_adjuster,
-                dim_modification_reporter=dim_modification_reporter,
-                records_creator=records_creator)
+                update=update)
             self.name2class[key] = key_obj
         else:
             key_obj = tp_obj
@@ -327,8 +318,7 @@ class TypeManager(object):
             self.join_types.add(tp_obj)
 
         self.tp_to_dataframe_payload[tp_obj] = (
-            (self.get_requested_type, pcc_adjuster, records_creator,
-             dim_modification_reporter)
+            update
             if not metadata.group_dimensions else
             None)
         return tp_obj

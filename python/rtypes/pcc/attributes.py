@@ -55,32 +55,25 @@ class rtype_property(property):
         prop.__dict__.update(self.__dict__)
         return prop
 
-    def __set__(self, obj, value, bypass = False):
+    def update(self, obj, value):
         property.__set__(self, obj, value)
-        if not hasattr(obj, "__start_tracking__"):
-            return
+
+    def __set__(self, obj, value, bypass = False):
+        #if not hasattr(obj, "__start_tracking__"):
+        #    return
+        # Dataframe is present
         if (hasattr(obj, "_dataframe_data")
                 and obj._dataframe_data
                 and hasattr(obj, "__primarykey__")
                 and obj.__primarykey__):
-            if obj.__start_tracking__:
-                (get_requested_type, pcc_adjuster, records_creator,
-                 dim_modification_reporter) = obj._dataframe_data
-                tp_obj = get_requested_type(obj.__class__)
-                applied_records = (
-                    records_creator(tp_obj, obj.__primarykey__, {self: value}))
-                pcc_change_records = (
-                    pcc_adjuster(tp_obj,
-                       {obj.__primarykey__: (obj, {self: value})},
-                       to_be_converted = True))
-                dim_modification_reporter(applied_records, pcc_change_records)
-                    
-        if not obj.__start_tracking__ or bypass:
-            if self._primarykey and value == None:
-                value = str(uuid.uuid4())
-                obj._primarykey = self
-            property.__set__(self, obj, value)
-            return
+            # Get dataframe method from the payload
+            dataframe_update_method = obj._dataframe_data  
+            # execute this method in the dataframe
+            dataframe_update_method(self, obj, value)
+        # no dataframe
+        else:
+            self.update(obj, value)
+
 
 class primarykey(object):
     def __init__(self, tp=None, default=True):

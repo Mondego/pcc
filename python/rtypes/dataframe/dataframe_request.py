@@ -155,3 +155,42 @@ class GetRecordDFRequest(object):
     @token.setter
     def token(self, v):
         self._token = v
+
+
+class UpdateDFRequest(DFRequest):
+    # Token
+    @property
+    def token(self): return self._token
+    @token.setter
+    def token(self, v): self._token = v
+
+    # Object
+    @property
+    def obj(self):
+        try:
+            return self._obj
+        except AttributeError:
+            self._obj = None
+            return self._obj
+    @obj.setter
+    def obj(self, v): self._obj = v
+
+    # Value
+    def value(self):
+        try:
+            return self._value
+        except AttributeError:
+            self._value = None
+            return self._value
+    @value.setter
+    def value(self, v): self._value = v
+
+    # Dimension
+    def dimension(self):
+        try:
+            return self._dimension
+        except AttributeError:
+            self._dimension = None
+            return self._dimension
+    @dimension.setter
+    def dimension(self, v): self._dimension = v
