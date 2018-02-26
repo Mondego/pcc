@@ -129,7 +129,7 @@ class UpdateDFRequest(DFRequest):
     @obj.setter
     def obj(self, v): self._obj = v
 
-    # New Value
+    # Value
     def value(self):
         try:
             return self._value
@@ -139,7 +139,7 @@ class UpdateDFRequest(DFRequest):
     @value.setter
     def value(self, v): self._value = v
 
-            # New Value
+    # Dimension
     def dimension(self):
         try:
             return self._dimension
