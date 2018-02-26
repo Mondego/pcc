@@ -130,12 +130,22 @@ class UpdateDFRequest(DFRequest):
     def obj(self, v): self._obj = v
 
     # New Value
-    def new_value(self):
+    def value(self):
         try:
-            return self._new_value
+            return self._value
         except AttributeError:
-            self._new_value = None
-            return self._new_value
-    @new_value.setter
-    def new_value(self, v): self._new_value = v
+            self._value = None
+            return self._value
+    @value.setter
+    def value(self, v): self._value = v
+
+            # New Value
+    def dimension(self):
+        try:
+            return self._dimension
+        except AttributeError:
+            self._dimension = None
+            return self._dimension
+    @dimension.setter
+    def dimension(self, v): self._dimension = v
 

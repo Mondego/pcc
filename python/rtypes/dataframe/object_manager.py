@@ -626,7 +626,7 @@ class ObjectManager(object):
 
     def __change_modified(self, objs_mod, records, touched_objs):
         for tp_obj in objs_mod:
-            if tp_obj.name not in self.object_map: 
+            if tp_obj.name not in self.object_map:
                 continue
             for oid, obj_and_change in objs_mod[tp_obj].items():
                 obj, change = obj_and_change

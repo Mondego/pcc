@@ -61,7 +61,7 @@ class TriggerManager(object):
            Only executes TriggerProcedure objs that meet the specified criteria.
            Passes in arguments "dataframe", "new", "old", and "current" into the procedure
 
-            Args:r
+            Args:
                 tp (PCC Type): Used to determine if the type has an trigger attached to it
                 time (str): Used to specify the activation time of the trigger
                 action (str): Used to specify the activation action of the trigger
