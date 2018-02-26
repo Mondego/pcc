@@ -15,5 +15,4 @@
 .vs
 CRED.json
 *.vscode/
-.pyperf
-test.py
+*.pyperf

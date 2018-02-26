@@ -23,12 +23,19 @@ class TriggerProcedure(object):
         return self.procedure(dataframe, new, old, current)
 
     def __eq__(self, v):
+        if isinstance(v, int):
+            return self.priority == v
         return  self.priority == v.priority
+        
 
     def __lt__(self, v):
+        if isinstance(v, int):
+            return self.priority < v
         return self.priority < v.priority
 
     def __gt__(self, v):
+        if isinstance(v, int):
+            return self.priority > v
         return self.priority > v.priority
 
 class trigger(object):

@@ -97,8 +97,7 @@ class TypeManager(object):
     ### API Methods #################################
     #################################################
 
-    def add_type(
-            self, tp, tracking=False, update=None):
+    def add_type(self, tp, tracking=False, update=None):
         pairs_added = set()
         with type_lock:
             self.__add_type(
@@ -106,8 +105,7 @@ class TypeManager(object):
                 update=update)
         return pairs_added
 
-    def add_types(
-            self, types, tracking=False, update=None):
+    def add_types(self, types, tracking=False, update=None):
         pairs_added = set()
         with type_lock:
             for tp in types:
@@ -309,7 +307,7 @@ class TypeManager(object):
             self.join_types.add(tp_obj)
 
         self.tp_to_dataframe_payload[tp_obj] = (
-            (update)
+            update
             if not metadata.group_dimensions else
             None)
         return tp_obj

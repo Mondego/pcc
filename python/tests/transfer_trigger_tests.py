@@ -272,7 +272,7 @@ class Test_trigger_transfer_test(unittest.TestCase):
         df = dataframe()
         df.add_trigger(before_create)
         df.add_type(Transaction)
-        self.assertEqual([], df.get(Transaction)) # Nothing before creation of object
+        self.assertListEqual([], df.get(Transaction)) # Nothing before creation of object
         df.append(Transaction, Transaction("Robert", 10))
         self.assertEqual([], df.get(Transaction)) # Nothing after creation of object
 
