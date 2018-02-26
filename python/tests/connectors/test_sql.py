@@ -1,4 +1,6 @@
-import unittest, json
+import unittest
+import json
+import time
 import datetime
 import uuid
 from mysql.connector import MySQLConnection
@@ -77,12 +79,16 @@ class EvenSubsetTableProjection(object):
 
 
 class test_sql(unittest.TestCase):
+    
+    def get_mysql_connection(self):
+        return MySQLConnection(
+            user=self.cred["user"], password=self.cred["password"],
+            host="127.0.0.1", database="rtypes_test")
+
     def setUp(self):
         cred = json.load(open("tests/connectors/CRED.json"))
+        self.cred = cred
         self.pcc_connection = RTypesMySQLConnection(
-            user=cred["user"], password=cred["password"],
-            host="127.0.0.1", database="rtypes_test")
-        self.sql_connection = MySQLConnection(
             user=cred["user"], password=cred["password"],
             host="127.0.0.1", database="rtypes_test")
         (self.uuid1, self.uuid2, self.uuid3,
@@ -93,14 +99,16 @@ class test_sql(unittest.TestCase):
         self.df = None
 
     def cleanup_tables(self):
-        cur = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur = sql_connection.cursor()
         for tblname in set(["BasicTable",
                             "EvenSubsetTable", "EvenSubsetTableProjection"]):
             try:
                 cur.execute("DROP TABLE {0};".format(tblname))
             except Error as err:
                 pass
-        self.sql_connection.commit()
+        sql_connection.commit()
+        sql_connection.reconnect()
 
     def test_sql(self):
         self.cleanup_tables()
@@ -116,7 +124,8 @@ class test_sql(unittest.TestCase):
     def sql_basic_type_insert(self):
         self.df.add_types([BasicTable])
         self.df.push()
-        cur = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur = sql_connection.cursor()
         cur.execute("DESCRIBE BasicTable;")
         rows = cur.fetchall()
         self.assertDictEqual(
@@ -135,7 +144,9 @@ class test_sql(unittest.TestCase):
              BasicTable(self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
              BasicTable(self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))])
         self.df.push()
-        cur = self.sql_connection.cursor()
+        time.sleep(1)
+        sql_connection = self.get_mysql_connection()
+        cur = sql_connection.cursor()
         cur.execute(
             "SELECT oid, prop1, prop2, prop3 FROM BasicTable;")
         rows = cur.fetchall()
@@ -147,12 +158,13 @@ class test_sql(unittest.TestCase):
         cur.close()
 
     def sql_basic_objs_read(self):
-        cur = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur = sql_connection.cursor()
         cur.execute(
             "INSERT INTO BasicTable (oid, prop1, prop2, prop3) "
             "VALUES (%s, %s, %s, %s);", (
                 self.uuid4, "o4", 4, datetime.datetime(2018, 1, 1)))
-        self.sql_connection.commit()
+        sql_connection.commit()
         cur.close()
         self.df.pull()
         bt_objs = self.df.get(BasicTable)
@@ -168,7 +180,8 @@ class test_sql(unittest.TestCase):
         obj = self.df.get(BasicTable, oid=self.uuid1)
         obj.prop2 = 10
         self.df.push()
-        cur = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur = sql_connection.cursor()
         cur.execute(
             "SELECT oid, prop1, prop2, prop3 FROM BasicTable;")
         rows = cur.fetchall()
@@ -187,22 +200,24 @@ class test_sql(unittest.TestCase):
     def sql_basic_objs_delete(self):
         self.df.delete(BasicTable, self.df.get(BasicTable, oid=self.uuid4))
         self.df.push()
-        self.sql_connection.reconnect()
-        cur = self.sql_connection.cursor()
+        time.sleep(1)
+        sql_connection = self.get_mysql_connection()
+        cur = sql_connection.cursor()
         cur.execute(
             "SELECT oid, prop1, prop2, prop3 FROM BasicTable;")
         rows = cur.fetchall()
         self.assertSetEqual(
             set([(self.uuid1, "o1", 10, datetime.datetime(1989, 10, 28)),
-             (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
-             (self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))]),
+                 (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
+                 (self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))]),
             set(rows))
         cur.close()
 
     def sql_subset_objs_modify(self):
         self.df.add_type(EvenSubsetTable)
         self.df.push()
-        cur1 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur1 = sql_connection.cursor()
         cur1.execute("DESCRIBE EvenSubsetTable;")
         rows1 = cur1.fetchall()
         self.assertDictEqual(
@@ -213,8 +228,8 @@ class test_sql(unittest.TestCase):
             {pid: (pid, tp, is_null, key, default, extra)
              for pid, tp, is_null, key, default, extra in rows1})
         cur1.close()
-        self.sql_connection.reconnect()
-        cur2 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur2 = sql_connection.cursor()
         cur2.execute(
             "SELECT oid, prop1, prop2, prop3 FROM EvenSubsetTable;")
         rows2 = cur2.fetchall()
@@ -228,8 +243,8 @@ class test_sql(unittest.TestCase):
         self.assertIsNotNone(obj)
         obj.prop2 = 9
         cur2.close()
-        self.sql_connection.reconnect()
-        cur3 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur3 = sql_connection.cursor()
         cur3.execute(
             "SELECT oid, prop1, prop2, prop3 FROM EvenSubsetTable;")
         rows3 = cur3.fetchall()
@@ -242,8 +257,8 @@ class test_sql(unittest.TestCase):
         self.assertEqual(self.uuid2, objs[0].oid)
         self.df.push()
         cur3.close()
-        self.sql_connection.reconnect()
-        cur4 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur4 = sql_connection.cursor()
         cur4.execute(
             "SELECT oid, prop1, prop2, prop3 FROM EvenSubsetTable;")
         rows4 = cur4.fetchall()
@@ -251,13 +266,13 @@ class test_sql(unittest.TestCase):
             set([(self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17))]),
             set(rows4))
         cur4.close()
-        self.sql_connection.reconnect()
-        cur5 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur5 = sql_connection.cursor()
         cur5.execute(
             "INSERT INTO EvenSubsetTable (oid, prop1, prop2, prop3) "
             "VALUES (%s, %s, %s, %s);",
             (self.uuid5, "o5", 6, datetime.datetime(2017, 04, 17)))
-        self.sql_connection.commit()
+        sql_connection.commit()
         cur5.close()
         self.df.pull()
         objs2 = self.df.get(EvenSubsetTable)
@@ -268,7 +283,8 @@ class test_sql(unittest.TestCase):
     def sql_composition_objs_modify(self):
         self.df.add_type(EvenSubsetTableProjection)
         self.df.push()
-        cur1 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur1 = sql_connection.cursor()
         cur1.execute("DESCRIBE EvenSubsetTableProjection;")
         rows1 = cur1.fetchall()
         self.assertDictEqual(
@@ -277,8 +293,8 @@ class test_sql(unittest.TestCase):
             {pid: (pid, tp, is_null, key, default, extra)
              for pid, tp, is_null, key, default, extra in rows1})
         cur1.close()
-        self.sql_connection.reconnect()
-        cur2 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur2 = sql_connection.cursor()
         cur2.execute(
             "SELECT oid, prop1 FROM EvenSubsetTableProjection;")
         rows2 = cur2.fetchall()
@@ -297,8 +313,8 @@ class test_sql(unittest.TestCase):
         self.assertIsNotNone(obj2)
         obj2.prop2 = 5
         cur2.close()
-        self.sql_connection.reconnect()
-        cur3 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur3 = sql_connection.cursor()
         cur3.execute(
             "SELECT oid, prop1 FROM EvenSubsetTableProjection;")
         rows3 = cur3.fetchall()
@@ -310,8 +326,8 @@ class test_sql(unittest.TestCase):
         self.assertEqual(self.uuid2, objs[0].oid)
         self.df.push()
         cur3.close()
-        self.sql_connection.reconnect()
-        cur4 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur4 = sql_connection.cursor()
         cur4.execute(
             "SELECT oid, prop1 FROM EvenSubsetTableProjection;")
         rows4 = cur4.fetchall()
@@ -319,13 +335,13 @@ class test_sql(unittest.TestCase):
             set([(self.uuid2, "o2")]),
             set(rows4))
         cur4.close()
-        self.sql_connection.reconnect()
-        cur5 = self.sql_connection.cursor()
+        sql_connection = self.get_mysql_connection()
+        cur5 = sql_connection.cursor()
         cur5.execute(
             "INSERT INTO BasicTable (oid, prop1, prop2, prop3) "
             "VALUES (%s, %s, %s, %s);",
             (self.uuid6, "o6", 6, datetime.datetime(2017, 10, 10)))
-        self.sql_connection.commit()
+        sql_connection.commit()
         cur5.close()
         self.df.pull()
         objs2 = self.df.get(EvenSubsetTableProjection)
