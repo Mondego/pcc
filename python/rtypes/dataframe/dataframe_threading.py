@@ -9,7 +9,8 @@ from dataframe_request import GetDFRequest, \
     DeleteDFRequest, \
     DeleteAllDFRequest, \
     ApplyChangesDFRequest, \
-    PutDFRequest
+    PutDFRequest, \
+    UpdateDFRequest
 
 class dataframe_wrapper(Thread):
     def __init__(self, name = str(uuid4()), df=None):
@@ -33,7 +34,7 @@ class dataframe_wrapper(Thread):
             if isinstance(req, GetDFRequest):
                 self.process_get_req(req, self.get_token_dict)
             else:
-                self.process_put_req(req)
+                self.process_put_req(req, self.get_token_dict)
 
     def process_get_req(self, get_req, token_dict):
         if not isinstance(get_req, GetDFRequest):
@@ -42,7 +43,14 @@ class dataframe_wrapper(Thread):
             get_req.type_object, get_req.oid, get_req.param)
         token_dict[get_req.token].put(result)
 
-    def process_put_req(self, put_req):
+    def process_update_request(self, req, token_dict):
+        if not isinstance(req, UpdateDFRequest):
+            return
+        result = self.dataframe.update(
+            req.dimension, req.obj, req.value)
+        token_dict[req.token].put(result)
+
+    def process_put_req(self, put_req, token_dict):
         if isinstance(put_req, ApplyChangesDFRequest):
             self.process_apply_req(put_req)
         elif isinstance(put_req, AppendDFRequest):
@@ -53,6 +61,8 @@ class dataframe_wrapper(Thread):
             self.process_delete_req(put_req)
         elif isinstance(put_req, DeleteAllDFRequest):
             self.process_deleteall_req(put_req)
+        elif isinstance(put_req, UpdateDFRequest):
+            self.process_update_request(put_req, token_dict)
         return
 
     def process_append_req(self, append_req):
@@ -93,6 +103,7 @@ class dataframe_wrapper(Thread):
 
     def remove_types(self, types):
         self.dataframe.remove_types(types)
+
     #############################################
 
     ####### OBJECT MANAGEMENT METHODS ###########
@@ -131,6 +142,20 @@ class dataframe_wrapper(Thread):
         req = DeleteAllDFRequest()
         req.type_object = tp
         self.queue.put(req)
+
+    def update(self, dimension, obj, value):
+        req = UpdateDFRequest()
+        req.dimension = dimension
+        req.obj = obj
+        req.value = value
+        req.token = uuid4()
+        self.get_token_dict[req.token] = Queue()
+        self.queue.put(req)
+        try:
+            self.get_token_dict[req.token].get(timeout=5)
+            return True
+        except Empty:
+            return False
 
     #############################################
 

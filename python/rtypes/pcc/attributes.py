@@ -60,45 +60,26 @@ class rtype_property(property):
         prop.__dict__.update(self.__dict__)
         return prop
 
-    def __set__(self, obj, value, bypass = False):
+    def update(self, obj, value):
         property.__set__(self, obj, value)
-        if not hasattr(obj, "__start_tracking__"):
-            return
+
+    def __set__(self, obj, value, bypass = False):
+        #if not hasattr(obj, "__start_tracking__"):
+        #    return
+        # Dataframe is present
         if (hasattr(obj, "_dataframe_data")
                 and obj._dataframe_data
                 and hasattr(obj, "__primarykey__")
                 and obj.__primarykey__):
-            if obj.__start_tracking__:
-                tp_getter, tr, gr, rr = obj._dataframe_data
-                tp_obj = tp_getter(obj.__class__)
-                applied_records = (
-                    gr(tp_obj, obj.__primarykey__, {self: value}))
-                pcc_change_records = (
-                    tr(tp_obj,
-                       {obj.__primarykey__: (obj, {self: value})},
-                       to_be_converted = True))
-                rr(applied_records, pcc_change_records)
-                    
-        if not obj.__start_tracking__ or bypass:
-            if self._primarykey and value == None:
-                value = str(uuid.uuid4())
-                obj._primarykey = self
-            property.__set__(self, obj, value)
-            return
-        if (not self._primarykey
-                and "_primarykey" != self._name
-                and rtype_property.GLOBAL_TRACKER):
-            type_name = get_type(value)
-            store_value = value
-            if type_name == "dependent":
-                return
-            elif type_name == "object":
-                store_value = dict(value.__dict__)
+            # Get dataframe method from the payload
+            dataframe_update_method = obj._dataframe_data  
+            # execute this method in the dataframe
+            dataframe_update_method(self, obj, value)
+        # no dataframe
+        else:
+            self.update(obj, value)
 
-            rtype_property.change_tracker.setdefault(
-                currentThread().getName(), RecursiveDictionary()).setdefault(
-                    obj.__class__, RecursiveDictionary()).setdefault(
-                        obj.__primarykey__, dict())[self._name] = store_value
+
 
 class primarykey(object):
     def __init__(self, tp=None, default=True):

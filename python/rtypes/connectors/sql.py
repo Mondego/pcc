@@ -51,7 +51,7 @@ class RTypesMySQLConnection(MySQLConnection):
         cursor = self.cursor()
         cursor.execute("SHOW TABLES;")
         rows = cursor.fetchall()
-        existing_tables = set(row[0] for row in rows if row)
+        existing_tables = set(row[0].lower() for row in rows if row)
         if "gc" not in changes and "types" not in changes:
             return
         queries = list()
