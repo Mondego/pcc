@@ -198,7 +198,10 @@ class dataframe_wrapper(Thread):
         self.queue.put(req)
         if wait_for_server:
             try:
-                return self.get_token_dict[req.token].get(timeout=5)
+                value = self.get_token_dict[req.token].get(timeout=5)
+                self.get_token_dict[req.token].close()
+                del self.get_token_dict[req.token]
+                return value
             except Empty:
                 return False
 
@@ -209,7 +212,10 @@ class dataframe_wrapper(Thread):
         self.get_token_dict[req.token] = Queue()
         self.queue.put(req)
         try:
-            return self.get_token_dict[req.token].get(timeout=5)
+            value = self.get_token_dict[req.token].get(timeout=5)
+            self.get_token_dict[req.token].close()
+            del self.get_token_dict[req.token]
+            return value
         except Empty:
             return dict()
 

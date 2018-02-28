@@ -160,9 +160,11 @@ class GetRecordDFRequest(object):
 class UpdateDFRequest(DFRequest):
     # Token
     @property
-    def token(self): return self._token
+    def token(self):
+        return self._token
     @token.setter
-    def token(self, v): self._token = v
+    def token(self, v):
+        self._token = v
 
     # Object
     @property
@@ -173,19 +175,24 @@ class UpdateDFRequest(DFRequest):
             self._obj = None
             return self._obj
     @obj.setter
-    def obj(self, v): self._obj = v
+    def obj(self, v):
+        self._obj = v
 
     # Value
+    @property
     def value(self):
         try:
             return self._value
         except AttributeError:
             self._value = None
             return self._value
+
     @value.setter
-    def value(self, v): self._value = v
+    def value(self, v):
+        self._value = v
 
     # Dimension
+    @property
     def dimension(self):
         try:
             return self._dimension

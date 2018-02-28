@@ -211,7 +211,7 @@ def create_obj(sql_obj, dims_order, pcc_type):
     obj = _container()
     obj.__class__ = pcc_type
     for i in range(len(dims_order)):
-        setattr(obj, dims_order[i], values[i])
+        setattr(obj, dims_order[i], sql_obj[i])
     return obj.__primarykey__, obj
 
 
@@ -221,27 +221,27 @@ def create_table_query(entity):
         query = (
             ("CREATE TABLE %s (" % (metadata.shortname,))
             + ", ".join([
-                " ".join([d._name, 
+                " ".join([d._name,
                           convert_type(
                               d._type, primarykey=(d == metadata.primarykey)),
                           "PRIMARY KEY" if d == metadata.primarykey else ""])
                 for d in metadata.dimensions])
-            + ");") 
+            + ");")
         return query, list()
     else:
         # TODO: Make this work for all types of alternate views.
         select_filters = read_filters(entity)
         query = (("CREATE VIEW %s AS SELECT %s FROM %s %s;") %
-                 (metadata.shortname, 
+                 (metadata.shortname,
                   ", ".join(d._name for d in metadata.dimensions),
                   metadata.base_parents[0].shortname,
                   select_filters))
         return query, list()
-    
+
 
 def drop_table_query(entity):
     metadata = entity.__rtypes_metadata__
-    tbltype = ("TABLE" 
+    tbltype = ("TABLE"
                if metadata.final_category is PCCCategories.pcc_set else
                "VIEW")
     return "DROP %s %s;" % (
@@ -252,7 +252,8 @@ def read_filters(tp):
     metadata = tp.__rtypes_metadata__
     filter_str = ""
     if metadata.predicate:
-        filter_str += "WHERE " + convert_expr(metadata.predicate)
+        filter_str += "WHERE " + convert_expr(
+            metadata.predicate, metadata.is_new_type_predicate)
     # Have to implement all the groupby and orderby and all that.
     return filter_str
 
@@ -260,33 +261,41 @@ def read_filters(tp):
 def cleanup(code):
     line1 = code.split("\n")[0]
     cleanline1 = line1.strip()
-    starting_tab  = len(line1) - len(cleanline1)
+    starting_tab = len(line1) - len(cleanline1)
     return "\n".join([l[starting_tab:] for l in code.split("\n")])
 
 
-def convert_expr(func):
-    x = cleanup(inspect.getsource(func))
-    #print x
-    tree = ast.parse(x)
-    obj_varname = tree.body[0].args.args[0].id
+def convert_expr(func, is_new_type_predicate):
+    if is_new_type_predicate:
+        func = func.func
+    clean_line = cleanup(inspect.getsource(func))
+
+    tree = ast.parse(clean_line)
     return_obj = tree.body[0].body[0].value
-    return sqlify(return_obj, obj_varname)
+    if not is_new_type_predicate:
+        obj_varname = tree.body[0].args.args[0].id
+        return sqlify(return_obj, obj_varname=obj_varname)
+    else:
+        dim_names = {dim.id: dim.id for dim in tree.body[0].args.args}
+        return sqlify(return_obj, parsed_expr=dim_names)
 
 
-def sqlify(expr, obj_varname, parsed_expr = dict()):
-    if type(expr) == ast.Compare:
-        return " ".join([sqlify(expr.left, obj_varname),
-                         sqlify(expr.ops, obj_varname),
-                         sqlify(expr.comparators, obj_varname)])
-    if type(expr) == ast.BinOp:
-        return " ".join([sqlify(expr.left, obj_varname),
-                         sqlify(expr.op, obj_varname),
-                         sqlify(expr.right, obj_varname)])
-    if type(expr) == ast.Attribute:
+def sqlify(expr, obj_varname="", parsed_expr=dict()):
+    if isinstance(expr, ast.Compare):
+        return " ".join([
+            sqlify(expr.left, obj_varname, parsed_expr),
+            sqlify(expr.ops, obj_varname, parsed_expr),
+            sqlify(expr.comparators, obj_varname, parsed_expr)])
+    if isinstance(expr, ast.BinOp):
+        return " ".join([
+            sqlify(expr.left, obj_varname, parsed_expr),
+            sqlify(expr.op, obj_varname, parsed_expr),
+            sqlify(expr.right, obj_varname, parsed_expr)])
+    if isinstance(expr, ast.Attribute):
         return expr.attr
-    if type(expr) == list:
-        return " ".join([sqlify(e, obj_varname) for e in expr])
-    if type(expr) == ast.Name:
+    if isinstance(expr, list):
+        return " ".join([sqlify(e, obj_varname, parsed_expr) for e in expr])
+    if isinstance(expr, ast.Name):
         if expr.id == "True":
             return '1'
         if expr.id == "False":
@@ -294,39 +303,39 @@ def sqlify(expr, obj_varname, parsed_expr = dict()):
         if expr.id == "None":
             return 'NULL'
         return parsed_expr[expr.id] if expr.id in parsed_expr else ""
-    if type(expr) == ast.Eq:
+    if isinstance(expr, ast.Eq):
         return "="
-    if type(expr) == ast.NotEq:
+    if isinstance(expr, ast.NotEq):
         return "!="
-    if type(expr) == ast.Lt:
+    if isinstance(expr, ast.Lt):
         return "<"
-    if type(expr) == ast.LtE:
+    if isinstance(expr, ast.LtE):
         return "<="
-    if type(expr) == ast.Gt:
+    if isinstance(expr, ast.Gt):
         return ">"
-    if type(expr) == ast.GtE:
+    if isinstance(expr, ast.GtE):
         return ">="
-    if type(expr) == ast.Is:
+    if isinstance(expr, ast.Is):
         return "=="
-    if type(expr) == ast.IsNot:
+    if isinstance(expr, ast.IsNot):
         return "!="
-    if type(expr) == ast.Add:
+    if isinstance(expr, ast.Add):
         return "+"
-    if type(expr) == ast.And:
+    if isinstance(expr, ast.And):
         return "AND"
-    if type(expr) == ast.Or:
+    if isinstance(expr, ast.Or):
         return "OR"
-    if type(expr) == ast.Sub:
+    if isinstance(expr, ast.Sub):
         return "-"
-    if type(expr) == ast.Mult:
+    if isinstance(expr, ast.Mult):
         return "*"
-    if type(expr) == ast.Div:
+    if isinstance(expr, ast.Div):
         return "/"
-    if type(expr) == ast.Mod:
+    if isinstance(expr, ast.Mod):
         return "%"
-    if type(expr) == ast.Num:
+    if isinstance(expr, ast.Num):
         return str(expr.n)
-    if type(expr) == ast.Str:
+    if isinstance(expr, ast.Str):
         return expr.s
 
 
