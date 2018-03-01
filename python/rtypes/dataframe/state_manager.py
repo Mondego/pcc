@@ -265,13 +265,13 @@ class StateManager(object):
         tform_type = self.type_to_obj_transformation[tpname]
         if curr_vn in self.type_to_obj_dimstate[tpname][oid]:
             return self.__merge_records(
-                self.type_to_obj_dimstate[tpname][oid][curr_vn:],
+                self.type_to_obj_dimstate[tpname][oid][curr_vn:][1:],
                 projection_dims)
         elif oid in tform_type and curr_vn in tform_type[oid]:
             next_tp = tform_type[oid][curr_vn]["next_timestamp"]
             return self.__merge_records(
-                tform_type[oid][curr_vn]["transform"] +
-                self.type_to_obj_dimstate[tpname][oid][next_tp:],
+                [tform_type[oid][curr_vn]["transform"]] +
+                self.type_to_obj_dimstate[tpname][oid][next_tp:][1:],
                 projection_dims)
         else:
             # How the hell is it here?!
@@ -362,7 +362,7 @@ class StateManager(object):
                     transformation = self.__calculate_transform(
                         changes_from_prev, {"dims": obj_changes["dims"]})
                     self.type_to_obj_transformation[groupname].setdefault(
-                        oid, dict())[prev_version] = {
+                        oid, dict())[curr_version] = {
                             "next_timestamp": next_timestamp,
                             "transform": transformation}
                     group_changelist[oid][next_timestamp] = {
@@ -407,7 +407,7 @@ class StateManager(object):
         new_changes = {"dims": dict()}
         if "dims" in inplace_changes:
             for dimname, dimchange in inplace_changes["dims"].iteritems():
-                if dimname not in new_changes["dims"]:
+                if dimname not in inplace_changes["dims"]:
                     new_changes["dims"][dimname] = dimchange
         return new_changes
 
