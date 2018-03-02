@@ -789,11 +789,13 @@ class ObjectManager(object):
                         group_type,
                         df_changes["gc"])
                 elif (groupname in self.current_state
-                         and oid in self.current_state[groupname]):
+                      and oid in self.current_state[groupname]):
                     # This is required in case it is an update where type
                     # changes, but the object data is already with the class.
                     new_obj = self.__create_fake_class()()
                     new_obj.__dict__ = self.current_state[groupname][oid]
+                else:
+                    new_obj = self.__create_fake_class()()
 
                 # For all type and status changes for that object
                 for found_member, status in obj_changes["types"].items():
@@ -816,9 +818,9 @@ class ObjectManager(object):
                     for member in types_to_go_through:
                         # If the object is New, or New for this dataframe.
                         if (status == Event.New
-                               or status == Event.Modification):
+                                or status == Event.Modification):
                             if (member not in self.object_map
-                                   or oid not in self.object_map[member]):
+                                    or oid not in self.object_map[member]):
                                 actual_obj = change_type(
                                     new_obj,
                                     tm.get_requested_type_from_str(

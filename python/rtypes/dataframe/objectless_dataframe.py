@@ -12,12 +12,12 @@ BASE_TYPES = set([])
 
 
 class ObjectlessDataframe(object):
-    def __init__(self, name=str(uuid4())):
+    def __init__(self, name=str(uuid4()), clear_state=True):
         # Unique ID for this dataframe.
         self.name = name
 
         # The object that deals with object management
-        self.state_manager = StateManager()
+        self.state_manager = StateManager(clear_state)
 
     def add_types(self, types, tracking=False):
         self.state_manager.add_types(types)
