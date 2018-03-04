@@ -156,6 +156,14 @@ class GetRecordDFRequest(object):
     def token(self, v):
         self._token = v
 
+    @property
+    def app(self):
+        return self._app
+
+    @app.setter
+    def app(self, v):
+        self._app = v
+
 
 class UpdateDFRequest(DFRequest):
     # Token

@@ -16,3 +16,5 @@
 CRED.json
 *.vscode/
 *.pyperf
+*.code-workspace
+.RtypesStateManagerState

@@ -1,8 +1,9 @@
 from threading import Thread
 from uuid import uuid4
 
-from multiprocess import Queue
-from multiprocess.queues import Empty
+from multiprocessing import Queue
+from multiprocessing import Event
+from multiprocessing.queues import Empty
 
 from rtypes.dataframe import dataframe
 
@@ -40,6 +41,8 @@ class dataframe_wrapper(Thread):
                 self.process_get_req(req, self.get_token_dict)
             else:
                 self.process_put_req(req, self.get_token_dict)
+        self.queue.cancel_join_thread()
+        self.queue.close()
 
     def shutdown(self):
         self.queue.put(ShutdownDFRequest())
@@ -50,15 +53,17 @@ class dataframe_wrapper(Thread):
             result = self.dataframe.get(
                 get_req.type_object, get_req.oid, get_req.param)
         elif isinstance(get_req, GetRecordDFRequest):
-            result = self.dataframe.get_record(get_req.changelist)
-        token_dict[get_req.token].put(result)
+            result = self.dataframe.get_record(
+                get_req.changelist, app=get_req.app)
+        token_dict[get_req.token]["result"] = result
+        token_dict[get_req.token]["is_set"].set()
 
     def process_update_request(self, req, token_dict):
         if not isinstance(req, UpdateDFRequest):
             return
-        result = self.dataframe.update(
+        self.dataframe.update(
             req.dimension, req.obj, req.value)
-        token_dict[req.token].put(result)
+        token_dict[req.token]["is_set"].set()
 
     def process_put_req(self, put_req, token_dict):
         if isinstance(put_req, ApplyChangesDFRequest):
@@ -97,7 +102,7 @@ class dataframe_wrapper(Thread):
         self.dataframe.apply_changes(
             apply_req.df_changes, except_app=apply_req.except_app)
         if apply_req.wait_for_server:
-            token_dict[apply_req.token].put(True)
+            token_dict[apply_req.token]["is_set"].set()
 
     ####### TYPE MANAGEMENT METHODS #############
     def add_type(self, tp, tracking=False):
@@ -133,18 +138,19 @@ class dataframe_wrapper(Thread):
         req.type_object = tp
         self.queue.put(req)
 
-    def get(self, tp, oid = None, parameters=None):
+    def get(self, tp, oid=None, parameters=None):
         req = GetDFRequest()
         req.type_object = tp
         req.oid = oid
         req.param = parameters
         req.token = uuid4()
-        self.get_token_dict[req.token] = Queue()
+        self.get_token_dict[req.token] = {"is_set": Event()}
         self.queue.put(req)
-        try:
-            return self.get_token_dict[req.token].get(timeout=5)
-        except Empty:
-            return list()
+        result = list()
+        if self.get_token_dict[req.token]["is_set"].wait(timeout=5):
+            result = self.get_token_dict[req.token]["result"]
+            del self.get_token_dict[req.token]
+        return result
 
     def delete(self, tp, obj):
         req = DeleteDFRequest()
@@ -163,13 +169,10 @@ class dataframe_wrapper(Thread):
         req.obj = obj
         req.value = value
         req.token = uuid4()
-        self.get_token_dict[req.token] = Queue()
+        self.get_token_dict[req.token] = {"is_set": Event()}
         self.queue.put(req)
-        try:
-            self.get_token_dict[req.token].get(timeout=5)
-            return True
-        except Empty:
-            return False
+        if self.get_token_dict[req.token]["is_set"].wait(timeout=5):
+            del self.get_token_dict[req.token]
 
     #############################################
 
@@ -194,30 +197,24 @@ class dataframe_wrapper(Thread):
         req.wait_for_server = wait_for_server
         if wait_for_server:
             req.token = uuid4()
-            self.get_token_dict[req.token] = Queue()
+            self.get_token_dict[req.token] = {"is_set": Event()}
         self.queue.put(req)
         if wait_for_server:
-            try:
-                value = self.get_token_dict[req.token].get(timeout=5)
-                self.get_token_dict[req.token].close()
+            if self.get_token_dict[req.token]["is_set"].wait(timeout=5):
                 del self.get_token_dict[req.token]
-                return value
-            except Empty:
-                return False
 
-    def get_record(self, changelist=None):
+    def get_record(self, changelist=None, app=None):
         req = GetRecordDFRequest()
         req.changelist = changelist
         req.token = uuid4()
-        self.get_token_dict[req.token] = Queue()
+        req.app = app
+        self.get_token_dict[req.token] = {"is_set": Event()}
         self.queue.put(req)
-        try:
-            value = self.get_token_dict[req.token].get(timeout=5)
-            self.get_token_dict[req.token].close()
+        result = dict()
+        if self.get_token_dict[req.token]["is_set"].wait(timeout=5):
+            result = self.get_token_dict[req.token]["result"]
             del self.get_token_dict[req.token]
-            return value
-        except Empty:
-            return dict()
+        return result
 
     def clear_record(self):
         return self.dataframe.clear_record()

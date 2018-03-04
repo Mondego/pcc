@@ -12,12 +12,12 @@ BASE_TYPES = set([])
 
 
 class ObjectlessDataframe(object):
-    def __init__(self, name=str(uuid4()), clear_state=True):
+    def __init__(self, name=str(uuid4()), maintain_change_record=True):
         # Unique ID for this dataframe.
         self.name = name
 
         # The object that deals with object management
-        self.state_manager = StateManager(clear_state)
+        self.state_manager = StateManager(maintain_change_record)
 
     def add_types(self, types, tracking=False):
         self.state_manager.add_types(types)
@@ -26,7 +26,7 @@ class ObjectlessDataframe(object):
         self.state_manager.add_type(tp)
 
     def apply_changes(self, changes, except_app=None):
-        return self.state_manager.apply_changes(changes)
+        return self.state_manager.apply_changes(changes, except_app)
 
-    def get_record(self, changelist=None):
-        return self.state_manager.get_records(changelist)
+    def get_record(self, changelist=None, app=None):
+        return self.state_manager.get_records(changelist, app)

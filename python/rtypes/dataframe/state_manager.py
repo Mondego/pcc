@@ -16,7 +16,7 @@ from rtypes.pcc.create import create, change_type
 from rtypes.pcc.utils._utils import ValueParser
 from rtypes.pcc.utils.enums import Event, Record
 from rtypes.dataframe.type_state import TypeState
-from rtypes.dataframe.file_state_recorder import FileStateRecorder
+from rtypes.dataframe.state_recorder import StateRecorder
 
 
 #################################################
@@ -25,8 +25,7 @@ from rtypes.dataframe.file_state_recorder import FileStateRecorder
 
 
 class StateManager(object):
-    save_store = ".RtypesStateManagerState"
-    def __init__(self, clear_saved_state):
+    def __init__(self, maintain_change_record):
         # A map of the form
         # self.type_to_obj_dimstate = {
         #     group_key1 : {
@@ -47,10 +46,7 @@ class StateManager(object):
         #     tpname2: set([...]), ...}
         self.type_to_objids = dict()
         self.type_manager = TypeManager()
-        if clear_saved_state:
-            self.__clear_saved_state()
-            self.__create_save_folder()
-
+        self.maintain = maintain_change_record
 
     #################################################
     ### Static Methods ##############################
@@ -75,17 +71,18 @@ class StateManager(object):
             for tpname, _ in tpnames_basetype_pairs:
                 self.__create_table(tpname)
 
-    def apply_changes(self, df_changes):
+    def apply_changes(self, df_changes, except_app):
         if "gc" in df_changes:
-            self.__apply_changes(df_changes["gc"])
+            self.__apply_changes(df_changes["gc"], except_app)
 
     def clear_all(self):
         for tpname in self.type_to_objids:
             if tpname in self.type_to_obj_dimstate:
-                self.type_to_obj_dimstate[tpname].clear()
+                self.type_to_obj_dimstate[tpname] = StateRecorder(
+                    tpname, self.maintain)
             self.type_to_objids[tpname].clear()
 
-    def get_records(self, changelist):
+    def get_records(self, changelist, app):
         final_record = RecursiveDictionary()
         pcc_types_to_process = set()
         no_change_groups = set()
@@ -97,7 +94,7 @@ class StateManager(object):
                 tp_record = (
                     self.__get_dim_changes_for_basetype(
                         tpname, changelist[tpname],
-                        new_oids, mod_oids, del_oids))
+                        new_oids, mod_oids, del_oids, app))
                 if tp_record:
                     final_record[tpname] = tp_record
                     self.__set_type_change_status(
@@ -123,7 +120,7 @@ class StateManager(object):
                 tp_record = (
                     self.__get_dim_changes_for_basetype(
                         groupname, changelist[tpname],
-                        new_oids, mod_oids, del_oids,
+                        new_oids, mod_oids, del_oids, app,
                         projection_dims=metadata.projection_dims))
                 if not tp_record:
                     final_record[groupname] = tp_record
@@ -144,18 +141,10 @@ class StateManager(object):
     ### Private Methods #############################
     #################################################
 
-    def __clear_saved_state(self):
-        if os.path.exists(StateManager.save_store):
-            shutil.rmtree(StateManager.save_store)
-
-    def __create_save_folder(self):
-        if not os.path.exists(StateManager.save_store):
-            os.makedirs(StateManager.save_store)
-
     def __set_latest_versions(self, tpname, new_oids, final_changes):
         for oid in new_oids:
             final_changes[oid]["version"] = [
-                None, self.type_to_obj_dimstate[tpname][oid].lastkey()]
+                None, self.type_to_obj_dimstate[tpname].lastkey(oid)]
 
     def __set_type_change_status(
             self, tpname, new_oids, mod_oids, del_oids, changes):
@@ -185,12 +174,12 @@ class StateManager(object):
 
     def __get_dim_changes_for_basetype(
             self, tpname, changelist, new_oids,
-            mod_oids, del_oids, projection_dims=None):
+            mod_oids, del_oids, app, projection_dims=None):
         group_changes = self.type_to_obj_dimstate[tpname]
         final_record = dict()
         for oid in new_oids:
             final_record[oid] = self.__merge_records(
-                group_changes.get_full_obj(oid), projection_dims)
+                group_changes.get_full_obj(oid, app), projection_dims)
             final_record[oid]["version"] = [
                 None,
                 group_changes.lastkey(oid)]
@@ -199,53 +188,40 @@ class StateManager(object):
         for oid in mod_oids:
             curr_vn = changelist[oid]
             dim_changes = self.__merge_records(
-                group_changes.get_dim_changes_since(oid, curr_vn),
+                group_changes.get_dim_changes_since(oid, curr_vn, app),
                 projection_dims)
-            if dim_changes:
+            latest_vn = group_changes.lastkey(oid)
+            if latest_vn != curr_vn:
                 final_record[oid] = dim_changes
-                final_record[oid]["version"] = [
-                    changelist[oid],
-                    group_changes.lastkey(oid)]
+                final_record[oid]["version"] = [curr_vn, latest_vn]
 
         return final_record
 
     def __merge_records(self, records, projection_dims):
         if not records:
             return dict()
-        # Doing a deep copy so that we dont make modifications on existing
-        # changelists by mistake.
-        try:
-            record1_copy = copy.deepcopy(records.next())
-        except StopIteration:
-            return dict()
 
         projection_dims_str = (
             set([d._name for d in projection_dims])
             if projection_dims else
             set())
-        if projection_dims_str:
-            final_record = {
-                "dims": {
-                    d: v
-                    for d, v in record1_copy.setdefault(
-                        "dims", dict()).iteritems()
-                    if d in projection_dims_str}}
-        else:
-            final_record = record1_copy
+        final_record = dict()
         final_record_dims = final_record.setdefault("dims", dict())
 
         for rec in records:
-            for dim, value in (
-                    rec["dims"] if "dims" in rec else dict()).iteritems():
-                if projection_dims:
+            if projection_dims:
+                for dim, value in (
+                        rec["dims"] if "dims" in rec else dict()).iteritems():
                     # In case of projection, copy only req dimensions.
                     if dim in projection_dims_str:
                         final_record_dims[dim] = value
-                else:
-                    final_record_dims[dim] = value
-        return final_record
+            elif "dims" in rec:
+                final_record_dims.update(rec["dims"])
+        if final_record_dims:
+            return final_record
+        return dict()
 
-    def __apply_changes(self, df_changes):
+    def __apply_changes(self, df_changes, except_app=None):
         '''
         all_changes is a dictionary in this format
 
@@ -291,7 +267,8 @@ class StateManager(object):
                     if "dims" in obj_changes and prev_version is None:
                         # Should be a new object.
                         group_changelist.add_obj(
-                            oid, curr_version, {"dims": obj_changes["dims"]})
+                            oid, curr_version, {"dims": obj_changes["dims"]},
+                            except_app)
                         objects_to_check_pcc.setdefault(
                             groupname, set()).add(oid)
                         self.type_to_objids[groupname].add(oid)
@@ -317,13 +294,14 @@ class StateManager(object):
                     # Alright, no need for transformations. Straightforward
                     # merge.
                     group_changelist.add_next_change(
-                        oid, curr_version, {"dims": obj_changes["dims"]})
+                        oid, curr_version, {"dims": obj_changes["dims"]},
+                        except_app)
                     # Do not need to change latest_version_number
                 else:
                     # Have to do a merge.
                     changes_from_prev = self.__merge_records(
                         group_changelist.get_dim_changes_since(
-                            oid, prev_version), None)
+                            oid, prev_version, except_app), None)
                     transformation = self.__calculate_transform(
                         changes_from_prev, {"dims": obj_changes["dims"]})
                     group_changelist.add_transformation(
@@ -331,7 +309,8 @@ class StateManager(object):
                             "next_timestamp": next_timestamp,
                             "transform": transformation})
                     group_changelist.add_next_change(
-                        oid, next_timestamp, {"dims": obj_changes["dims"]})
+                        oid, next_timestamp, {"dims": obj_changes["dims"]},
+                        except_app)
 
         # start pcc calculations now.
         for groupname, oids in deleted_objs.iteritems():
@@ -342,7 +321,7 @@ class StateManager(object):
             for pcc_type in group_type.pure_group_members:
                 if pcc_type.name in self.type_to_objids:
                     self.type_to_objids[pcc_type.name].difference_update(oids)
-        
+
         for groupname, oids in objects_to_check_pcc.iteritems():
             try:
                 group_type = tm.get_requested_type_from_str(groupname)
@@ -361,7 +340,7 @@ class StateManager(object):
                     if PCCCategories.subset in metadata.categories:
                         if pcc_type.metadata.predicate(
                                 *(ValueParser.parse(dim_changes[d])
-                                for d in pcc_type.metadata.dim_triggers_str)):
+                                  for d in pcc_type.metadata.dim_triggers_str)):
                             self.type_to_objids[pcc_type.name].add(oid)
                         elif oid in self.type_to_objids[pcc_type.name]:
                             self.type_to_objids[pcc_type.name].remove(oid)
@@ -379,6 +358,6 @@ class StateManager(object):
     def __create_table(self, tpname):
         tp_obj = self.type_manager.get_requested_type_from_str(tpname)
         self.type_to_obj_dimstate.setdefault(
-            tp_obj.group_key, FileStateRecorder(StateManager.save_store, tp_obj.group_key))
+            tp_obj.group_key, StateRecorder(tp_obj.group_key, self.maintain))
         self.type_to_objids.setdefault(tp_obj.group_key, set())
         self.type_to_objids.setdefault(tpname, set())

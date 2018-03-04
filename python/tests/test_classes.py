@@ -28,6 +28,34 @@ class SmallBase(object):
         self._sp1 = v
 
 @pcc_set
+class SmallIntBase(object):
+    def __repr__(self):
+        return "{0}, {1}".format(self.oid, self.iprop1)
+
+    def __eq__(self, obj):
+        return self.oid == obj.oid and self.iprop1 == obj.iprop1
+
+    def __hash__(self):
+        return hash((self.oid, self.iprop1))
+
+    @primarykey(str)
+    def oid(self):
+        return self._oid
+    @oid.setter
+    def oid(self, v):
+        self._oid = v
+    @dimension(int)
+    def iprop1(self):
+        return self._ip1
+    @iprop1.setter
+    def iprop1(self, v):
+        self._ip1 = v
+
+    def __init__(self, oid, iprop):
+        self._oid = oid
+        self._ip1 = iprop
+
+@pcc_set
 class LargeBase(object):
     @primarykey(str)
     def oid(self):
@@ -75,7 +103,7 @@ class SubsetLargeBase(object):
     @staticmethod
     def __predicate__(lb):
         return lb.prop1 == "subset"
-    
+
     def func2(self):
         return self.prop2
 
@@ -84,7 +112,7 @@ class InheritedSubsetLargeBase(LargeBase):
     @staticmethod
     def __predicate__(lb):
         return lb.prop1 == "subset"
-    
+
     def func2(self):
         return self.prop2
 

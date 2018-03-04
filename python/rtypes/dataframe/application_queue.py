@@ -1,8 +1,8 @@
 import time
 from threading import Thread
 
-from multiprocess import RLock
-from multiprocess.queues import Empty
+from multiprocessing import RLock
+from multiprocessing.queues import Empty
 
 from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary

@@ -20,6 +20,7 @@ rtypes/dataframe/object_manager.py
 rtypes/dataframe/objectless_dataframe.py
 rtypes/dataframe/queue_manager.py
 rtypes/dataframe/state_manager.py
+rtypes/dataframe/state_recorder.py
 rtypes/dataframe/trigger_manager.py
 rtypes/dataframe/type_manager.py
 rtypes/dataframe/type_state.py

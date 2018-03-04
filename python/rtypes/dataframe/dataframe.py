@@ -269,7 +269,7 @@ class dataframe(object):
             self.change_manager.add_records(
                 applied_records, pcc_change_records, except_app)
 
-    def get_record(self, changelist=None):
+    def get_record(self, changelist=None, app=None):
         return self.change_manager.get_record(changelist)
 
     def clear_record(self):

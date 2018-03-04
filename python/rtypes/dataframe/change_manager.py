@@ -1,7 +1,7 @@
 #################################################
 #### Record keeping (Atomic Needed) #############
 #################################################
-from multiprocess import Queue
+from multiprocessing import Queue
 
 from rtypes.dataframe.queue_manager import QueueManager
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
