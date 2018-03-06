@@ -1,21 +1,9 @@
-
-import os
-import datetime
-import copy
 import time
-import shutil
-from uuid import uuid4
-from dateutil import parser
-from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from rtypes.dataframe.type_manager import TypeManager
-from rtypes.pcc.types.parameter import ParameterMode
 from rtypes.pcc.utils.enums import PCCCategories
-from rtypes.dataframe.dataframe_changes import IDataframeChanges as df_repr
 from rtypes.dataframe.dataframe_type import object_lock
-from rtypes.pcc.create import create, change_type
 from rtypes.pcc.utils._utils import ValueParser
-from rtypes.pcc.utils.enums import Event, Record
-from rtypes.dataframe.type_state import TypeState
+from rtypes.pcc.utils.enums import Event
 from rtypes.dataframe.state_recorder import StateRecorder
 
 
@@ -83,7 +71,7 @@ class StateManager(object):
             self.type_to_objids[tpname].clear()
 
     def get_records(self, changelist, app):
-        final_record = RecursiveDictionary()
+        final_record = dict()
         pcc_types_to_process = set()
         no_change_groups = set()
         for tpname in changelist:
@@ -150,16 +138,16 @@ class StateManager(object):
             self, tpname, new_oids, mod_oids, del_oids, changes):
         for oid in new_oids:
             changes.setdefault(oid, dict()).setdefault(
-                "types", RecursiveDictionary())[tpname] = Event.New
+                "types", dict())[tpname] = Event.New
         for oid in del_oids:
             changes.setdefault(oid, dict()).setdefault(
-                "types", RecursiveDictionary())[tpname] = Event.Delete
+                "types", dict())[tpname] = Event.Delete
         for oid in mod_oids:
             # If there are no dim changes, it cannot be modification.
             if oid not in changes:
                 continue
             changes[oid].setdefault(
-                "types", RecursiveDictionary())[tpname] = (
+                "types", dict())[tpname] = (
                     Event.Modification)
 
     def __get_oid_change_buckets(self, tpname, changelist):

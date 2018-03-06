@@ -24,47 +24,8 @@
 
 __author__ = 'jannis@itisme.org (Jannis Andrija Schnitzer)(original), ra.rohan@gmail.com (Rohan Achar)'
 
-class OrderedSliceableDict(OrderedDict):
-    __author__ = 'ra.rohan@gmail.com (Rohan Achar)'
 
-    def lastkey(self):
-        root = self._OrderedDict__root
-        try:
-            return root[0][2]
-        except IndexError:
-            return None
-
-    def __getitem__(self, key):
-        if isinstance(key, slice):
-            map = self._OrderedDict__map
-            root = self._OrderedDict__root
-            step = key.step if key.step else 1
-            reverse = True if step < 0 else False
-            if key.start is None and key.stop is None:
-                return self.values()[::key.step]
-            if len(self) == 0:
-                raise KeyError("Cannot slice empty dictionary")
-            start = key.start if key.start else root[1 if reverse else 0][2]
-            stop = (map[key.stop] if key.stop else root)[1 if reverse else 0][2]
-            if start == stop:
-                return list()
-            items = list()
-            curr = map[start]
-            while True:
-                items.append(self[curr[2]])
-                if curr[2] == stop:
-                    break
-                curr = curr[0] if reverse else curr[1]
-                if curr[2] is None:
-                    # curr = curr[0] if reverse else curr[1]
-                    break
-            return items[::abs(step)]
-        else:
-            return OrderedDict.__getitem__(self, key)
-
-
-
-class RecursiveDictionary(OrderedSliceableDict):
+class RecursiveDictionary(OrderedDict):
     """RecursiveDictionary provides the methods rec_update and iter_rec_update
     that can be used to update member dictionaries rather than overwriting
     them."""

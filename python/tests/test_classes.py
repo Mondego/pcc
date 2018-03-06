@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from rtypes.pcc.attributes import dimension, primarykey, count, namespace
+from rtypes.pcc.attributes import dimension, primarykey, count, namespace, predicate
 from rtypes.pcc.types.set import pcc_set
 from rtypes.pcc.types.subset import subset
 from rtypes.pcc.types.impure import impure
@@ -54,6 +54,22 @@ class SmallIntBase(object):
     def __init__(self, oid, iprop):
         self._oid = oid
         self._ip1 = iprop
+
+# pylint: disable=E1101,E0213
+@subset(SmallIntBase)
+class SubsetOddInt(object):
+    def __repr__(self):
+        return "{0}, {1}".format(self.oid, self.iprop1)
+
+    def __eq__(self, obj):
+        return self.oid == obj.oid and self.iprop1 == obj.iprop1
+
+    def __hash__(self):
+        return hash((self.oid, self.iprop1))
+
+    @predicate(SmallIntBase.iprop1)
+    def __predicate__(iprop1):
+        return iprop1 % 2
 
 @pcc_set
 class LargeBase(object):

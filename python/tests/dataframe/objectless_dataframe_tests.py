@@ -7,6 +7,25 @@ from rtypes.pcc.utils.enums import Record, Event
 import cProfile
 
 class test_objectless_dataframe(unittest.TestCase):
+    @staticmethod
+    def apply_versions(gpname, changes, version_map, new_version):
+        version_for_tp = version_map.setdefault(gpname, dict())
+        for oid, obchanges in changes["gc"][gpname].iteritems():
+            old_version = version_for_tp[oid] if oid in version_for_tp else None
+            version_for_tp[oid] = new_version
+            obchanges["version"] = [old_version, new_version]
+
+    @staticmethod
+    def get_versions(gpname, changes, version_map, tpname=None):
+        if not tpname:
+            tpname = gpname
+        for oid, obchanges in changes["gc"][gpname].iteritems():
+            if obchanges["types"][tpname] == Event.Delete:
+                del version_map[tpname][oid]
+            else:
+                version_map[tpname][oid] = obchanges["version"][1]
+
+
     def test_basic_apply_no_maintain(self):
         self.maxDiff = None
         df = ObjectlessDataframe(maintain_change_record=False)
@@ -384,7 +403,9 @@ class test_objectless_dataframe(unittest.TestCase):
         self.assertDictEqual({"gc": dict()}, record6)
 
     def test_basic_apply_maintain3(self):
+        # prof = cProfile.Profile()
         self.maxDiff = None
+        obj_count = 1000
         df = ObjectlessDataframe(maintain_change_record=True)
         df.add_type(tc.SmallIntBase)
         df_c1 = dataframe_client()
@@ -393,40 +414,133 @@ class test_objectless_dataframe(unittest.TestCase):
 
         df_c2 = dataframe_client()
         df_c2.add_type(tc.SmallIntBase)
-        base_objs = [tc.SmallIntBase(str(i), i) for i in xrange(1000)]
+        base_objs = [tc.SmallIntBase(str(i), i) for i in xrange(obj_count)]
         df_c1.extend(tc.SmallIntBase, base_objs)
         apply_changes1 = df_c1.get_record()
         df_c1.clear_record()
         dfc1_versions = dict()
         vn0 = 0
+        # pylint: disable=E1101
         gpname = tc.SmallIntBase.__rtypes_metadata__.name
-        for oid, obchanges in apply_changes1["gc"][gpname].iteritems():
-            dfc1_versions.setdefault(gpname, dict())[oid] = vn0
-            obchanges["version"] = [None, vn0]
+        # pylint: enable=E1101
+        test_objectless_dataframe.apply_versions(
+            gpname, apply_changes1, dfc1_versions, vn0)
+        # prof.enable()
         df.apply_changes(apply_changes1, except_app="DFC1")
+        # prof.disable()
 
         dfc2_versions = {gpname: dict()}
+        # prof.enable()
         return_changes1 = df.get_record(dfc2_versions, "DFC2")
+        # prof.disable()
         df_c2.apply_changes(return_changes1)
-        for oid, obchanges in return_changes1["gc"][gpname].iteritems():
-            dfc2_versions[gpname][oid] = obchanges["version"][1]
+        test_objectless_dataframe.get_versions(
+            gpname, return_changes1, dfc2_versions)
 
         self.assertSetEqual(set(base_objs), set(df_c2.get(tc.SmallIntBase)))
+        version = vn0
+        for step in range(10):
+            for obj in df_c1.get(tc.SmallIntBase):
+                obj.iprop1 += 1
+            apply_changes = df_c1.get_record()
+            df_c1.clear_record()
+            version += 1
+            test_objectless_dataframe.apply_versions(
+                gpname, apply_changes, dfc1_versions, version)
+            # prof.enable()
+            df.apply_changes(apply_changes, except_app="DFC1")
+            # prof.disable()
 
-        for obj in df_c1.get(tc.SmallIntBase):
-            obj.iprop1 += 1
-        apply_changes2 = df_c1.get_record()
+            # prof.enable()
+            return_changes = df.get_record(dfc2_versions, "DFC2")
+            # prof.disable()
+            df_c2.apply_changes(return_changes)
+            test_objectless_dataframe.get_versions(
+                gpname, return_changes, dfc2_versions)
+
+            self.assertSetEqual(
+                set(df_c1.get(tc.SmallIntBase)),
+                set(df_c2.get(tc.SmallIntBase)))
+            for i in range(obj_count):
+                self.assertEqual(
+                    1, len(df.state_manager.type_to_obj_dimstate[
+                        gpname].obj_to_state[str(i)].changes))
+        # prof.print_stats(sort="cumulative")
+
+    def test_basic_apply_maintain4(self):
+        # prof = cProfile.Profile()
+        obj_count = 1000
+        self.maxDiff = None
+        df = ObjectlessDataframe(maintain_change_record=True)
+        df.add_types([tc.SmallIntBase, tc.SubsetOddInt])
+        df_c1 = dataframe_client()
+        df_c1.add_type(tc.SmallIntBase)
+        df_c1.start_recording = True
+
+        df_c2 = dataframe_client()
+        df_c2.add_type(tc.SubsetOddInt)
+
+        base_objs = [tc.SmallIntBase(str(i), i) for i in xrange(obj_count)]
+        df_c1.extend(tc.SmallIntBase, base_objs)
+        apply_changes1 = df_c1.get_record()
         df_c1.clear_record()
-        vn1 = 1
-        for oid, obchanges in apply_changes2["gc"][gpname].iteritems():
-            dfc1_versions.setdefault(gpname, dict())[oid] = vn1
-            obchanges["version"] = [vn0, vn1]
-        df.apply_changes(apply_changes2, except_app="DFC1")
+        dfc1_versions = dict()
+        vn0 = 0
+        # pylint: disable=E1101
+        gpname = tc.SmallIntBase.__rtypes_metadata__.name
+        subsetname = tc.SubsetOddInt.__rtypes_metadata__.name
+        # pylint: enable=E1101
+        test_objectless_dataframe.apply_versions(
+            gpname, apply_changes1, dfc1_versions, vn0)
+        # prof.enable()
+        df.apply_changes(apply_changes1, except_app="DFC1")
+        # prof.disable()
+        dfc2_versions = {subsetname: dict()}
+        # prof.enable()
+        return_changes1 = df.get_record(dfc2_versions, "DFC2")
+        # prof.disable()
+        df_c2.apply_changes(return_changes1)
 
-        return_changes2 = df.get_record(dfc2_versions, "DFC2")
-        df_c2.apply_changes(return_changes2)
-        for oid, obchanges in return_changes2["gc"][gpname].iteritems():
-            dfc2_versions[gpname][oid] = obchanges["version"][1]
-
+        test_objectless_dataframe.get_versions(
+            gpname, return_changes1, dfc2_versions, subsetname)
         self.assertSetEqual(
-            set(df_c1.get(tc.SmallIntBase)), set(df_c2.get(tc.SmallIntBase)))
+            set((o.oid, o.iprop1)
+                for o in base_objs
+                if tc.SubsetOddInt.__predicate__(o.iprop1)),
+            set((s.oid, s.iprop1) for s in df_c2.get(tc.SubsetOddInt)))
+
+        version = vn0
+        for _ in range(10):
+            for obj in df_c1.get(tc.SmallIntBase):
+                obj.iprop1 += 1
+            # prof.enable()
+            apply_changes = df_c1.get_record()
+            df_c1.clear_record()
+            # prof.disable()
+            version += 1
+            test_objectless_dataframe.apply_versions(
+                gpname, apply_changes, dfc1_versions, version)
+            # prof.enable()
+            df.apply_changes(apply_changes, except_app="DFC1")
+            # prof.disable()
+
+            # prof.enable()
+            return_changes = df.get_record(dfc2_versions, "DFC2")
+            # prof.disable()
+            # prof.enable()
+            df_c2.apply_changes(return_changes)
+            # prof.disable()
+            test_objectless_dataframe.get_versions(
+                gpname, return_changes, dfc2_versions, subsetname)
+            self.assertSetEqual(
+                set((o.oid, o.iprop1)
+                    for o in base_objs
+                    if tc.SubsetOddInt.__predicate__(o.iprop1)),
+                set((s.oid, s.iprop1) for s in df_c2.get(tc.SubsetOddInt)))
+            subset_oids = set(int(s.oid) for s in df_c2.get(tc.SubsetOddInt))
+            for i in xrange(obj_count):
+                self.assertEqual(
+                    1 if i in subset_oids else 2,
+                    len(df.state_manager.type_to_obj_dimstate[
+                        gpname].obj_to_state[str(i)].changes))
+        # prof.print_stats(sort="cumulative")
