@@ -9,84 +9,26 @@ class TypeManager(object):
 
     def __init__(self):
 
-        # group key (always string fullanme of type) to members of group.
-        # For example: car -> activecar, inactivecar, redcar, etc etc.
-        self.group_to_members = dict()
-
-        # group key (always string fullanme of type)
-        # to members of group that are pure.  For example: car -> activecar,
-        # inactivecar, redcar, etc etc. but not CarAndPedestrian (a join)
-        self.group_to_pure_members = dict()
-
         # str name to class.
         self.name2class = dict()
-
-        # member to groups it belongs to. (should be just one i think)
-        # redcar -> car
-        self.member_to_group = dict()
 
         # set of types that are impure by default
         # and hence cannot be maintained continuously.
         self.impure = set()
 
-        # dependent type. activecar -depends on-> car
-        # pedestrianAndCarNearby - depends on-> activecar, walker,
-        # car, pedestrian (goes all the way)
-        self.depends_map = dict()
-
-        # Categories that a type belongs to
-        self.categories = dict()
-
-        # Part class structures for dataframes that do not use sets,
-        # but only projections of sets.
-        self.super_class_map = dict()
-
         # Types that are only to be read, not written into.
         self.observing_types = set()
 
-        # Types that are marked with @join.
-        self.join_types = set()
-
-        # The closest premamnent storable type for a registered type.
-        self.closest_foreign_key_type = dict()
-
         self.tp_to_dataframe_payload = dict()
+
+        self.groupname_to_pure_members = dict()
 
     #################################################
     ### Static Methods ##############################
     #################################################
 
     @staticmethod
-    def __create_superset_class():
-        class _container(object):
-            @staticmethod
-            def add_dims(dims):
-                for dim in dims:
-                    setattr(_container, dim._name, dim)
-        return _container
-
-    @staticmethod
-    def __categorize(tp):
-        return tp.__rtypes_metadata__.categories
-
-    @staticmethod
-    def __get_depends(tp):
-        return tp.__rtypes_metadata__.parent_types
-
-    @staticmethod
-    def __get_group_key(tp):
-        metadata = tp.__rtypes_metadata__
-        return metadata.group_type.name, metadata.group_type.cls
-
-    @staticmethod
-    def __is_not_saveable(categories):
-        return (PCCCategories.join in categories
-                or PCCCategories.parameter in categories
-                or PCCCategories.subset in categories
-                or PCCCategories.union in categories)
-
-    @staticmethod
-    def __is_impure(tp, categories):
+    def __is_impure(categories):
         return (len(set([PCCCategories.join,
                          PCCCategories.impure,
                          PCCCategories.parameter,
@@ -97,28 +39,20 @@ class TypeManager(object):
     ### API Methods #################################
     #################################################
 
-    def add_type(self, tp, tracking=False, update=None):
-        pairs_added = set()
+    def add_type(self, tp, update=None):
         with type_lock:
-            self.__add_type(
-                tp, tracking=tracking, pairs_added=pairs_added,
-                update=update)
+            pairs_added = self.__add_type(tp, update=update)
         return pairs_added
 
-    def add_types(
-            self, types, tracking=False, update=None,
-            check_new_type_predicate=False):
+    def add_types(self, types, update=None):
         pairs_added = set()
         with type_lock:
             for tp in types:
-                self.__add_type(
-                    tp, tracking=tracking, pairs_added=pairs_added,
-                    update=update,
-                    check_new_type_predicate=check_new_type_predicate)
+                pairs_added.update(self.__add_type(tp, update=update))
         return pairs_added
 
     def has_type(self, tp):
-        return tp.__rtypes_metadata__.name in self.member_to_group
+        return tp.__rtypes_metadata__.name in self.name2class
 
     def reload_types(self, types):
         pass
@@ -136,15 +70,15 @@ class TypeManager(object):
                 "Type %s cannot be inserted/deleted into Dataframe, "
                 "declare it as pcc_set." % tp.__class__.__name__)
         metadata = tp.__rtypes_metadata__
-        if metadata.name not in self.name2class:
+        if (metadata.name not in self.name2class
+                and metadata != self.name2class[metadata.name]):
             raise TypeError("Type %s hasnt been registered" % metadata.name)
-        tp_obj = self.name2class[metadata.name]
-        if not tp_obj in self.observing_types:
+        if metadata not in self.observing_types:
             raise TypeError(
                 "Type %s cannot be inserted/deleted into Dataframe, "
                 "register it first." % metadata.name)
-        if (PCCCategories.pcc_set not in tp_obj.categories
-               and PCCCategories.projection not in tp_obj.categories):
+        if (PCCCategories.pcc_set not in metadata.categories
+                and PCCCategories.projection not in metadata.categories):
             # Person not appending the right type of object
             raise TypeError("Cannot insert/delete type %s" % metadata.name)
         if not hasattr(tp, "__primarykey__"):
@@ -157,7 +91,7 @@ class TypeManager(object):
         metadata = tp.__rtypes_metadata__
         tp_obj = self.name2class[metadata.name]
         if (metadata.name != obj.__class__.__rtypes_metadata__.name
-               and tp_obj.group_key != metadata.name):
+                and tp_obj.groupname != metadata.name):
             raise TypeError("Object type and type given do not match")
         return True
 
@@ -176,149 +110,83 @@ class TypeManager(object):
     def get_name2type_map(self):
         return self.name2class
 
-    def get_impures_in_types(self, types, all=False):
-        if all:
+    def get_impures_in_types(self, types, all_types=False):
+        if all_types:
             # Passed by reference. very important!!!
             return self.impure
-        result = set()
-        for tp in types:
-            tp_obj = self.get_requested_type(tp)
-            if (PCCCategories.impure in tp_obj.categories
-                or PCCCategories.join in tp_obj.categories
-                or PCCCategories.parameter in tp_obj.categories
-                or PCCCategories.union in tp_obj.categories):
-                result.add(tp)
-        return result
+        return set(
+            tp for tp in types if self.get_requested_type(tp) in self.impure)
 
     def get_join_types(self):
-        return self.join_types
+        return [
+            tp_meta for tp_meta in self.name2class.itervalues()
+            if PCCCategories.join in tp_meta.categories]
 
+    def meta_to_pure_members(self, metadata):
+        if metadata.groupname in self.groupname_to_pure_members:
+            return self.groupname_to_pure_members[metadata.groupname]
+        return set()
+
+    def tpname_is_impure(self, tpname):
+        return self.metadata_is_impure(self.name2class[tpname])
+
+    def metadata_is_impure(self, tpmeta):
+        return self.type_is_impure(tpmeta.cls)
+
+    def type_is_impure(self, tp):
+        return tp in self.impure
+
+    def tpname_is_join(self, tpname):
+        return self.metadata_is_join(self.name2class[tpname])
+
+    def metadata_is_join(self, meta):
+        return PCCCategories.join in meta.categories
+
+    def type_is_join(self, tp):
+        return self.metadata_is_join(tp.__rtypes_metadata__)
 
     #################################################
     ### Private Methods #############################
     #################################################
 
-    def __check_type(self, tp, check_new_type_predicate):
+    def __check_type(self, tp):
         if not hasattr(tp, "__rtypes_metadata__"):
             raise TypeError("Type {0} has to be a PCC Type".format(repr(tp)))
-        metadata = tp.__rtypes_metadata__
-        if check_new_type_predicate and not metadata.is_new_type_predicate:
-            raise TypeError(
-                "Type {0} has to be a PCC Type with the alternate form of "
-                "predicate (Use @predicate to define the predicate)".format(
-                    repr(tp)))
+
+    def __anaylze_metadata(self, metadata, update, observed=True):
+        pairs_added = set()
+        if metadata.name in self.name2class:
+            if observed:
+                self.observing_types.add(metadata)
+            return pairs_added
+        self.name2class[metadata.name] = metadata
+        if observed:
+            self.observing_types.add(metadata)
+        self.groupname_to_pure_members.setdefault(
+            metadata.groupname, set()).update(set(
+                meta for meta in metadata.group_members
+                if (meta.name in self.name2class
+                    and not TypeManager.__is_impure(meta.categories))))
+        pairs_added.add((
+            metadata.name, PCCCategories.pcc_set in metadata.categories))
+        group_type = metadata.group_type
+        if (group_type is not metadata
+                and group_type.name not in self.name2class):
+            pairs_added.update(
+                self.__anaylze_metadata(group_type, update, observed=False))
+        if TypeManager.__is_impure(metadata.categories):
+            self.impure.add(metadata.cls)
+        self.tp_to_dataframe_payload[metadata] = (
+            update
+            if not (hasattr(metadata, "group_dimensions")
+                    and metadata.group_dimensions) else
+            None)
+        for parent_meta in metadata.get_base_parents():
+            pairs_added.update(
+                self.__anaylze_metadata(parent_meta, update, observed=False))
+        return pairs_added
 
     def __add_type(
-            self, tp, except_type=None, tracking=False, not_member=False,
-            pairs_added=set(), update=None,
-            check_new_type_predicate=False):
-        self.__check_type(tp, check_new_type_predicate)
-
-        metadata = tp.__rtypes_metadata__
-        name = metadata.name
-        categories = TypeManager.__categorize(tp)
-        if PCCCategories.unknown_type in categories:
-            raise TypeError("Type %s cannot be added" % name)
-        if metadata.group_dimensions:
-            categories.add(PCCCategories.impure)
-        key, keytp = TypeManager.__get_group_key(tp)
-        tp_obj = DataframeType(tp, keytp, categories)
-        if key in self.name2class:
-            key_obj = self.name2class[key]
-        elif key != name:
-            key_obj = self.__add_type(
-                keytp, except_type=tp, not_member=True,
-                update=update)
-            self.name2class[key] = key_obj
-        else:
-            key_obj = tp_obj
-        self.name2class[name] = tp_obj
-
-        if not not_member:
-            self.observing_types.add(tp_obj)
-        #tp_obj.observable = not not_member
-
-        not_directly_saveable_type = TypeManager.__is_not_saveable(categories)
-        if not not_directly_saveable_type:
-            tp_obj.saveable_parent = tp_obj
-        cannot_be_saved = (
-            PCCCategories.join in categories
-            or PCCCategories.union in categories)
-        # getting all the dependencies that tp depends on.
-        # (results are in string form)
-        depend_types = TypeManager.__get_depends(tp)
-        self.depends_map[name] = depend_types
-
-        depends = []
-        for dtp in depend_types:
-            dtp_metadata = dtp.__rtypes_metadata__
-            dtpname = dtp_metadata.name
-            if dtpname == except_type:
-                raise TypeError(
-                    "Cyclic reference detected in definition of %s" % name)
-            if dtpname not in self.name2class:
-                dtp_obj =  self.__add_type(
-                    dtp, except_type=name, not_member=True,
-                    pcc_adjuster=pcc_adjuster,
-                    dim_modification_reporter=dim_modification_reporter,
-                    records_creator=records_creator)
-            else:
-                dtp_obj = self.name2class[dtpname]
-            if PCCCategories.impure in dtp_obj.categories:
-                categories.add(PCCCategories.impure)
-            if (not cannot_be_saved
-                and not_directly_saveable_type
-                and dtp_obj.can_be_persistent):
-                tp_obj.saveable_parent = dtp_obj.saveable_parent
-            depends.append(dtp_obj)
-
-        tp_obj.is_pure = not TypeManager.__is_impure(tp, categories)
-        tp_obj.depends = depends
-        if metadata.parameter_types:
-            for mode, types in metadata.parameter_types.iteritems():
-                ptype_objs = []
-                for ptp in types:
-                    insert_obj = ptp
-                    if hasattr(ptp, "__rtypes_metadata__"):
-                        ptp_metadata = ptp.__rtypes_metadata__
-                        insert_obj = (
-                            self.name2class[ptp_metadata.name]
-                            if ptp_metadata.name in self.name2class else
-                            self.__add_type(
-                                ptp, except_type=name,
-                                not_member=True, pcc_adjuster=pcc_adjuster,
-                                dim_modification_reporter=\
-                                    dim_modification_reporter,
-                                records_creator=records_creator))
-                    ptype_objs.append(insert_obj)
-                if tp_obj.parameter_types == dict():
-                    tp_obj.parameter_types = dict()
-                tp_obj.parameter_types[mode] = ptype_objs
-
-        # Adding name to the group
-        self.group_to_members.setdefault(key, set()).add(tp_obj)
-        self.group_to_pure_members.setdefault(key, set())
-        if (tp != keytp
-                and (not TypeManager.__is_impure(tp, categories))
-                and len(set([
-                    PCCCategories.projection,
-                    PCCCategories.subset,
-                    PCCCategories.union]).intersection(
-                        categories)) > 0):
-            self.group_to_pure_members[key].add(tp_obj)
-
-        tp_obj.group_members = self.group_to_members[key]
-        tp_obj.pure_group_members = self.group_to_pure_members[key]
-        pairs_added.add((name, PCCCategories.pcc_set in categories))
-        self.super_class_map.setdefault(
-            key, self.__create_superset_class()).add_dims(metadata.dimensions)
-        tp_obj.super_class = self.super_class_map[key]
-
-        if PCCCategories.join in categories:
-            self.join_types.add(tp_obj)
-
-        self.tp_to_dataframe_payload[tp_obj] = (
-            update
-            if not metadata.group_dimensions else
-            None)
-        return tp_obj
+            self, tp, update):
+        self.__check_type(tp)
+        return self.__anaylze_metadata(tp.__rtypes_metadata__, update)

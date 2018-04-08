@@ -6,12 +6,12 @@ object_lock = RLock()
 
 
 class DataframeType(object):
-    # Name -> str, 
-    # Type -> type, 
-    # GroupType -> type, 
-    # GroupKey -> key, 
-    # Category -> dict, 
-    # ClosestSaveableParent -> DataframeType, 
+    # Name -> str,
+    # Type -> type,
+    # GroupType -> type,
+    # GroupKey -> key,
+    # Category -> dict,
+    # ClosestSaveableParent -> DataframeType,
     # GroupMembers -> [DataframeType]
     # IsPure -> Bool
 
@@ -52,5 +52,3 @@ class DataframeType(object):
         self.is_base_type = self.name == self.group_key
         self.is_projection = PCCCategories.projection in self.categories
         self.dim_to_predicate_map = dict()
-        self.dim_to_groupmember_trigger = (
-            self.metadata.dim_to_groupmember_trigger)

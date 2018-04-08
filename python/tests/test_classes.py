@@ -1,13 +1,11 @@
 from __future__ import absolute_import
 
-from rtypes.pcc.attributes import dimension, primarykey, count, namespace, predicate
+from rtypes.pcc.attributes import dimension, primarykey, predicate
 from rtypes.pcc.types.set import pcc_set
 from rtypes.pcc.types.subset import subset
-from rtypes.pcc.types.impure import impure
-from rtypes.pcc.types.parameter import parameter, ParameterMode
 from rtypes.pcc.types.join import join
 from rtypes.pcc.types.projection import projection
-from rtypes.pcc import this
+from rtypes.pcc import THIS
 
 class NonPCC(object):
     pass
@@ -27,6 +25,10 @@ class SmallBase(object):
     def sprop1(self, v):
         self._sp1 = v
 
+    def __init__(self, oid, sprop1):
+        self.oid = oid
+        self.sprop1 = sprop1
+
 @pcc_set
 class SmallIntBase(object):
     def __repr__(self):
@@ -41,12 +43,15 @@ class SmallIntBase(object):
     @primarykey(str)
     def oid(self):
         return self._oid
+
     @oid.setter
     def oid(self, v):
         self._oid = v
+
     @dimension(int)
     def iprop1(self):
         return self._ip1
+
     @iprop1.setter
     def iprop1(self, v):
         self._ip1 = v
@@ -76,36 +81,49 @@ class LargeBase(object):
     @primarykey(str)
     def oid(self):
         return self._oid
+
     @oid.setter
     def oid(self, v):
         self._oid = v
+
     @dimension(str)
     def prop1(self):
         return self._p1
+
     @prop1.setter
     def prop1(self, v):
         self._p1 = v
+
     @dimension(list)
     def prop2(self):
         return self._p2
+
     @prop2.setter
     def prop2(self, v):
         self._p2 = v
+
     @dimension(NonPCC)
     def prop3(self):
         return self._p3
+
     @prop3.setter
     def prop3(self, v):
         self._p3 = v
+
     @dimension(SmallBase)
     def prop4(self):
         return self._p4
+
     @prop4.setter
     def prop4(self, v):
         self._p4 = v
 
     def func1(self):
         return self.prop1
+
+    def __init__(self, oid, prop1):
+        self.oid = oid
+        self.prop1 = prop1
 
 @pcc_set
 class InheritedSmallBase(SmallBase):
@@ -138,48 +156,25 @@ class ProjectLargeBase(object):
     def func2(self):
         return self.prop2
 
-@join(SmallBase, LargeBase)
+@subset(THIS)
+@join(SB=SmallBase, LB=LargeBase)
 class JoinSmallAndLargeBase(object):
-    @primarykey(str)
-    def oid(self):
-        return self.sb.oid
-    @namespace(SmallBase)
-    def sb(self):
-        return self._sb
-    @sb.setter
-    def sb(self, v):
-        self._sb = v
-    @namespace(LargeBase)
-    def lb(self):
-        return self._lb
-    @lb.setter
-    def lb(self, v):
-        self._lb = v
-    
-    @staticmethod
-    def __predicate__(sb, lb):
-        return sb.oid == lb.oid and sb.sprop1 == lb.prop1
+    @predicate(THIS.SB.oid, THIS.SB.sprop1, THIS.LB.oid, THIS.LB.prop1)
+    def __predicate__(sb_oid, sb_sprop1, lb_oid, lb_prop1):
+        return sb_oid == lb_oid and sb_sprop1 == lb_prop1
 
-@projection(this, this.oid, this.sb.oid, this.lb.prop1)
-@join(SmallBase, LargeBase)
+@projection(THIS, THIS.SB.oid, THIS.LB.prop1)
+@subset(THIS)
+@join(SB=SmallBase, LB=LargeBase)
 class ProjectedJoinSmallAndLargeBase(object):
-    @primarykey(str)
-    def oid(self):
-        return self.sb.oid
-    @namespace(SmallBase)
-    def sb(self):
-        return self._sb
-    @sb.setter
-    def sb(self, v):
-        self._sb = v
-    @namespace(LargeBase)
-    def lb(self):
-        return self._lb
-    @lb.setter
-    def lb(self, v):
-        self._lb = v
-    
-    @staticmethod
-    def __predicate__(sb, lb):
-        return sb.oid == lb.oid and sb.sprop1 == lb.prop1
-    
+    @predicate(THIS.SB.oid, THIS.SB.sprop1, THIS.LB.oid, THIS.LB.prop1)
+    def __predicate__(sb_oid, sb_sprop1, lb_oid, lb_prop1):
+        return sb_oid == lb_oid and sb_sprop1 == lb_prop1
+
+@projection(THIS, THIS.SB1.oid, THIS.SB1.sprop1)
+@subset(THIS)
+@join(SB1=SmallBase, SB2=SmallBase)
+class ProjectedJoinSmallAndSmallBase(object):
+    @predicate(THIS.SB1.oid, THIS.SB1.sprop1, THIS.SB2.oid, THIS.SB2.sprop1)
+    def __predicate__(sb1_oid, sb1_sprop1, sb2_oid, sb2_sprop1):
+        return sb1_oid == sb2_oid and sb1_sprop1 == sb2_sprop1

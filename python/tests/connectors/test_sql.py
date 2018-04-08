@@ -7,14 +7,14 @@ from mysql.connector import MySQLConnection
 from mysql.connector.errors import Error
 from rtypes.connectors.sql import RTypesMySQLConnection
 
-from rtypes.pcc.attributes import dimension, primarykey, count, namespace
+from rtypes.pcc.attributes import dimension, primarykey, count
 from rtypes.pcc.types.set import pcc_set
 from rtypes.pcc.types.subset import subset
 from rtypes.pcc.types.impure import impure
 from rtypes.pcc.types.parameter import parameter, ParameterMode
 from rtypes.pcc.types.join import join
 from rtypes.pcc.types.projection import projection
-from rtypes.pcc import this
+from rtypes.pcc import THIS
 from rtypes.dataframe import dataframe
 
 @pcc_set
@@ -70,7 +70,7 @@ class EvenSubsetTable(object):
     def __predicate__(t):
         return t.prop2 % 2 == 0
 
-@projection(this, this.oid, this.prop1)
+@projection(THIS, THIS.oid, THIS.prop1)
 @subset(BasicTable)
 class EvenSubsetTableProjection(object):
     @staticmethod
@@ -93,9 +93,9 @@ class test_sql(unittest.TestCase):
             host="127.0.0.1", database="rtypes_test")
         (self.uuid1, self.uuid2, self.uuid3,
          self.uuid4, self.uuid5, self.uuid6) = (
-            str(uuid.uuid4()), str(uuid.uuid4()),
-            str(uuid.uuid4()), str(uuid.uuid4()),
-            str(uuid.uuid4()), str(uuid.uuid4()))
+             str(uuid.uuid4()), str(uuid.uuid4()),
+             str(uuid.uuid4()), str(uuid.uuid4()),
+             str(uuid.uuid4()), str(uuid.uuid4()))
         self.df = None
 
     def cleanup_tables(self):
@@ -141,7 +141,7 @@ class test_sql(unittest.TestCase):
         self.df.extend(
             BasicTable,
             [BasicTable(self.uuid1, "o1", 1, datetime.datetime(1989, 10, 28)),
-             BasicTable(self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
+             BasicTable(self.uuid2, "o2", 2, datetime.datetime(1990, 4, 17)),
              BasicTable(self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))])
         self.df.push()
         time.sleep(1)
@@ -152,7 +152,7 @@ class test_sql(unittest.TestCase):
         rows = cur.fetchall()
         self.assertSetEqual(
             set([(self.uuid1, "o1", 1, datetime.datetime(1989, 10, 28)),
-                 (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
+                 (self.uuid2, "o2", 2, datetime.datetime(1990, 4, 17)),
                  (self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))]),
             set(rows))
         cur.close()
@@ -171,7 +171,7 @@ class test_sql(unittest.TestCase):
         self.assertEqual(4, len(bt_objs))
         self.assertListEqual(
             [BasicTable(self.uuid1, "o1", 1, datetime.datetime(1989, 10, 28)),
-             BasicTable(self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
+             BasicTable(self.uuid2, "o2", 2, datetime.datetime(1990, 4, 17)),
              BasicTable(self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11)),
              BasicTable(self.uuid4, "o4", 4, datetime.datetime(2018, 1, 1))],
             sorted(bt_objs, key=lambda x: x.prop2))
@@ -189,12 +189,12 @@ class test_sql(unittest.TestCase):
             set([(unicode(self.uuid1), u"o1", 1,
                   datetime.datetime(1989, 10, 28)),
                  (unicode(self.uuid2), u"o2", 2,
-                  datetime.datetime(1990, 04, 17)),
+                  datetime.datetime(1990, 4, 17)),
                  (unicode(self.uuid3), u"o3", 3,
                   datetime.datetime(2017, 11, 11)),
                  (unicode(self.uuid4), u"o4", 4,
                   datetime.datetime(2018, 1, 1))]),
-             set(rows))
+            set(rows))
         cur.close()
 
     def sql_basic_objs_delete(self):
@@ -208,7 +208,7 @@ class test_sql(unittest.TestCase):
         rows = cur.fetchall()
         self.assertSetEqual(
             set([(self.uuid1, "o1", 10, datetime.datetime(1989, 10, 28)),
-                 (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17)),
+                 (self.uuid2, "o2", 2, datetime.datetime(1990, 4, 17)),
                  (self.uuid3, "o3", 3, datetime.datetime(2017, 11, 11))]),
             set(rows))
         cur.close()
@@ -235,7 +235,7 @@ class test_sql(unittest.TestCase):
         rows2 = cur2.fetchall()
         self.assertSetEqual(
             set([(self.uuid1, "o1", 10, datetime.datetime(1989, 10, 28)),
-             (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17))]),
+                 (self.uuid2, "o2", 2, datetime.datetime(1990, 4, 17))]),
             set(rows2))
         objs1 = self.df.get(EvenSubsetTable)
         self.assertEqual(2, len(objs1))
@@ -250,7 +250,7 @@ class test_sql(unittest.TestCase):
         rows3 = cur3.fetchall()
         self.assertSetEqual(
             set([(self.uuid1, "o1", 10, datetime.datetime(1989, 10, 28)),
-             (self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17))]),
+             (self.uuid2, "o2", 2, datetime.datetime(1990, 4, 17))]),
             set(rows3))
         objs = self.df.get(EvenSubsetTable)
         self.assertEqual(1, len(objs))
@@ -263,7 +263,7 @@ class test_sql(unittest.TestCase):
             "SELECT oid, prop1, prop2, prop3 FROM EvenSubsetTable;")
         rows4 = cur4.fetchall()
         self.assertSetEqual(
-            set([(self.uuid2, "o2", 2, datetime.datetime(1990, 04, 17))]),
+            set([(self.uuid2, "o2", 2, datetime.datetime(1990, 4, 17))]),
             set(rows4))
         cur4.close()
         sql_connection = self.get_mysql_connection()
@@ -271,7 +271,7 @@ class test_sql(unittest.TestCase):
         cur5.execute(
             "INSERT INTO EvenSubsetTable (oid, prop1, prop2, prop3) "
             "VALUES (%s, %s, %s, %s);",
-            (self.uuid5, "o5", 6, datetime.datetime(2017, 04, 17)))
+            (self.uuid5, "o5", 6, datetime.datetime(2017, 4, 17)))
         sql_connection.commit()
         cur5.close()
         self.df.pull()

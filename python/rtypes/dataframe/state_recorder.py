@@ -4,6 +4,14 @@ class StateRecorder(object):
         self.obj_to_state = dict()
         self.maintain = maintain
 
+    def __getitem__(self, key):
+        return self.obj_to_state[key].full_version
+
+    def iteritems(self):
+        return [
+            (oid, state.full_version)
+            for oid, state in self.obj_to_state.iteritems()]
+
     def check_oid_exists(self, oid):
         if not self.has_obj(oid):
             raise RuntimeError("Object %r not found" % oid)

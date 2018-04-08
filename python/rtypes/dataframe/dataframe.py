@@ -40,7 +40,7 @@ class dataframe(object):
     ##.3e clear buffers
 
     #.4 Trigger Management
-    
+
     def __init__(self, name=str(uuid4()), external_db=None):
         # PCCs to be calculated only if it is in Master Mode.
         self.calculate_pcc = True
@@ -75,21 +75,15 @@ class dataframe(object):
             None)
 
     ####### TYPE MANAGEMENT METHODS #############
-    def add_type(self, tp, tracking=False):
-        pairs_added = self.type_manager.add_type(
-            tp, 
-            tracking, 
-            self.update)
+    def add_type(self, tp):
+        pairs_added = self.type_manager.add_type(tp, self.update)
         records = self.object_manager.create_tables(pairs_added)
         if self.external_db_queue:
             self.external_db_queue.add_types(pairs_added)
         self.change_manager.add_records(records)
 
-    def add_types(self, types, tracking=False):
-        pairs_added = self.type_manager.add_types(
-            types, 
-            tracking, 
-            self.update)
+    def add_types(self, types):
+        pairs_added = self.type_manager.add_types(types, self.update)
         records = self.object_manager.create_tables(pairs_added)
         if self.external_db_queue:
             self.external_db_queue.add_types(pairs_added)
@@ -112,34 +106,32 @@ class dataframe(object):
     ####### OBJECT MANAGEMENT METHODS ###########
     def update(self, dimension, obj, value):
         try:
-            obj_before_changes = obj
-
             # 0 - get the object's type
-            tp_obj = self.type_manager.get_requested_type(obj.__class__.__rtypes_metadata__.cls)
+            tp_obj = self.type_manager.get_requested_type(
+                obj.__class__.__rtypes_metadata__.cls)
             self.trigger_manager.execute_trigger(
-                tp_obj.type, TriggerTime.before, TriggerAction.update,
+                tp_obj.cls, TriggerTime.before, TriggerAction.update,
                 self, None, obj, obj)
 
             # 1 - Update the dimension
             dimension.update(obj, value)
 
             # 2 - changes the dimensions of the object in dataframe
-            applied_records = self.object_manager.create_records_for_dim_modification(
-                tp_obj,
-                obj.__primarykey__,
-                {dimension: value})
+            applied_records = (
+                self.object_manager.create_records_for_dim_modification(
+                    tp_obj, obj.__primarykey__, {dimension: value}))
 
             # 3 - change any pccs that are changed as a result of this change
             pcc_change_records = self.object_manager.adjust_pcc(
                 tp_obj,
-                {obj.__primarykey__: (obj, {dimension: value})},
-                to_be_converted=True)
+                {obj.__primarykey__: (obj, {dimension: value})})
 
-            # 4 - report changes to dataframe so changes can be made in other systems
-            self.change_manager.report_dim_modification(applied_records,
-                                                        pcc_change_records)
+            # 4 - report changes to dataframe so changes
+            #  can be made in other systems
+            self.change_manager.report_dim_modification(
+                applied_records, pcc_change_records)
             self.trigger_manager.execute_trigger(
-                tp_obj.type, TriggerTime.after, TriggerAction.update,
+                tp_obj.cls, TriggerTime.after, TriggerAction.update,
                 self, obj, None, obj)
 
         except BlockAction:
@@ -151,12 +143,12 @@ class dataframe(object):
                     and self.type_manager.check_obj_type_for_insert(tp, obj)):
                 tp_obj = self.type_manager.get_requested_type(tp)
                 self.trigger_manager.execute_trigger(
-                    tp_obj.type, TriggerTime.before, TriggerAction.create,
+                    tp_obj.cls, TriggerTime.before, TriggerAction.create,
                     self, obj, None, None)
                 records = self.object_manager.append(tp_obj, obj)
                 self.change_manager.add_records(records)
                 self.trigger_manager.execute_trigger(
-                    tp_obj.type, TriggerTime.after, TriggerAction.create,
+                    tp_obj.cls, TriggerTime.after, TriggerAction.create,
                     self, obj, None, obj)
         except BlockAction:
             pass
@@ -169,37 +161,40 @@ class dataframe(object):
                     # One pass through objects to see if the types match.
                     self.type_manager.check_obj_type_for_insert(tp, obj)
                     self.trigger_manager.execute_trigger(
-                        tp_obj.type, TriggerTime.before, TriggerAction.create,
+                        tp_obj.cls, TriggerTime.before, TriggerAction.create,
                         self, obj, None, None)
 
-                    self.change_manager.add_records(self.object_manager.append(tp_obj, obj))
+                    self.change_manager.add_records(
+                        self.object_manager.append(tp_obj, obj))
                     self.trigger_manager.execute_trigger(
-                        tp_obj.type, TriggerTime.after, TriggerAction.create,
+                        tp_obj.cls, TriggerTime.after, TriggerAction.create,
                         self, obj, None, obj)
         except BlockAction:
             pass
 
     def get(self, tp, oid=None, parameters=None):
         try:
-            name = tp.__rtypes_metadata__.name
-            if name not in self.type_manager.observing_types:
+            metadata = tp.__rtypes_metadata__
+            name = metadata.name
+            if metadata not in self.type_manager.observing_types:
                 raise TypeError(
                     ("%s Type is not registered for observing."
                      % name))
             tp_obj = self.type_manager.get_requested_type(tp)
             self.trigger_manager.execute_trigger(
-                tp_obj.type, TriggerTime.before, TriggerAction.read,
+                tp_obj.cls, TriggerTime.before, TriggerAction.read,
                 self, None, None, None)
             objs = (self.object_manager.get(tp_obj, parameters)
                     if oid is None else
                     [self.object_manager.get_one(tp_obj, oid, parameters)])
-            # Try/Except section prevents after read trigers from interrupting the read
+            # Try/Except section prevents after
+            # read trigers from interrupting the read
             try:
                 if self.trigger_manager.trigger_exists(
-                    tp_obj.type, TriggerTime.after, TriggerAction.read):
+                        tp_obj.cls, TriggerTime.after, TriggerAction.read):
                     for obj in objs:
                         self.trigger_manager.execute_trigger(
-                            tp_obj.type, TriggerTime.after, TriggerAction.read,
+                            tp_obj.cls, TriggerTime.after, TriggerAction.read,
                             self, None, obj, obj)
             except BlockAction:
                 pass
@@ -212,12 +207,12 @@ class dataframe(object):
             # TODO: Add checks for tp
             tp_obj = self.type_manager.get_requested_type(tp)
             self.trigger_manager.execute_trigger(
-                tp_obj.type, TriggerTime.before, TriggerAction.delete,
+                tp_obj.cls, TriggerTime.before, TriggerAction.delete,
                 self, None, obj, obj)
             records = self.object_manager.delete(tp_obj, obj)
             try:
                 self.trigger_manager.execute_trigger(
-                    tp_obj.type, TriggerTime.after, TriggerAction.delete,
+                    tp_obj.cls, TriggerTime.after, TriggerAction.delete,
                     self, None, obj, None)
                 self.change_manager.add_records(records)
             except BlockAction:
@@ -231,12 +226,12 @@ class dataframe(object):
         if tp_obj.name in self.object_manager.object_map:
             for obj in self.object_manager.object_map[tp_obj.name].values():
                 self.trigger_manager.execute_trigger(
-                    tp_obj.type, TriggerTime.before, TriggerAction.delete,
+                    tp_obj.cls, TriggerTime.before, TriggerAction.delete,
                     self, None, obj, obj)
                 self.change_manager.add_records(
                     self.object_manager.delete(tp_obj, obj))
                 self.trigger_manager.execute_trigger(
-                    tp_obj.type, TriggerTime.after, TriggerAction.delete,
+                    tp_obj.cls, TriggerTime.after, TriggerAction.delete,
                     self, None, obj, None)
 
     def clear_joins(self):
@@ -278,7 +273,7 @@ class dataframe(object):
     def connect_app_queue(self, app_queue):
         return (
             self.type_manager.get_impures_in_types(
-                app_queue.types, all=app_queue.all),
+                app_queue.types, all_types=app_queue.all),
             self.change_manager.add_app_queue(app_queue))
 
     def convert_to_record(self, results, deleted_oids):
@@ -308,7 +303,7 @@ class dataframe(object):
 
     def pull(self):
         changes, clear_all = self.external_db.__rtypes_query__(
-            [df_tp.type for df_tp in self.type_manager.observing_types])
+            [df_tp.cls for df_tp in self.type_manager.observing_types])
         self.apply_changes(
             changes,
             except_app=self.external_db_queue.app_name,
@@ -318,7 +313,7 @@ class dataframe(object):
         changes = self.external_db_queue.get_record()
         self.external_db_queue.clear_record()
         pcc_type_map = {
-            name: tp_obj.type
+            name: tp_obj.cls
             for name, tp_obj in self.type_manager.name2class.iteritems()}
         self.external_db.__rtypes_write__(changes, pcc_type_map)
 
@@ -326,17 +321,17 @@ class dataframe(object):
     ######## Trigger MANAGEMENT METHODS #########
 
     def add_trigger(self, trigger_obj):
-        """ Method can add a trigger into the trigger_manager into the dataframe """
+        """Method to add trigger into trigger_manager."""
         self.trigger_manager.add_trigger(trigger_obj)
 
     def add_triggers(self, trigger_objs):
-        """ Method can add multiple triggers into the trigger_manager into the dataframe """
+        """Method to add multiple triggers into the trigger_manager."""
         self.trigger_manager.add_triggers(trigger_objs)
 
     def remove_trigger(self, trigger_obj):
-         """ can remove a trigger from the trigger_manager into the dataframe """
-         self.trigger_manager.remove_trigger(trigger_obj)
+        """Method to remove a trigger from the trigger_manager."""
+        self.trigger_manager.remove_trigger(trigger_obj)
 
     def execute_trigger(self, tp_obj, time, action, new, old, current):
         self.trigger_manager.execute_trigger(
-            tp_obj.type, time, action, self, new, old, current)
+            tp_obj.cls, time, action, self, new, old, current)

@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from rtypes.pcc.attributes import dimension, primarykey
+from rtypes.pcc.attributes import dimension, primarykey, predicate
 from rtypes.pcc.types.set import pcc_set
 from rtypes.pcc.types.subset import subset
 from rtypes.pcc.types.impure import impure
@@ -10,6 +10,7 @@ from rtypes.pcc.types.parameter import parameter, ParameterMode
 from rtypes.pcc.types.join import join
 from rtypes.pcc.types.projection import projection
 from rtypes.pcc.utils.enums import Event, Record
+from rtypes.pcc import THIS
 from rtypes.dataframe.dataframe_changes.dataframe_changes_json import DataframeChanges
 from rtypes.dataframe.application_queue import ApplicationQueue
 
@@ -44,20 +45,20 @@ def create_cars():
 
     @subset(Car)
     class ActiveCar(Car):
-        @staticmethod
-        def __predicate__(c):
-            return c.velocity != 0
+        @predicate(Car.velocity)
+        def __predicate__(velocity):
+            return velocity != 0
 
     @subset(ActiveCar)
     class RedActiveCar(Car):
-        @staticmethod
-        def __predicate__(ac):
-            return ac.color == "RED"
+        @predicate(Car.color)
+        def __predicate__(color):
+            return color == "RED"
 
-    cars = [Car("id1", 0, "BLUE"), 
-            Car("id2", 0, "RED"), 
-            Car("id3", 1, "GREEN"), 
-            Car("id4", 1, "RED"), 
+    cars = [Car("id1", 0, "BLUE"),
+            Car("id2", 0, "RED"),
+            Car("id3", 1, "GREEN"),
+            Car("id4", 1, "RED"),
             Car("id5", 2, "RED")]
     return Car, ActiveCar, RedActiveCar, cars
 
@@ -69,37 +70,37 @@ def create_complex_cartypes():
             self.Z = Z
 
         # -----------------------------------------------------------------
-        def VectorDistanceSquared(self, other) :
+        def VectorDistanceSquared(self, other):
             dx = self.X - other.X
             dy = self.Y - other.Y
             dz = self.Z - other.Z
             return dx * dx + dy * dy + dz * dz
 
         # -----------------------------------------------------------------
-        def VectorDistance(self, other) :
+        def VectorDistance(self, other):
             return math.sqrt(self.VectorDistanceSquared(other))
 
         # -----------------------------------------------------------------
-        def Length(self) :
+        def Length(self):
             return math.sqrt(self.VectorDistanceSquared(ZeroVector))
 
         # -----------------------------------------------------------------
-        def LengthSquared(self) :
+        def LengthSquared(self):
             return self.VectorDistanceSquared(ZeroVector)
 
-        def AddVector(self, other) :
+        def AddVector(self, other):
             return Vector3(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
 
         # -----------------------------------------------------------------
-        def SubVector(self, other) :
+        def SubVector(self, other):
             return Vector3(self.X - other.X, self.Y - other.Y, self.Z - other.Z)
 
         # -----------------------------------------------------------------
-        def ScaleConstant(self, factor) :
+        def ScaleConstant(self, factor):
             return Vector3(self.X * factor, self.Y * factor, self.Z * factor)
 
         # -----------------------------------------------------------------
-        def ScaleVector(self, scale) :
+        def ScaleVector(self, scale):
             return Vector3(self.X * scale.X, self.Y * scale.Y, self.Z * scale.Z)
 
         def ToList(self):
@@ -110,14 +111,19 @@ def create_complex_cartypes():
             return Vector3()
 
         # -----------------------------------------------------------------
-        def Equals(self, other) :
+        def Equals(self, other):
             if isinstance(other, Vector3):
-                return self.X == other.X and self.Y == other.Y and self.Z == other.Z
+                return (
+                    self.X == other.X
+                    and self.Y == other.Y
+                    and self.Z == other.Z)
             elif isinstance(other, tuple) or isinstance(other, list):
-                return (other[0] == self.X and other[1] == self.Y and other[2] == self.Z)
+                return (other[0] == self.X
+                        and other[1] == self.Y
+                        and other[2] == self.Z)
 
         # -----------------------------------------------------------------
-        def ApproxEquals(self, other, tolerance) :
+        def ApproxEquals(self, other, tolerance):
             return self.VectorDistanceSquared(other) < (tolerance * tolerance)
 
         def __json__(self):
@@ -133,19 +139,19 @@ def create_complex_cartypes():
             return not self.__eq__(other)
 
         # -----------------------------------------------------------------
-        def __add__(self, other) :
+        def __add__(self, other):
             return self.AddVector(other)
 
         # -----------------------------------------------------------------
-        def __sub__(self, other) :
+        def __sub__(self, other):
             return self.SubVector(other)
 
         # -----------------------------------------------------------------
-        def __mul__(self, factor) :
+        def __mul__(self, factor):
             return self.ScaleConstant(factor)
 
         # -----------------------------------------------------------------
-        def __div__(self, factor) :
+        def __div__(self, factor):
             return self.ScaleConstant(1.0 / factor)
 
         @staticmethod
@@ -168,8 +174,8 @@ def create_complex_cartypes():
         '''
         classdocs
         '''
-        FINAL_POSITION = 700;
-        SPEED = 40;
+        FINAL_POSITION = 700
+        SPEED = 40
 
         @primarykey(str)
         def ID(self):
@@ -224,13 +230,9 @@ def create_complex_cartypes():
 
     @subset(Car)
     class InactiveCar(Car):
-        @staticmethod
-        def __query__(cars):
-            return [c for c in cars if InactiveCar.__predicate__(c)]
-
-        @staticmethod
-        def __predicate__(c):
-            return c.Position == Vector3(0,0,0)
+        @predicate(Car.Position)
+        def __predicate__(Position):
+            return Position == Vector3(0, 0, 0)
 
         def start(self):
             logger.debug("[InactiveCar]: {0} starting".format(self.ID))
@@ -238,30 +240,32 @@ def create_complex_cartypes():
 
     @subset(Car)
     class ActiveCar(Car):
-        @staticmethod
-        def __query__(cars):  # @DontTrace
-            return [c for c in cars if ActiveCar.__predicate__(c)]
-
-        @staticmethod
-        def __predicate__(c):
-            return c.Velocity != Vector3(0,0,0)
+        @predicate(Car.Velocity)
+        def __predicate__(Velocity):
+            return Velocity != Vector3(0, 0, 0)
 
         def move(self):
-            self.Position = Vector3(self.Position.X + self.Velocity.X, self.Position.Y + self.Velocity.Y, self.Position.Z + self.Velocity.Z)
-            logger.debug("[ActiveCar]: Current velocity: {0}, New position {1}".format(self.Velocity, self.Position));
+            self.Position = Vector3(
+                self.Position.X + self.Velocity.X,
+                self.Position.Y + self.Velocity.Y,
+                self.Position.Z + self.Velocity.Z)
+            logger.debug(
+                "[ActiveCar]: Current velocity: {0}, New position {1}".format(
+                    self.Velocity, self.Position))
 
             # End of ride
-            if (self.Position.X >= self.FINAL_POSITION or self.Position.Y >= self.FINAL_POSITION):
-                self.stop();
+            if (self.Position.X >= self.FINAL_POSITION
+                    or self.Position.Y >= self.FINAL_POSITION):
+                self.stop()
 
         def stop(self):
-            logger.debug("[ActiveCar]: {0} stopping".format(self.ID));
-            self.Position.X = 0;
-            self.Position.Y = 0;
-            self.Position.Z = 0;
-            self.Velocity.X = 0;
-            self.Velocity.Y = 0;
-            self.Velocity.Z = 0;
+            logger.debug("[ActiveCar]: {0} stopping".format(self.ID))
+            self.Position.X = 0
+            self.Position.Y = 0
+            self.Position.Z = 0
+            self.Velocity.X = 0
+            self.Velocity.Y = 0
+            self.Velocity.Z = 0
 
     return Car, InactiveCar, ActiveCar
 
@@ -317,8 +321,9 @@ def CreateProjectionTypesAndObjects():
         @velocity.setter
         def velocity(self, value): self._velocity = value
 
-        def __init__(self, id, owner, location, velocity):
-            (self.id, self.owner, self.location, self.velocity) = (id, owner, location, velocity)
+        def __init__(self, oid, owner, location, velocity):
+            (self.oid, self.owner, self.location, self.velocity) = (
+                oid, owner, location, velocity)
 
         def change_owner(self, owner, license):
             self.owner, self.license = owner, license
@@ -333,7 +338,7 @@ def CreateProjectionTypesAndObjects():
     car1 = Car(1, "Murugan", "himalaya", 299792458)
     car2 = Car(2, "Shiva", "himalaya", 299792459)
 
-    return Car, CarForPedestrian, [car1, car2] 
+    return Car, CarForPedestrian, [car1, car2]
 
 
 
@@ -393,7 +398,7 @@ def _join_example_data():
         @oid.setter
         def oid(self, value):
             self._id = value
-        
+
         @dimension(bool)
         def holdstate(self):
             return self._holdstate
@@ -409,7 +414,7 @@ def _join_example_data():
         @owner.setter
         def owner(self, value):
             self._owner = value
-        
+
         def __init__(self, oid, owner):
             self.oid = oid
             self.owner = owner
@@ -443,51 +448,17 @@ def _join_example_data():
         def notify(self):
             pass
 
-    @join(Person, Card, Transaction)
+    @subset(THIS)
+    @join(P=Person, C=Card, T=Transaction)
     class RedAlert(object):
-        @primarykey(str)
-        def oid(self): return self._id
-
-        @oid.setter
-        def oid(self, value): self._id = value
-
-        @dimension(Person)
-        def p(self):
-            return self._p
-
-        @p.setter
-        def p(self, value):
-            self._p = value
-
-        @dimension(Card)
-        def c(self):
-            return self._c
-
-        @c.setter
-        def c(self, value):
-            self._c = value
-
-        @dimension(Transaction)
-        def t(self):
-            return self._t
-
-        @t.setter
-        def t(self, value):
-            self._t = value
-
-        def __init__(self, p, c, t):
-            self.p = p
-            self.c = c
-            self.t = t
-
-        @staticmethod
-        def __predicate__(p, c, t):
-            return c.owner == p.oid and t.card == c.oid and t.amount > 2000
+        @predicate(
+            THIS.P.oid, THIS.C.owner, THIS.C.oid, THIS.T.card, THIS.T.amount)
+        def __predicate__(poid, cowner, coid, tcard, tamount):
+            return cowner == poid and tcard == coid and tamount > 2000
 
         def Protect(self):
-            self.t.flag()
-            self.c.hold()
-            self.p.notify()
+            self.T.flagged = True
+            self.C.holdstate = True
 
     p1 = Person("0", "Vishnu")
     c1p1 = Card("0", "0")
@@ -501,7 +472,9 @@ def _join_example_data():
     t3 = Transaction("0", 10000)
     #Also RedAlert Card but not Vishnu's
     t4 = Transaction(3, 10000)
-    return Person, Card, Transaction, RedAlert, [p1, p2, p3], [c1p1, c2p1, c1p2, c1p3], [t1, t2, t3, t4]
+    return (
+        Person, Card, Transaction, RedAlert,
+        [p1, p2, p3], [c1p1, c2p1, c1p2, c1p3], [t1, t2, t3, t4])
 
 update_json1 = convert_json_to_proto({
             "tests.transfer_dataframe_tests.Car": {
@@ -1125,7 +1098,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.apply_changes(update_json7)
         self.assertTrue(len(df.get(Car)) == 1)
         c = df.get(Car)[0]
-        self.assertTrue(c.velocity.x == 10 and c.velocity.y == 10 and c.velocity.z == 10)
+        self.assertTrue(
+            c.velocity.x == 10 and c.velocity.y == 10 and c.velocity.z == 10)
         self.assertTrue(c.color == ["BLUE"])
 
     def test_dataframe_get_changes1(self):
@@ -1136,7 +1110,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.start_recording = True
         for c in df.get(RedActiveCar):
             c.velocity = 0
-        #print json.dumps(df.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        #print json.dumps(
+        # df.get_record(), sort_keys = True,
+        #  separators = (',', ': '), indent = 4) 
         self.assertTrue(df.get_record() == convert_json_to_proto({
             "tests.transfer_dataframe_tests.Car" :{
                 "id4" :{
@@ -1176,7 +1152,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.start_recording = True
         for c in df.get(Car):
             c.velocity += 1
-        #print json.dumps(df.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        #print json.dumps(df.get_record(), sort_keys = True,
+        #  separators = (',', ': '), indent = 4) 
         self.assertTrue(df.get_record() == convert_json_to_proto({
             "tests.transfer_dataframe_tests.Car": {
                 "id1": {
@@ -1262,25 +1239,25 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         }))
 
     def test_dataframe_transfer_changes3(self):
-        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        Car1, ActiveCar1, RedActiveCar1, cars1 = create_cars()
         df1 = dataframe()
-        df1.add_types([Car, ActiveCar, RedActiveCar])
-        df1.extend(Car, cars)
-        Car, ActiveCar, RedActiveCar, cars = create_cars()
+        df1.add_types([Car1, ActiveCar1, RedActiveCar1])
+        df1.extend(Car1, cars1)
+        Car2, ActiveCar2, RedActiveCar2, cars2 = create_cars()
         df2 = dataframe()
-        df2.add_types([Car, ActiveCar, RedActiveCar])
-        df2.extend(Car, cars) # So they are not linked by reference.
+        df2.add_types([Car2, ActiveCar2, RedActiveCar2])
+        df2.extend(Car2, cars2) # So they are not linked by reference.
         #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
         
         df1.start_recording = True
-        for c in df1.get(Car):
+        for c in df1.get(Car1):
             c.velocity += 1
-        self.assertFalse(len(df1.get(ActiveCar)) == len(df2.get(ActiveCar)))
+        self.assertFalse(len(df1.get(ActiveCar1)) == len(df2.get(ActiveCar2)))
         #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
         x = df1.get_record()
         df2.apply_changes(x)
         #print len(df1.get(ActiveCar)), len(df2.get(ActiveCar))
-        self.assertTrue(len(df1.get(ActiveCar)) == len(df2.get(ActiveCar)))
+        self.assertTrue(len(df1.get(ActiveCar1)) == len(df2.get(ActiveCar2)))
 
     def test_dataframe_transfer_changes4(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
@@ -1395,7 +1372,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df_m.add_types([Car, ActiveCar, RedActiveCar])
         df_s = ApplicationQueue("df_s", [ActiveCar, RedActiveCar], df_m)
         df_m.apply_changes(update_json1)
-        #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        #print json.dumps(df_s.get_record(), sort_keys = True,
+        #  separators = (',', ': '), indent = 4) 
         self.assertTrue(df_s.get_record() == resp_json1)
         self.assertTrue(len(df_m.get(Car)) == 4)
     
@@ -1405,7 +1383,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df_m.add_types([Car, ActiveCar, RedActiveCar])
         df_s = ApplicationQueue("df_s", [ActiveCar, RedActiveCar], df_m)
         df_m.apply_changes(update_json8)
-        #print json.dumps(df_s.get_record(), sort_keys = True, separators = (',', ': '), indent = 4) 
+        #print json.dumps(df_s.get_record(), sort_keys = True,
+        #  separators = (',', ': '), indent = 4) 
         self.assertTrue(df_s.get_record() == resp_json1)
         self.assertTrue(len(df_m.get(Car)) == 4)
         
@@ -1456,7 +1435,8 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         self.assertTrue(len(df.get(Car)) == 2)
         self.assertTrue(len(df.get(CarForPedestrian)) == 2)
         record = df_cache.get_record()
-        #print json.dumps(record, sort_keys = True, separators = (',', ': '), indent = 4) 
+        #print json.dumps(record, sort_keys = True,
+        #  separators = (',', ': '), indent = 4) 
         self.assertTrue(record == resp_json10)
     
     def test_dataframe_apply_serialize_all(self):
@@ -1466,14 +1446,18 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
         df.extend(Car, cars)
         serialized = df.serialize_all()
         self.assertTrue(len(serialized["gc"]) == 1)
-        self.assertTrue("tests.transfer_dataframe_tests.Car" in serialized["gc"])
-        self.assertTrue(len(serialized["gc"]["tests.transfer_dataframe_tests.Car"]) == 2)
-        for oid, obj_c in serialized["gc"]["tests.transfer_dataframe_tests.Car"].items():
+        self.assertTrue(
+            "tests.transfer_dataframe_tests.Car" in serialized["gc"])
+        self.assertTrue(
+            len(serialized["gc"]["tests.transfer_dataframe_tests.Car"]) == 2)
+        for oid, obj_c in (
+                serialized["gc"]["tests.transfer_dataframe_tests.Car"].items()):
             self.assertTrue(len(obj_c["dims"]) == 4)
             self.assertTrue(len(obj_c["types"]) == 2)
 
     def test_dataframe_get_join(self):
-        Person, Card, Transaction, RedAlert, people, cards, trans = _join_example_data()
+        Person, Card, Transaction, RedAlert, people, cards, trans = (
+            _join_example_data())
         df = dataframe()
         df.add_types([Person, Card, Transaction, RedAlert])
         df.extend(Person, people)
@@ -1491,7 +1475,9 @@ class Test_dataframe_transfer_tests(unittest.TestCase):
 
     def test_dataframe_high_volume(self):
         Car, ActiveCar, RedActiveCar, cars = create_cars()
-        cars = [Car(str(i), i%5, ["RED", "BLUE", "GREEN", "YELLOW"][i%4]) for i in xrange(1000)]
+        cars = [
+            Car(str(i), i%5, ["RED", "BLUE", "GREEN", "YELLOW"][i%4])
+            for i in xrange(1000)]
 
         df = dataframe()
         df.add_types([Car, ActiveCar, RedActiveCar])

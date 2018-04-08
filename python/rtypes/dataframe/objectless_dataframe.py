@@ -19,10 +19,10 @@ class ObjectlessDataframe(object):
         # The object that deals with object management
         self.state_manager = StateManager(maintain_change_record)
 
-    def add_types(self, types, tracking=False):
+    def add_types(self, types):
         self.state_manager.add_types(types)
 
-    def add_type(self, tp, tracking=False):
+    def add_type(self, tp):
         self.state_manager.add_type(tp)
 
     def apply_changes(self, changes, except_app=None):

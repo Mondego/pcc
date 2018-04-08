@@ -5,13 +5,13 @@ import datetime
 import cPickle
 from mysql.connector import MySQLConnection
 from mysql.connector import errors
-from rtypes.pcc.create import change_type
+
 from rtypes.pcc.utils.cache import cache
 from rtypes.pcc.utils.recursive_dictionary import RecursiveDictionary
 from rtypes.pcc.utils.enums import PCCCategories, Record, Event
 from rtypes.pcc.utils._utils import ValueParser
 
-logger = logging.getLogger("rtypes-sql")
+LOGGER = logging.getLogger("rtypes-sql")
 
 
 class RTypesMySQLConnection(MySQLConnection):
@@ -33,19 +33,19 @@ class RTypesMySQLConnection(MySQLConnection):
                     metadata.groupname, RecursiveDictionary())
                 for row in cursor.fetchall():
                     dim_dict = dict(zip(dims_order, row))
-                    primarykey_value = dim_dict[metadata.primarykey._name]
+                    primarykey_value = dim_dict[metadata.primarykey.name]
                     dim_changes = convert_to_dim_map(dim_dict)
                     obj_changes = grp_changes.setdefault(
                         primarykey_value,
                         RecursiveDictionary())
                     obj_changes.setdefault(
                         "types",
-                        RecursiveDictionary())[metadata.name] = Event.New 
+                        RecursiveDictionary())[metadata.name] = Event.New
                     obj_changes.setdefault(
                         "dims", RecursiveDictionary()).rec_update(dim_changes)
         except errors.Error as err:
             self.rollback()
-            # logger.error("Exeception %s seen during query", repr(err))
+            # LOGGER.error("Exeception %s seen during query", repr(err))
             result = RecursiveDictionary()
         self.commit()
         cursor.close()
@@ -110,7 +110,7 @@ class RTypesMySQLConnection(MySQLConnection):
             self.reconnect()
             self.rollback()
             # print err
-            # logger.error("Exeception %s seen during write", repr(err))
+            # LOGGER.error("Exeception %s seen during write", repr(err))
 
 
 def convert_to_dim_map(dim_dict):
@@ -146,7 +146,7 @@ def determine_update_type(group_key, type_changes):
         return Event.Delete
     if type_changes_seen == set([Event.New]):
         # Should not be there without the groupkey.
-        logger.warning("Event.New seen without group key being present")
+        LOGGER.warning("Event.New seen without group key being present")
         return Event.New
     if Event.Modification in type_changes_seen:
         return Event.Modification
@@ -171,7 +171,7 @@ def modify_query(group_key, oid, dims, pcc_type_map):
     if group_key not in pcc_type_map:
         raise TypeError("Unregistered type %s found in changes", group_key)
     metadata = pcc_type_map[group_key].__rtypes_metadata__
-    primarykey_field = metadata.primarykey._name
+    primarykey_field = metadata.primarykey.name
     names, values = zip(*dims.iteritems())
     query = (
         "UPDATE {0} SET "
@@ -188,7 +188,7 @@ def delete_query(group_key, oid, pcc_type_map):
     if group_key not in pcc_type_map:
         raise TypeError("Unregistered type %s found in changes", group_key)
     metadata = pcc_type_map[group_key].__rtypes_metadata__
-    primarykey_field = metadata.primarykey._name
+    primarykey_field = metadata.primarykey.name
     query = (
         "DELETE FROM {0} WHERE {1} = (%s);".format(
             metadata.shortname, primarykey_field))
@@ -198,7 +198,7 @@ def delete_query(group_key, oid, pcc_type_map):
 @cache
 def convert_to_read_query(pcc_type):
     metadata = pcc_type.__rtypes_metadata__
-    names = [dim._name for dim in metadata.dimensions]
+    names = [dim.name for dim in metadata.dimensions]
     primarykey = metadata.primarykey
     select_filters = read_filters(pcc_type)
     return (names, "SELECT {0} FROM {1} {2};".format(
@@ -221,9 +221,9 @@ def create_table_query(entity):
         query = (
             ("CREATE TABLE %s (" % (metadata.shortname,))
             + ", ".join([
-                " ".join([d._name,
+                " ".join([d.name,
                           convert_type(
-                              d._type, primarykey=(d == metadata.primarykey)),
+                              d.type, primarykey=(d == metadata.primarykey)),
                           "PRIMARY KEY" if d == metadata.primarykey else ""])
                 for d in metadata.dimensions])
             + ");")
@@ -233,8 +233,8 @@ def create_table_query(entity):
         select_filters = read_filters(entity)
         query = (("CREATE VIEW %s AS SELECT %s FROM %s %s;") %
                  (metadata.shortname,
-                  ", ".join(d._name for d in metadata.dimensions),
-                  metadata.base_parents[0].shortname,
+                  ", ".join(d.name for d in metadata.dimensions),
+                  metadata.parent.shortname,
                   select_filters))
         return query, list()
 
@@ -251,7 +251,7 @@ def drop_table_query(entity):
 def read_filters(tp):
     metadata = tp.__rtypes_metadata__
     filter_str = ""
-    if metadata.predicate:
+    if hasattr(metadata, "predicate") and metadata.predicate:
         filter_str += "WHERE " + convert_expr(
             metadata.predicate, metadata.is_new_type_predicate)
     # Have to implement all the groupby and orderby and all that.

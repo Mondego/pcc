@@ -4,7 +4,10 @@ class thisattr(object):
         return self.__rtypes_attr_name
 
     def __init__(self, name, prev):
-        self.__rtypes_attr_name = ((prev.__rtypes_attr_name__ + ".") if prev.__rtypes_attr_name__ else "") + name
+        self.__rtypes_attr_name = (
+            (prev.__rtypes_attr_name__ + ".")
+            if prev.__rtypes_attr_name__ else
+            "") + name
         self.__rtypes_attr_prev = prev
         self.__rtypes_attr_children = dict()
 
@@ -34,3 +37,5 @@ class thisclass(object):
             self.__rtypes_attr_children.setdefault(arg, arg_obj)
             self.arg = arg_obj
             return arg_obj
+
+THIS = thisclass()

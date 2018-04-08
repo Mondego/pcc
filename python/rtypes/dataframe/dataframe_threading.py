@@ -106,11 +106,11 @@ class dataframe_wrapper(Thread):
             token_dict[apply_req.token]["is_set"].set()
 
     ####### TYPE MANAGEMENT METHODS #############
-    def add_type(self, tp, tracking=False):
-        self.dataframe.add_type(tp, tracking)
+    def add_type(self, tp):
+        self.dataframe.add_type(tp)
 
-    def add_types(self, types, tracking=False):
-        self.dataframe.add_types(types, tracking)
+    def add_types(self, types):
+        self.dataframe.add_types(types)
 
     def has_type(self, tp):
         self.dataframe.has_type(tp)

@@ -1,5 +1,4 @@
 from tests import test_classes as tc
-from rtypes.pcc.utils.metadata import Metadata
 from rtypes.pcc.utils.enums import PCCCategories
 from rtypes.pcc import create
 
@@ -10,35 +9,23 @@ class test_create(unittest.TestCase):
         np1 = tc.NonPCC()
         np2 = tc.NonPCC()
 
-        s1 = tc.SmallBase()
-        s1.oid = "sb1"
-        s1.sprop1 = "base"
+        s1 = tc.SmallBase("sb1", "base")
 
-        s2 = tc.SmallBase()
-        s2.oid = "b1"
-        s2.sprop1 = "subset"
+        s2 = tc.SmallBase("b1", "subset")
 
-        s3 = tc.SmallBase()
-        s3.oid = "sb2"
-        s3.sprop1 = "subset"
-        
-        l1 = tc.LargeBase()
-        l1.oid = "b1"
-        l1.prop1 = "subset"
+        s3 = tc.SmallBase("sb2", "subset")
+
+        l1 = tc.LargeBase("b1", "subset")
         l1.prop2 = ["item1", "item2"]
         l1.prop3 = np1
         l1.prop4 = s1
-        
-        l2 = tc.LargeBase()
-        l2.oid = "lb2"
-        l2.prop1 = "normal"
+
+        l2 = tc.LargeBase("lb2", "normal")
         l2.prop2 = ["item3", "item4"]
         l2.prop3 = np1
         l2.prop4 = s1
-        
-        l3 = tc.LargeBase()
-        l3.oid = "lb3"
-        l3.prop1 = "normal"
+
+        l3 = tc.LargeBase("lb3", "normal")
         l3.prop2 = ["item5", "item6"]
         l3.prop3 = np2
         l3.prop4 = s3
@@ -49,7 +36,7 @@ class test_create(unittest.TestCase):
             s1, s2, s3, l1, l2, l3)
         self.np1 = np1
         self.np2 = np2
-        
+
     def test_basic_create(self):
         self.assertListEqual(
             [self.s1, self.s2, self.s3], create(tc.SmallBase, self.small_bases))
@@ -114,9 +101,8 @@ class test_create(unittest.TestCase):
         self.assertEqual(1, len(join_list))
         jl1 = join_list[0]
         self.assertEqual(tc.JoinSmallAndLargeBase, type(jl1))
-        self.assertEqual("b1", jl1.oid)
-        self.assertEqual("subset", jl1.sb.sprop1)
-        self.assertEqual("subset", jl1.lb.prop1)
-        self.assertTrue(hasattr(jl1.lb, "prop2"))
-        self.assertTrue(hasattr(jl1.lb, "prop3"))
-        self.assertTrue(hasattr(jl1.lb, "prop4"))
+        self.assertEqual("subset", jl1.SB.sprop1)
+        self.assertEqual("subset", jl1.LB.prop1)
+        self.assertTrue(hasattr(jl1.LB, "prop2"))
+        self.assertTrue(hasattr(jl1.LB, "prop3"))
+        self.assertTrue(hasattr(jl1.LB, "prop4"))

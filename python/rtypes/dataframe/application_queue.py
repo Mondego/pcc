@@ -67,13 +67,13 @@ class ApplicationQueue(object):
             if event == Event.New:
                 type_changes[tpname] = event
                 obj_changes.setdefault(
-                    "dims", RecursiveDictionary()).rec_update(full_obj)
+                    "dims", RecursiveDictionary()).update(full_obj)
             elif event == Event.Modification:
                 type_changes[tpname] = event if is_known else Event.New
                 change = dim_change if is_known else full_obj
                 if change:
                     obj_changes.setdefault(
-                        "dims", RecursiveDictionary()).rec_update(change)
+                        "dims", RecursiveDictionary()).update(change)
             elif event == Event.Delete:
                 type_changes[tpname] = event
 

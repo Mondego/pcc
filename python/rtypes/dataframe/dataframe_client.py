@@ -12,4 +12,4 @@ class dataframe_client(dataframe):
         self.object_manager.ignore_buffer_changes = False
 
     def get_group_key(self, tp):
-        return self.type_manager.get_requested_type(tp).group_key
+        return self.type_manager.get_requested_type(tp).groupname

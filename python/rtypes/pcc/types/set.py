@@ -3,10 +3,9 @@ Create on Feb 27, 2016
 
 @author: Rohan Achar
 '''
-from rtypes.pcc.utils._utils import build_required_attrs
-from rtypes.pcc.utils.enums import PCCCategories
+from rtypes.pcc.metadata.set import SetMetadata
 
 
 def pcc_set(actual_class):
-    build_required_attrs(actual_class, PCCCategories.pcc_set, list())
+    actual_class.__rtypes_metadata__ = SetMetadata(actual_class)
     return actual_class

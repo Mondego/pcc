@@ -544,3 +544,178 @@ class test_objectless_dataframe(unittest.TestCase):
                     len(df.state_manager.type_to_obj_dimstate[
                         gpname].obj_to_state[str(i)].changes))
         # prof.print_stats(sort="cumulative")
+
+    def test_basic_apply_maintain5(self):
+        # prof = cProfile.Profile()
+        obj_count = 10
+        self.maxDiff = None
+        df = ObjectlessDataframe(maintain_change_record=True)
+        df.add_types(
+            [tc.SmallBase, tc.LargeBase, tc.ProjectedJoinSmallAndLargeBase])
+        df_c1 = dataframe_client()
+        df_c1.add_types([tc.SmallBase, tc.LargeBase])
+        df_c1.start_recording = True
+
+        df_c2 = dataframe_client()
+        df_c2.add_type(tc.ProjectedJoinSmallAndLargeBase)
+
+        small_base_objs = [
+            tc.SmallBase(str(i), i) for i in xrange(obj_count)]
+        large_base_objs = [
+            tc.LargeBase(str(i), i if i%2 == 0 else 0)
+            for i in xrange(obj_count)]
+        df_c1.extend(tc.SmallBase, small_base_objs)
+        df_c1.extend(tc.LargeBase, large_base_objs)
+        apply_changes1 = df_c1.get_record()
+        df_c1.clear_record()
+        dfc1_versions = dict()
+        vn0 = 0
+        # pylint: disable=E1101
+        smallgpname = tc.SmallBase.__rtypes_metadata__.name
+        largegpname = tc.LargeBase.__rtypes_metadata__.name
+        joinname = tc.ProjectedJoinSmallAndLargeBase.__rtypes_metadata__.name
+        # pylint: enable=E1101
+        test_objectless_dataframe.apply_versions(
+            smallgpname, apply_changes1, dfc1_versions, vn0)
+        test_objectless_dataframe.apply_versions(
+            largegpname, apply_changes1, dfc1_versions, vn0)
+        # prof.enable()
+        df.apply_changes(apply_changes1, except_app="DFC1")
+        # prof.disable()
+        dfc2_versions = {joinname: dict()}
+        # prof.enable()
+        return_changes1 = df.get_record(dfc2_versions, "DFC2")
+        # prof.disable()
+        df_c2.apply_changes(return_changes1)
+
+        self.assertEqual(
+            obj_count / 2, len(df_c2.get(tc.ProjectedJoinSmallAndLargeBase)))
+        # self.assertSetEqual(
+        #     set((o.oid, o.iprop1)
+        #         for o in base_objs
+        #         if tc.SubsetOddInt.__predicate__(o.iprop1)),
+        #     set((s.oid, s.iprop1) for s in df_c2.get(tc.SubsetOddInt)))
+
+        # version = vn0
+        # for _ in range(10):
+        #     for obj in df_c1.get(tc.SmallIntBase):
+        #         obj.iprop1 += 1
+        #     # prof.enable()
+        #     apply_changes = df_c1.get_record()
+        #     df_c1.clear_record()
+        #     # prof.disable()
+        #     version += 1
+        #     test_objectless_dataframe.apply_versions(
+        #         gpname, apply_changes, dfc1_versions, version)
+        #     # prof.enable()
+        #     df.apply_changes(apply_changes, except_app="DFC1")
+        #     # prof.disable()
+
+        #     # prof.enable()
+        #     return_changes = df.get_record(dfc2_versions, "DFC2")
+        #     # prof.disable()
+        #     # prof.enable()
+        #     df_c2.apply_changes(return_changes)
+        #     # prof.disable()
+        #     test_objectless_dataframe.get_versions(
+        #         gpname, return_changes, dfc2_versions, subsetname)
+        #     self.assertSetEqual(
+        #         set((o.oid, o.iprop1)
+        #             for o in base_objs
+        #             if tc.SubsetOddInt.__predicate__(o.iprop1)),
+        #         set((s.oid, s.iprop1) for s in df_c2.get(tc.SubsetOddInt)))
+        #     subset_oids = set(int(s.oid) for s in df_c2.get(tc.SubsetOddInt))
+        #     for i in xrange(obj_count):
+        #         self.assertEqual(
+        #             1 if i in subset_oids else 2,
+        #             len(df.state_manager.type_to_obj_dimstate[
+        #                 gpname].obj_to_state[str(i)].changes))
+        # prof.print_stats(sort="cumulative")
+
+    def test_basic_apply_maintain6(self):
+        # prof = cProfile.Profile()
+        obj_count = 10
+        self.maxDiff = None
+        df = ObjectlessDataframe(maintain_change_record=True)
+        df.add_types(
+            [tc.SmallBase, tc.ProjectedJoinSmallAndSmallBase])
+        df_c1 = dataframe_client()
+        df_c1.add_types([tc.SmallBase])
+        df_c1.start_recording = True
+
+        df_c2 = dataframe_client()
+        df_c2.add_type(tc.ProjectedJoinSmallAndSmallBase)
+
+        base_objs = [
+            tc.SmallBase(str(i), i) for i in xrange(obj_count)]
+        df_c1.extend(tc.SmallBase, base_objs)
+        apply_changes1 = df_c1.get_record()
+        df_c1.clear_record()
+        dfc1_versions = dict()
+        vn0 = 0
+        # pylint: disable=E1101
+        smallgpname = tc.SmallBase.__rtypes_metadata__.name
+        joinname = tc.ProjectedJoinSmallAndSmallBase.__rtypes_metadata__.name
+        # pylint: enable=E1101
+        test_objectless_dataframe.apply_versions(
+            smallgpname, apply_changes1, dfc1_versions, vn0)
+        # prof.enable()
+        df.apply_changes(apply_changes1, except_app="DFC1")
+        # prof.disable()
+        dfc2_versions = {joinname: dict()}
+        # prof.enable()
+        return_changes1 = df.get_record(dfc2_versions, "DFC2")
+        # prof.disable()
+        df_c2.apply_changes(return_changes1)
+
+        self.assertEqual(
+            obj_count, len(df_c2.get(tc.ProjectedJoinSmallAndSmallBase)))
+        join_objs = sorted(
+            df_c2.get(tc.ProjectedJoinSmallAndSmallBase),
+            key=lambda x: x.SB1.oid)
+        for i in range(len(join_objs)):
+            obj = join_objs[i]
+            self.assertEqual(obj.SB1.oid, str(i))
+            self.assertEqual(obj.SB1.sprop1, i)
+
+        # self.assertSetEqual(
+        #     set((o.oid, o.iprop1)
+        #         for o in base_objs
+        #         if tc.SubsetOddInt.__predicate__(o.iprop1)),
+        #     set((s.oid, s.iprop1) for s in df_c2.get(tc.SubsetOddInt)))
+
+        # version = vn0
+        # for _ in range(10):
+        #     for obj in df_c1.get(tc.SmallIntBase):
+        #         obj.iprop1 += 1
+        #     # prof.enable()
+        #     apply_changes = df_c1.get_record()
+        #     df_c1.clear_record()
+        #     # prof.disable()
+        #     version += 1
+        #     test_objectless_dataframe.apply_versions(
+        #         gpname, apply_changes, dfc1_versions, version)
+        #     # prof.enable()
+        #     df.apply_changes(apply_changes, except_app="DFC1")
+        #     # prof.disable()
+
+        #     # prof.enable()
+        #     return_changes = df.get_record(dfc2_versions, "DFC2")
+        #     # prof.disable()
+        #     # prof.enable()
+        #     df_c2.apply_changes(return_changes)
+        #     # prof.disable()
+        #     test_objectless_dataframe.get_versions(
+        #         gpname, return_changes, dfc2_versions, subsetname)
+        #     self.assertSetEqual(
+        #         set((o.oid, o.iprop1)
+        #             for o in base_objs
+        #             if tc.SubsetOddInt.__predicate__(o.iprop1)),
+        #         set((s.oid, s.iprop1) for s in df_c2.get(tc.SubsetOddInt)))
+        #     subset_oids = set(int(s.oid) for s in df_c2.get(tc.SubsetOddInt))
+        #     for i in xrange(obj_count):
+        #         self.assertEqual(
+        #             1 if i in subset_oids else 2,
+        #             len(df.state_manager.type_to_obj_dimstate[
+        #                 gpname].obj_to_state[str(i)].changes))
+        # prof.print_stats(sort="cumulative")

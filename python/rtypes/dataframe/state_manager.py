@@ -1,9 +1,10 @@
 import time
+import uuid
 from rtypes.dataframe.type_manager import TypeManager
 from rtypes.pcc.utils.enums import PCCCategories
 from rtypes.dataframe.dataframe_type import object_lock
 from rtypes.pcc.utils._utils import ValueParser
-from rtypes.pcc.utils.enums import Event
+from rtypes.pcc.utils.enums import Event, Record
 from rtypes.dataframe.state_recorder import StateRecorder
 
 
@@ -34,6 +35,8 @@ class StateManager(object):
         #     tpname2: set([...]), ...}
         self.type_to_objids = dict()
         self.type_manager = TypeManager()
+        self.impure_type_to_objids = dict()
+        self.join_ids = dict()
         self.maintain = maintain_change_record
 
     #################################################
@@ -46,8 +49,7 @@ class StateManager(object):
     #################################################
 
     def add_types(self, types):
-        pairs = self.type_manager.add_types(
-            types, check_new_type_predicate=True)
+        pairs = self.type_manager.add_types(types)
         self.create_tables(pairs)
 
     def add_type(self, tp):
@@ -56,8 +58,8 @@ class StateManager(object):
 
     def create_tables(self, tpnames_basetype_pairs):
         with object_lock:
-            for tpname, _ in tpnames_basetype_pairs:
-                self.__create_table(tpname)
+            for tpname, is_set in tpnames_basetype_pairs:
+                self.__create_table(tpname, is_set)
 
     def apply_changes(self, df_changes, except_app):
         if "gc" in df_changes:
@@ -73,7 +75,7 @@ class StateManager(object):
     def get_records(self, changelist, app):
         final_record = dict()
         pcc_types_to_process = set()
-        no_change_groups = set()
+        impure_pccs_to_process = set()
         for tpname in changelist:
             if tpname in self.type_to_obj_dimstate:
                 # It is a base type. Can pull dim state for it directly.
@@ -88,46 +90,157 @@ class StateManager(object):
                     self.__set_type_change_status(
                         tpname, new_oids, mod_oids, del_oids,
                         final_record[tpname])
-                else:
-                    no_change_groups.add(tpname)
+            elif self.type_manager.tpname_is_impure(tpname):
+                impure_pccs_to_process.add(tpname)
             else:
                 pcc_types_to_process.add(tpname)
 
+        impure_pccs = dict()
+        for tpname in impure_pccs_to_process:
+            tp_obj = self.type_manager.get_requested_type_from_str(tpname)
+            if tp_obj in impure_pccs:
+                continue
+            impure_pccs[tp_obj] = (
+                tp_obj.check_membership_from_serial_collection(
+                    self.type_to_obj_dimstate, built_collections=impure_pccs))
+
+        impure_gpchanges = dict()
+        for tpname in impure_pccs_to_process:
+            tp_obj = self.type_manager.get_requested_type_from_str(tpname)
+            if tp_obj not in impure_pccs or not impure_pccs[tp_obj]:
+                continue
+            if self.type_manager.metadata_is_impure(tp_obj):
+                for oid in impure_pccs[tp_obj]:
+                    noids, moids, doids = self.__setup_join(
+                        oid, impure_pccs[tp_obj][oid], tp_obj, final_record,
+                        changelist)
+                    for gpobj in noids:
+                        impure_gpchanges.setdefault(
+                            gpobj, {
+                                "new": set(),
+                                "mod": set(),
+                                "del": set()})["new"].update(noids[gpobj])
+                    for gpobj in moids:
+                        impure_gpchanges.setdefault(
+                            gpobj, {
+                                "new": set(),
+                                "mod": set(),
+                                "del": set()})["mod"].update(moids[gpobj])
+                    for gpobj in doids:
+                        impure_gpchanges.setdefault(
+                            gpobj, {
+                                "new": set(),
+                                "mod": set(),
+                                "del": set()})["del"].update(doids[gpobj])
+            else:
+                self.type_to_objids[tpname] = set(impure_pccs[tp_obj])
+
+        if impure_gpchanges:
+            for tpobj, changes in impure_gpchanges.iteritems():
+                new_oids, mod_oids, del_oids = (
+                    changes["new"], changes["mod"], changes["del"])
+                self.__process_get_pccs(
+                    tpobj, new_oids, mod_oids, del_oids, final_record,
+                    changelist, app)
+
         for tpname in pcc_types_to_process:
             tp_obj = self.type_manager.get_requested_type_from_str(tpname)
-            groupname = tp_obj.group_key
             new_oids, mod_oids, del_oids = self.__get_oid_change_buckets(
                 tpname, changelist[tpname])
-            metadata = tp_obj.metadata
-
-            tp_record = dict()
-            if (groupname not in final_record
-                    and groupname not in no_change_groups):
-                # The client is only pulling pcc record of this type. Not the
-                # main type as well. We havent built updates, so pull updates.
-                tp_record = (
-                    self.__get_dim_changes_for_basetype(
-                        groupname, changelist[tpname],
-                        new_oids, mod_oids, del_oids, app,
-                        projection_dims=metadata.projection_dims))
-                if not tp_record:
-                    final_record[groupname] = tp_record
-
-            # If there are new objs, deleted objects or some objects actually
-            # changed, then set status of the types.
-            if new_oids or del_oids or tp_record:
-                final_record[groupname] = tp_record
-                self.__set_type_change_status(
-                    tpname, new_oids, mod_oids if tp_record else set(),
-                    del_oids, final_record[groupname])
-                self.__set_latest_versions(
-                    groupname, new_oids, final_record[groupname])
+            self.__process_get_pccs(
+                tp_obj, new_oids, mod_oids, del_oids, final_record,
+                changelist, app)
 
         return {"gc": final_record}
 
     #################################################
     ### Private Methods #############################
     #################################################
+
+    def __process_get_pccs(
+            self, tp_obj, news, mods, dels, final_record,
+            changelist, app):
+        groupname = tp_obj.groupname
+        tp_record = dict()
+        new_oids = news.difference(
+            set(final_record.setdefault(groupname, dict()).keys()))
+        mod_oids = mods.difference(
+            set(final_record.setdefault(groupname, dict()).keys()))
+        del_oids = dels.difference(
+            set(final_record.setdefault(groupname, dict()).keys()))
+        if new_oids or mod_oids or del_oids:
+            # The client is only pulling pcc record of this type. Not the
+            # main type as well. We havent built updates, so pull updates.
+            pdims = (
+                tp_obj.projection_dims
+                if hasattr(tp_obj, "projection_dims") else
+                None)
+            tp_record = (
+                self.__get_dim_changes_for_basetype(
+                    groupname, changelist[tp_obj.name],
+                    new_oids, mod_oids, del_oids, app,
+                    projection_dims=pdims))
+            if not tp_record:
+                final_record.setdefault(groupname, dict())
+
+        # If there are new objs, deleted objects or some objects actually
+        # changed, then set status of the types.
+        if new_oids or del_oids or tp_record:
+            final_record.setdefault(groupname, dict()).update(tp_record)
+            self.__set_type_change_status(
+                tp_obj.name, new_oids, mod_oids if tp_record else set(),
+                del_oids, final_record[groupname])
+            self.__set_latest_versions(
+                groupname, new_oids, final_record[groupname])
+
+    def __setup_join(self, joid, one_cross, tp_obj, final_record, changelist):
+        join_record = {"dims": dict()}
+        cross_oids = list()
+        done = set()
+        news, mods = dict(), dict()
+        for npropname in one_cross:
+            oid, _ = one_cross[npropname]
+            cross_oids.append(oid)
+            nproptp = tp_obj.namespaces[npropname].__rtypes_property_type__
+            nptp_obj = nproptp.__rtypes_metadata__
+            if (nptp_obj.name, oid) not in done:
+                done.add((nptp_obj.name, oid))
+                if (nptp_obj.name in changelist
+                        and oid in changelist[nptp_obj.name]):
+                    mods.setdefault(nptp_obj, set()).add(oid)
+                else:
+                    changelist.setdefault(nptp_obj.name, dict())
+                    news.setdefault(nptp_obj, set()).add(oid)
+            join_record["dims"][npropname] = {
+                "type": Record.FOREIGN_KEY,
+                "value": {
+                    "group_key": nptp_obj.groupname,
+                    "actual_type": {
+                        "name": nptp_obj.name
+                    },
+                    "object_key": oid
+                }
+            }
+        cross_oids = tuple(cross_oids)
+        new_joid = (
+            self.join_ids[tp_obj][cross_oids]
+            if cross_oids in self.join_ids.setdefault(tp_obj, dict()) else
+            joid)
+        join_record["dims"][tp_obj.primarykey.name] = {
+            "type": Record.STRING,
+            "value": new_joid
+        }
+        self.join_ids[tp_obj][cross_oids] = new_joid
+        is_mod = (
+            tp_obj.name in changelist and new_joid in changelist[tp_obj.name])
+        join_record["types"] = {
+            tp_obj.name: Event.Modification if is_mod else Event.New}
+        join_record["version"] = [
+            changelist[tp_obj.name][new_joid] if is_mod else None,
+            time.time()]
+        final_record.setdefault(
+            tp_obj.groupname, dict())[new_joid] = join_record
+        return news, mods, dict()
 
     def __set_latest_versions(self, tpname, new_oids, final_changes):
         for oid in new_oids:
@@ -190,7 +303,7 @@ class StateManager(object):
             return dict()
 
         projection_dims_str = (
-            set([d._name for d in projection_dims])
+            set([d.name for d in projection_dims])
             if projection_dims else
             set())
         final_record = dict()
@@ -306,7 +419,7 @@ class StateManager(object):
                 group_type = tm.get_requested_type_from_str(groupname)
             except TypeError:
                 continue
-            for pcc_type in group_type.pure_group_members:
+            for pcc_type in tm.meta_to_pure_members(group_type):
                 if pcc_type.name in self.type_to_objids:
                     self.type_to_objids[pcc_type.name].difference_update(oids)
 
@@ -317,23 +430,15 @@ class StateManager(object):
                 continue
             for oid in oids:
                 dim_changes = df_changes[groupname][oid]["dims"]
-                dims_touched = set(dim_changes.keys())
-                pccs_to_check = [
-                    pcc_type
-                    for pcc_type in group_type.pure_group_members
-                    if pcc_type.metadata.dim_triggers_str.difference(
-                        dims_touched) == set()]
-                for pcc_type in pccs_to_check:
-                    metadata = pcc_type.metadata
-                    if PCCCategories.subset in metadata.categories:
-                        if pcc_type.metadata.predicate(
-                                *(ValueParser.parse(dim_changes[d])
-                                  for d in pcc_type.metadata.dim_triggers_str)):
+                for pcc_type in tm.meta_to_pure_members(group_type):
+                    if pcc_type.need_to_check(group_type, dim_changes):
+                        if pcc_type.check_single_membership(
+                                group_type, dim_changes,
+                                self.type_to_obj_dimstate):
                             self.type_to_objids[pcc_type.name].add(oid)
                         elif oid in self.type_to_objids[pcc_type.name]:
                             self.type_to_objids[pcc_type.name].remove(oid)
-                    if PCCCategories.projection in metadata.categories:
-                        self.type_to_objids[pcc_type.name].add(oid)
+
 
     def __calculate_transform(self, inplace_changes, new_changes):
         new_changes = {"dims": dict()}
@@ -343,9 +448,11 @@ class StateManager(object):
                     new_changes["dims"][dimname] = dimchange
         return new_changes
 
-    def __create_table(self, tpname):
+    def __create_table(self, tpname, is_set):
         tp_obj = self.type_manager.get_requested_type_from_str(tpname)
-        self.type_to_obj_dimstate.setdefault(
-            tp_obj.group_key, StateRecorder(tp_obj.group_key, self.maintain))
-        self.type_to_objids.setdefault(tp_obj.group_key, set())
+        if is_set:
+            self.type_to_obj_dimstate.setdefault(
+                tp_obj.groupname,
+                StateRecorder(tp_obj.groupname, self.maintain))
+        self.type_to_objids.setdefault(tp_obj.groupname, set())
         self.type_to_objids.setdefault(tpname, set())
