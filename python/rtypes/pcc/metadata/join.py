@@ -112,3 +112,9 @@ class JoinMetadata(BuildableMetadata):
         for parent in self.immediate_parents:
             result.extend(parent.get_base_parents())
         return result
+
+    def get_parents(self):
+        result = list()
+        for parent in self.immediate_parents:
+            result.extend([parent] + parent.get_parents())
+        return result

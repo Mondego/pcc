@@ -181,9 +181,11 @@ class TypeManager(object):
             if not (hasattr(metadata, "group_dimensions")
                     and metadata.group_dimensions) else
             None)
-        for parent_meta in metadata.get_base_parents():
+        for parent_meta in metadata.get_parents():
+            print "Parent Meta:", parent_meta
             pairs_added.update(
                 self.__anaylze_metadata(parent_meta, update, observed=False))
+        print "self.groupname_to_pure_members", self.groupname_to_pure_members
         return pairs_added
 
     def __add_type(

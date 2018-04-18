@@ -108,3 +108,6 @@ class ProjectionMetadata(Metadata):
 
     def get_base_parents(self):
         return self.parent.get_base_parents()
+
+    def get_parents(self):
+        return [self.parent] + self.parent.get_parents()

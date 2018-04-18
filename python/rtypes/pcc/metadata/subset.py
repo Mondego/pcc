@@ -164,15 +164,15 @@ class SubsetMetadata(BuildableMetadata):
                     self.parent.check_membership_from_serial_collection(
                         serial_collection_map, built_collections))
         parent_collection = built_collections[self.parent]
-        final_collection = list()
+        final_collection = dict()
         if self.group_dimensions:
             # TODO: Build group dimension variation.
-            final_collection = list()
+            final_collection = dict()
         else:
             final_collection = {
-                oid: parent_collection[oid]
-                for oid in parent_collection
-                if self.run_predicate_serial(parent_collection[oid])}
+                oid: full_record
+                for oid, full_record in parent_collection.iteritems()
+                if self.run_predicate_serial(full_record)}
         if self.sort_by:
             final_collection = sorted(
                 final_collection,
@@ -181,7 +181,7 @@ class SubsetMetadata(BuildableMetadata):
                     parent_collection[oid]["dims"][self.sort_by.name]))
 
         if self.limit:
-            final_collection = final_collection[:self.limit]
+            final_collection = dict(final_collection.items()[:self.limit])
 
         if self.distinct:
             dict_by_prop = dict()
@@ -223,3 +223,6 @@ class SubsetMetadata(BuildableMetadata):
 
     def get_base_parents(self):
         return self.parent.get_base_parents()
+
+    def get_parents(self):
+        return [self.parent] + self.parent.get_parents()

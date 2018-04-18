@@ -28,7 +28,7 @@ class SetMetadata(Metadata):
             self, serial_collection_map, built_collections=None):
         if self in serial_collection_map:
             return serial_collection_map[self.name]
-        return list()
+        return dict()
 
     def parse_dimensions(self):
         pkey, dims = SetMetadata.get_properties(self.cls)
@@ -44,4 +44,7 @@ class SetMetadata(Metadata):
         return True
 
     def get_base_parents(self):
+        return [self]
+
+    def get_parents(self):
         return [self]

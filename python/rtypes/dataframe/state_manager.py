@@ -103,13 +103,12 @@ class StateManager(object):
             impure_pccs[tp_obj] = (
                 tp_obj.check_membership_from_serial_collection(
                     self.type_to_obj_dimstate, built_collections=impure_pccs))
-
         impure_gpchanges = dict()
         for tpname in impure_pccs_to_process:
             tp_obj = self.type_manager.get_requested_type_from_str(tpname)
             if tp_obj not in impure_pccs or not impure_pccs[tp_obj]:
                 continue
-            if self.type_manager.metadata_is_impure(tp_obj):
+            if self.type_manager.metadata_is_join(tp_obj):
                 for oid in impure_pccs[tp_obj]:
                     noids, moids, doids = self.__setup_join(
                         oid, impure_pccs[tp_obj][oid], tp_obj, final_record,
@@ -134,7 +133,7 @@ class StateManager(object):
                                 "del": set()})["del"].update(doids[gpobj])
             else:
                 self.type_to_objids[tpname] = set(impure_pccs[tp_obj])
-
+                pcc_types_to_process.add(tpname)
         if impure_gpchanges:
             for tpobj, changes in impure_gpchanges.iteritems():
                 new_oids, mod_oids, del_oids = (
@@ -142,15 +141,18 @@ class StateManager(object):
                 self.__process_get_pccs(
                     tpobj, new_oids, mod_oids, del_oids, final_record,
                     changelist, app)
-
         for tpname in pcc_types_to_process:
             tp_obj = self.type_manager.get_requested_type_from_str(tpname)
             new_oids, mod_oids, del_oids = self.__get_oid_change_buckets(
                 tpname, changelist[tpname])
+
             self.__process_get_pccs(
                 tp_obj, new_oids, mod_oids, del_oids, final_record,
                 changelist, app)
-
+        for tp_obj in impure_pccs:
+            if tpname in self.type_to_objids:
+                del self.type_to_objids[tpname]
+        
         return {"gc": final_record}
 
     #################################################
